@@ -178,16 +178,16 @@ class FloatRegisterImpl: public AbstractRegisterImpl {
   bool  is_valid() const;
   const char* name() const;
   int   encoding_nocheck() const;
+
+  Register as_Register() {
+    return ::as_Register(encoding());
+  }
 };
 
 REGISTER_ACCESSORS(FloatRegister)
 
 inline FloatRegister FloatRegisterImpl::successor() const {
   return as_FloatRegister((encoding() + 1) % number_of_registers);
-}
-
-inline Register as_Register(FloatRegister r) {
-  return as_Register(r->encoding());
 }
 
 // The float registers of the AARCH64 architecture

@@ -1158,8 +1158,8 @@ public:
 #undef INSN
 
 #define INSN(NAME, opc)                         \
-  void NAME() {                 \
-    branch_reg(dummy_reg, opc);         \
+  void NAME() {                                 \
+    branch_reg(dummy_reg, opc);                 \
   }
 
   INSN(eret, 0b0100);
@@ -1201,10 +1201,10 @@ public:
     load_store_exclusive(Rs, Rt, dummy_reg, Rn, sz, op, o0); \
   }
 
-#define INSN2(NAME, sz, op, o0) /* Two registers */                     \
-  void NAME(Register Rt, Register Rn) {                                 \
-    load_store_exclusive(dummy_reg, Rt, dummy_reg, \
-                         Rn, sz, op, o0);                               \
+#define INSN2(NAME, sz, op, o0) /* Two registers */     \
+  void NAME(Register Rt, Register Rn) {                 \
+    load_store_exclusive(dummy_reg, Rt, dummy_reg,      \
+                         Rn, sz, op, o0);               \
   }
 
 #define INSN_FOO(NAME, sz, op, o0) /* Three registers, encoded differently */ \
@@ -1362,7 +1362,7 @@ public:
     starti;                                                             \
     f(opc, 31, 30), f(0b011, 29, 27), f(V, 26), f(0b00, 25, 24),        \
       sf(offset, 23, 5);                                                \
-    rf(as_Register(Rt), 0);                                             \
+    rf(Rt->as_Register(), 0);                                           \
   }
 
   INSN(ldrs, 0b00, 1);
@@ -1376,7 +1376,7 @@ public:
     starti;                                                             \
     f(size, 31, 30), f(0b111100, 29, 24), f(opc, 23, 22), f(0, 21);     \
     f(0, 20, 12), f(0b01, 11, 10);                                      \
-    rf(Rn, 5), rf(as_Register(Rt), 0);                                  \
+    rf(Rn, 5), rf(Rt->as_Register(), 0);                                \
   }
 
   INSN(ldrs, 0b10, 0b01);
@@ -1438,7 +1438,7 @@ public:
 #define INSN(NAME, size, p1, V, L, no_allocate)                         \
   void NAME(FloatRegister Rt1, FloatRegister Rt2, Address adr) {        \
     ld_st1(size, p1, V, L,                                              \
-           as_Register(Rt1), as_Register(Rt2),                          \
+           Rt1->as_Register(), Rt2->as_Register(),                      \
            adr, no_allocate);                                           \
   }
 
@@ -1513,7 +1513,7 @@ public:
 
 #define INSN(NAME, size, op)                            \
   void NAME(FloatRegister Rt, const Address &adr) {     \
-    ld_st2(as_Register(Rt), adr, size, op, 1);          \
+    ld_st2(Rt->as_Register(), adr, size, op, 1);        \
   }
 
   INSN(strd, 0b11, 0b00);
@@ -1868,8 +1868,8 @@ void mvnw(Register Rd, Register Rm,
 
 #undef INSN
 
-#define INSN(NAME, op54, op31, o0)                      \
-  void NAME(Register Rd, Register Rn, Register Rm) {    \
+#define INSN(NAME, op54, op31, o0)                                      \
+  void NAME(Register Rd, Register Rn, Register Rm) {                    \
     data_processing(op54, op31, o0, Rd, Rn, Rm, as_Register(31));       \
   }
 
@@ -1955,9 +1955,9 @@ public:
     rf(Vm, 16), rf(Vn, 5), rf(Vd, 0);
   }
 
-#define INSN(NAME, op31, type, opcode)                  \
+#define INSN(NAME, op31, type, opcode)                                  \
   void NAME(FloatRegister Vd, FloatRegister Vn, FloatRegister Vm) {     \
-    data_processing(op31, type, opcode, Vd, Vn, Vm);    \
+    data_processing(op31, type, opcode, Vd, Vn, Vm);                    \
   }
 
   INSN(fmuls, 0b000, 0b00, 0b0000);
@@ -2047,7 +2047,7 @@ public:
 
 #define INSN(NAME, op31, type, rmode, opcode)                           \
   void NAME(Register Rd, FloatRegister Vn) {                            \
-    float_int_convert(op31, type, rmode, opcode, Rd, as_Register(Vn)); \
+    float_int_convert(op31, type, rmode, opcode, Rd, Vn->as_Register()); \
   }
 
   INSN(fcvtzsw, 0b000, 0b00, 0b11, 0b000);
@@ -2064,7 +2064,7 @@ public:
 
 #define INSN(NAME, op31, type, rmode, opcode)                           \
   void NAME(FloatRegister Vd, Register Rn) {                            \
-    float_int_convert(op31, type, rmode, opcode, as_Register(Vd), Rn);  \
+    float_int_convert(op31, type, rmode, opcode, Vd->as_Register(), Rn);  \
   }
 
   INSN(fmovs, 0b000, 0b00, 0b00, 0b111);
@@ -2251,7 +2251,7 @@ private:
 public:
 #define INSN(NAME, op)                                                  \
   void NAME(FloatRegister Rt, SIMD_RegVariant T, const Address &adr) {  \
-    ld_st2(as_Register(Rt), adr, (int)T & 3, op + ((T==Q) ? 0b10:0b00), 1); \
+    ld_st2(Rt->as_Register(), adr, (int)T & 3, op + ((T==Q) ? 0b10:0b00), 1); \
   }
 
   INSN(ldr, 1);
