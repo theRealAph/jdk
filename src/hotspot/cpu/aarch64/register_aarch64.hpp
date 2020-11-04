@@ -36,10 +36,6 @@ typedef VMRegImpl* VMReg;
 class RegisterImpl;
 typedef RegisterImpl* Register;
 
-inline Register as_Register(int encoding) {
-  return (Register)(intptr_t) encoding;
-}
-
 class RegisterImpl: public AbstractRegisterImpl {
  public:
   enum {
@@ -50,24 +46,50 @@ class RegisterImpl: public AbstractRegisterImpl {
   };
 
   // derived registers, offsets, and addresses
-  Register successor() const                          { return as_Register(encoding() + 1); }
+  Register successor() const { return const_cast<Register>(this) + 1; }
 
   // construction
   inline friend Register as_Register(int encoding);
 
   VMReg as_VMReg();
 
-  // accessors
-  int   encoding() const                         { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  bool  is_valid() const                         { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
-  bool  has_byte_register() const                { return 0 <= (intptr_t)this && (intptr_t)this < number_of_byte_registers; }
-  const char* name() const;
-  int   encoding_nocheck() const                 { return (intptr_t)this; }
-
   // Return the bit which represents this register.  This is intended
   // to be ORed into a bitmask: for usage see class RegSet below.
   uint64_t bit(bool should_set = true) const { return should_set ? 1 << encoding() : 0; }
+
+  // accessors
+  int   encoding() const;
+  bool  is_valid() const;
+  bool  has_byte_register() const;
+  const char* name() const;
+  int   encoding_nocheck() const;
 };
+
+#define REGISTER_ACCESSORS(TYPE)                                        \
+namespace TYPE##Declarations {                                          \
+  extern TYPE##Impl the_regs[];                                         \
+  constexpr TYPE first_reg_addr = the_regs + 1;                         \
+}                                                                       \
+                                                                        \
+inline int TYPE##Impl::encoding_nocheck() const {                       \
+  return checked_cast<int>(this - TYPE##Declarations::first_reg_addr);  \
+}                                                                       \
+inline bool TYPE##Impl::is_valid() const {                              \
+  return 0 <= encoding_nocheck() && encoding_nocheck() < number_of_registers; \
+}                                                                       \
+inline int TYPE##Impl::encoding() const {                               \
+  assert(is_valid(), "invalid register");                               \
+  return encoding_nocheck();                                            \
+}                                                                       \
+inline TYPE as_##TYPE(int encoding) {                                   \
+  return TYPE##Declarations::first_reg_addr + encoding;                 \
+}
+
+REGISTER_ACCESSORS(Register)
+
+inline bool RegisterImpl::has_byte_register() const {
+  return 0 <= encoding() && encoding_nocheck() < number_of_byte_registers;
+}
 
 // The integer registers of the aarch64 architecture
 
@@ -132,10 +154,6 @@ const Register dummy_reg = r31_sp;
 class FloatRegisterImpl;
 typedef FloatRegisterImpl* FloatRegister;
 
-inline FloatRegister as_FloatRegister(int encoding) {
-  return (FloatRegister)(intptr_t) encoding;
-}
-
 // The implementation of floating point registers for the architecture
 class FloatRegisterImpl: public AbstractRegisterImpl {
  public:
@@ -153,15 +171,24 @@ class FloatRegisterImpl: public AbstractRegisterImpl {
   VMReg as_VMReg();
 
   // derived registers, offsets, and addresses
-  FloatRegister successor() const                          { return as_FloatRegister((encoding() + 1) % 32); }
+  FloatRegister successor() const;
 
   // accessors
-  int   encoding() const                          { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  int   encoding_nocheck() const                         { return (intptr_t)this; }
-  bool  is_valid() const                          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
+  int   encoding() const;
+  bool  is_valid() const;
   const char* name() const;
-
+  int   encoding_nocheck() const;
 };
+
+REGISTER_ACCESSORS(FloatRegister)
+
+inline FloatRegister FloatRegisterImpl::successor() const {
+  return as_FloatRegister((encoding() + 1) % number_of_registers);
+}
+
+inline Register as_Register(FloatRegister r) {
+  return as_Register(r->encoding());
+}
 
 // The float registers of the AARCH64 architecture
 
@@ -237,9 +264,6 @@ CONSTANT_REGISTER_DECLARATION(FloatRegister, z31    , (31));
 
 class PRegisterImpl;
 typedef PRegisterImpl* PRegister;
-inline PRegister as_PRegister(int encoding) {
-  return (PRegister)(intptr_t)encoding;
-}
 
 // The implementation of predicate registers for the architecture
 class PRegisterImpl: public AbstractRegisterImpl {
@@ -255,14 +279,16 @@ class PRegisterImpl: public AbstractRegisterImpl {
   VMReg as_VMReg();
 
   // derived registers, offsets, and addresses
-  PRegister successor() const     { return as_PRegister(encoding() + 1); }
+  PRegister successor() const { return const_cast<PRegister>(this) + 1; }
 
   // accessors
-  int   encoding() const          { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  int   encoding_nocheck() const  { return (intptr_t)this; }
-  bool  is_valid() const          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
+  int   encoding() const;
+  bool  is_valid() const;
   const char* name() const;
+  int   encoding_nocheck() const;
 };
+
+REGISTER_ACCESSORS(PRegister)
 
 // The predicate registers of SVE.
 CONSTANT_REGISTER_DECLARATION(PRegister, p0,  ( 0));
