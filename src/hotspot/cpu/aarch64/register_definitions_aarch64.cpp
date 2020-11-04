@@ -30,16 +30,14 @@
 #include "register_aarch64.hpp"
 # include "interp_masm_aarch64.hpp"
 
-#define NUM_REGS 35
-
 namespace RegisterDeclarations {
-  RegisterImpl the_regs[NUM_REGS];
+  RegisterImpl the_regs[RegisterImpl::number_of_registers + 3];  // 32 physical regs + SP + ZR + noreg
 };
 namespace FloatRegisterDeclarations {
-  FloatRegisterImpl the_regs[NUM_REGS];
+  FloatRegisterImpl the_regs[FloatRegisterImpl::number_of_registers + 1];   // 32 physical regs + fnoreg
 };
 namespace PRegisterDeclarations {
-  PRegisterImpl the_regs[NUM_REGS];
+  PRegisterImpl the_regs[PRegisterImpl::number_of_registers + 1];   // 16 physical registers + noreg
 };
 
 #define AARCH64_REGISTER_DEFINITION(type, name) \
