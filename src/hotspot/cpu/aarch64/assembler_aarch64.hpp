@@ -61,6 +61,11 @@ class Argument {
   };
 };
 
+#undef REGISTER_DECLARATION
+#define REGISTER_DECLARATION(type, alias, reg)  \
+  const type alias = ((type)reg)
+
+
 REGISTER_DECLARATION(Register, c_rarg0, r0);
 REGISTER_DECLARATION(Register, c_rarg1, r1);
 REGISTER_DECLARATION(Register, c_rarg2, r2);
@@ -247,13 +252,13 @@ public:
     int nbits = msb - lsb + 1;
     guarantee(val < (1ULL << nbits), "Field too big for insn");
     assert_cond(msb >= lsb);
-    unsigned mask = checked_cast<unsigned>(right_n_bits(nbits));
     val <<= lsb;
-    mask <<= lsb;
     insn |= val;
-    assert_cond((bits & mask) == 0);
 #ifdef ASSERT
+    unsigned mask = checked_cast<unsigned>(right_n_bits(nbits));
+    mask <<= lsb;
     bits |= mask;
+    assert_cond((bits & mask) == 0);
 #endif
   }
 
@@ -662,6 +667,9 @@ class Assembler : public AbstractAssembler {
 #endif
 
 public:
+
+  void ZZZZZ();
+  void ZZZZZ(int n);
 
   enum { instruction_size = 4 };
 

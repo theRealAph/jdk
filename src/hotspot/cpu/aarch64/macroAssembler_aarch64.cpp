@@ -4360,6 +4360,7 @@ void MacroAssembler::verify_tlab() {
 // stack overflow + shadow pages.  This clobbers tmp.
 void MacroAssembler::bang_stack_size(Register size, Register tmp) {
   assert_different_registers(tmp, size, rscratch1);
+  ZZZZZ();
   mov(tmp, sp);
   // Bang stack for total size given plus shadow page size.
   // Bang one page at a time because large size can bang beyond yellow and

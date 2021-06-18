@@ -65,6 +65,17 @@ class RegisterImpl: public AbstractRegisterImpl {
   int   encoding_nocheck() const                 { return (intptr_t)this; }
 };
 
+#undef AS_REGISTER
+#define AS_REGISTER(type,name)         ((type)name##_##type##EnumValue)
+
+#undef CONSTANT_REGISTER_DECLARATION
+#define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
+  enum { name##_##type##EnumValue = (value) };                  \
+  const type name = ((type)name##_##type##EnumValue)
+
+#undef REGISTER_DEFINITION
+#define REGISTER_DEFINITION(type, name)
+
 // The integer registers of the aarch64 architecture
 
 CONSTANT_REGISTER_DECLARATION(Register, noreg, (-1));
@@ -122,7 +133,7 @@ CONSTANT_REGISTER_DECLARATION(Register, zr,  (32));
 CONSTANT_REGISTER_DECLARATION(Register, sp,  (33));
 
 // Used as a filler in instructions where a register field is unused.
-const Register dummy_reg = r31_sp;
+const Register dummy_reg = (Register)31;
 
 // Use FloatRegister as shortcut
 class FloatRegisterImpl;
