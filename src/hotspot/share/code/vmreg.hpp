@@ -66,7 +66,8 @@ private:
 
 public:
 
-  static VMReg  as_VMReg(int val, bool bad_ok = false) { assert(val > BAD_REG || bad_ok, "invalid"); return (VMReg) (intptr_t) val; }
+  static VMReg  as_VMReg(int val, bool bad_ok = false) { assert(val > BAD_REG || bad_ok, "invalid");
+    return const_cast<VMReg>((VMReg)(intptr_t) val); }
 
   const char*  name() {
     if (is_reg()) {

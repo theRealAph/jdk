@@ -35,10 +35,9 @@ typedef VMRegImpl* VMReg;
 // Use Register as shortcut
 class RegisterImpl;
 typedef RegisterImpl* Register;
+extern RegisterImpl regs[64];
 
-inline Register as_Register(int encoding) {
-  return (Register)(intptr_t) encoding;
-}
+inline Register as_Register(int encoding);
 
 class RegisterImpl: public AbstractRegisterImpl {
  public:
@@ -58,27 +57,35 @@ class RegisterImpl: public AbstractRegisterImpl {
   VMReg as_VMReg();
 
   // accessors
-  int   encoding() const                         { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  bool  is_valid() const                         { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
-  bool  has_byte_register() const                { return 0 <= (intptr_t)this && (intptr_t)this < number_of_byte_registers; }
+  int   encoding() const                         { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
+  bool  is_valid() const                         { return 0 <= encoding_nocheck() && encoding_nocheck() < number_of_registers; }
+  bool  has_byte_register() const                { return 0 <= encoding_nocheck() && encoding_nocheck() < number_of_byte_registers; }
   const char* name() const;
-  int   encoding_nocheck() const                 { return (intptr_t)this; }
+  int   encoding_nocheck() const                 { return this - &regs[0]; }
 };
 
+inline Register as_Register(int encoding) {
+  return &regs[encoding];
+}
+
 #undef AS_REGISTER
-#define AS_REGISTER(type,name)         ((type)name##_##type##EnumValue)
+#define AS_REGISTER(type,name)         (&regs[name##_##type##EnumValue])
 
 #undef CONSTANT_REGISTER_DECLARATION
 #define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
   enum { name##_##type##EnumValue = (value) };                  \
-  const type name = ((type)name##_##type##EnumValue)
+  constexpr type name = (&regs[name##_##type##EnumValue])
+
+#define CONSTANT_FLOAT_REGISTER_DECLARATION(type, name, value)        \
+  enum { name##_##type##EnumValue = (value) };                  \
+  constexpr type name = (&float_regs[name##_##type##EnumValue])
 
 #undef REGISTER_DEFINITION
 #define REGISTER_DEFINITION(type, name)
 
 // The integer registers of the aarch64 architecture
 
-CONSTANT_REGISTER_DECLARATION(Register, noreg, (-1));
+CONSTANT_REGISTER_DECLARATION(Register, noreg, (63));
 
 
 CONSTANT_REGISTER_DECLARATION(Register, r0,    (0));
@@ -133,15 +140,14 @@ CONSTANT_REGISTER_DECLARATION(Register, zr,  (32));
 CONSTANT_REGISTER_DECLARATION(Register, sp,  (33));
 
 // Used as a filler in instructions where a register field is unused.
-const Register dummy_reg = (Register)31;
+const Register dummy_reg = r31_sp;
 
 // Use FloatRegister as shortcut
 class FloatRegisterImpl;
 typedef FloatRegisterImpl* FloatRegister;
+extern FloatRegisterImpl float_regs[64];
 
-inline FloatRegister as_FloatRegister(int encoding) {
-  return (FloatRegister)(intptr_t) encoding;
-}
+inline FloatRegister as_FloatRegister(int encoding);
 
 // The implementation of floating point registers for the architecture
 class FloatRegisterImpl: public AbstractRegisterImpl {
@@ -163,83 +169,86 @@ class FloatRegisterImpl: public AbstractRegisterImpl {
   FloatRegister successor() const                          { return as_FloatRegister((encoding() + 1) % 32); }
 
   // accessors
-  int   encoding() const                          { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  int   encoding_nocheck() const                         { return (intptr_t)this; }
-  bool  is_valid() const                          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
+  int   encoding() const                         { assert(is_valid(), "invalid register"); return this - &float_regs[0]; }
+  bool  is_valid() const                         { return 0 <= encoding_nocheck() && encoding_nocheck() < number_of_registers; }
+  int   encoding_nocheck() const  { return this - &float_regs[0]; }
   const char* name() const;
 
 };
+inline FloatRegister as_FloatRegister(int encoding) {
+  return &float_regs[encoding];
+}
 
 // The float registers of the AARCH64 architecture
 
-CONSTANT_REGISTER_DECLARATION(FloatRegister, fnoreg , (-1));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, fnoreg , (63));
 
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v0     , ( 0));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v1     , ( 1));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v2     , ( 2));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v3     , ( 3));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v4     , ( 4));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v5     , ( 5));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v6     , ( 6));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v7     , ( 7));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v8     , ( 8));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v9     , ( 9));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v10    , (10));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v11    , (11));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v12    , (12));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v13    , (13));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v14    , (14));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v15    , (15));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v16    , (16));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v17    , (17));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v18    , (18));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v19    , (19));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v20    , (20));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v21    , (21));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v22    , (22));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v23    , (23));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v24    , (24));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v25    , (25));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v26    , (26));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v27    , (27));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v28    , (28));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v29    , (29));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v30    , (30));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, v31    , (31));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v0     , ( 0));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v1     , ( 1));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v2     , ( 2));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v3     , ( 3));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v4     , ( 4));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v5     , ( 5));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v6     , ( 6));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v7     , ( 7));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v8     , ( 8));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v9     , ( 9));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v10    , (10));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v11    , (11));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v12    , (12));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v13    , (13));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v14    , (14));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v15    , (15));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v16    , (16));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v17    , (17));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v18    , (18));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v19    , (19));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v20    , (20));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v21    , (21));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v22    , (22));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v23    , (23));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v24    , (24));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v25    , (25));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v26    , (26));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v27    , (27));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v28    , (28));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v29    , (29));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v30    , (30));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, v31    , (31));
 
 // SVE vector registers, shared with the SIMD&FP v0-v31. Vn maps to Zn[127:0].
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z0     , ( 0));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z1     , ( 1));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z2     , ( 2));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z3     , ( 3));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z4     , ( 4));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z5     , ( 5));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z6     , ( 6));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z7     , ( 7));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z8     , ( 8));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z9     , ( 9));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z10    , (10));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z11    , (11));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z12    , (12));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z13    , (13));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z14    , (14));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z15    , (15));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z16    , (16));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z17    , (17));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z18    , (18));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z19    , (19));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z20    , (20));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z21    , (21));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z22    , (22));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z23    , (23));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z24    , (24));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z25    , (25));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z26    , (26));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z27    , (27));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z28    , (28));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z29    , (29));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z30    , (30));
-CONSTANT_REGISTER_DECLARATION(FloatRegister, z31    , (31));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z0     , ( 0));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z1     , ( 1));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z2     , ( 2));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z3     , ( 3));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z4     , ( 4));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z5     , ( 5));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z6     , ( 6));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z7     , ( 7));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z8     , ( 8));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z9     , ( 9));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z10    , (10));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z11    , (11));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z12    , (12));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z13    , (13));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z14    , (14));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z15    , (15));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z16    , (16));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z17    , (17));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z18    , (18));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z19    , (19));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z20    , (20));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z21    , (21));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z22    , (22));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z23    , (23));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z24    , (24));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z25    , (25));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z26    , (26));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z27    , (27));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z28    , (28));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z29    , (29));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z30    , (30));
+CONSTANT_FLOAT_REGISTER_DECLARATION(FloatRegister, z31    , (31));
 
 
 class PRegisterImpl;
@@ -270,6 +279,11 @@ class PRegisterImpl: public AbstractRegisterImpl {
   bool  is_valid() const          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
   const char* name() const;
 };
+
+#undef CONSTANT_REGISTER_DECLARATION
+#define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
+  enum { name##_##type##EnumValue = (value) };                  \
+  const type name = ((type)value);
 
 // The predicate registers of SVE.
 CONSTANT_REGISTER_DECLARATION(PRegister, p0,  ( 0));

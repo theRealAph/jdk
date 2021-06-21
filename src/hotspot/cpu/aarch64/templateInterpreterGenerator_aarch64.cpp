@@ -1158,6 +1158,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   __ ZZZZZ();
   __ ZZZZZ(1);
+  __ ZZZZZ(rscratch1, (uint8_t)56);
 
   bang_stack_shadow_pages(true);
 

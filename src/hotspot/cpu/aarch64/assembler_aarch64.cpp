@@ -36,7 +36,11 @@ void Assembler::ZZZZZ() {
 }
 void Assembler::ZZZZZ(int n) {
   // nop();
-  orr(rscratch1, zr, (uint8_t)n);
+  add(rscratch1, rscratch1, (uint8_t)n);
+}
+void Assembler::ZZZZZ(Register r, uint8_t n) {
+  // nop();
+  add(r, rscratch1, (uint8_t)n);
 }
 
 #ifndef PRODUCT
@@ -143,7 +147,7 @@ void Assembler::adrp(Register reg1, const Address &dest, uint64_t &byte_offset) 
 
 #undef __
 
-#define starti Instruction_aarch64 do_not_use(this); set_current(&do_not_use)
+#define starti DummyThing do_not_use(this);
 
   void Assembler::adr(Register Rd, address adr) {
     intptr_t offset = adr - pc();

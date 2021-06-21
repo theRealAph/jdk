@@ -63,7 +63,7 @@ class Argument {
 
 #undef REGISTER_DECLARATION
 #define REGISTER_DECLARATION(type, alias, reg)  \
-  const type alias = ((type)reg)
+  constexpr type alias = reg
 
 
 REGISTER_DECLARATION(Register, c_rarg0, r0);
@@ -158,7 +158,7 @@ REGISTER_DECLARATION(Register, rdispatch, r21);
 REGISTER_DECLARATION(Register, esp,      r20);
 
 // Preserved predicate register with all elements set TRUE.
-REGISTER_DECLARATION(PRegister, ptrue, p7);
+const PRegister ptrue = p7;
 
 #define assert_cond(ARG1) assert(ARG1, #ARG1)
 
@@ -176,19 +176,17 @@ class Instruction_aarch64 {
 #ifdef ASSERT
   unsigned bits;
 #endif
-  Assembler *assem;
 
 public:
 
-  Instruction_aarch64(class Assembler *as) {
+  void clear() {
 #ifdef ASSERT
     bits = 0;
 #endif
     insn = 0;
-    assem = as;
   }
 
-  inline ~Instruction_aarch64();
+  Instruction_aarch64() {  clear(); }
 
   unsigned &get_insn() { return insn; }
 #ifdef ASSERT
@@ -257,8 +255,8 @@ public:
 #ifdef ASSERT
     unsigned mask = checked_cast<unsigned>(right_n_bits(nbits));
     mask <<= lsb;
-    bits |= mask;
     assert_cond((bits & mask) == 0);
+    bits |= mask;
 #endif
   }
 
@@ -318,7 +316,15 @@ public:
   }
 };
 
-#define starti Instruction_aarch64 do_not_use(this); set_current(&do_not_use)
+class DummyThing {
+  Assembler *const _as;
+
+public:
+  DummyThing(Assembler *as);
+  ~DummyThing();
+};
+
+#define starti DummyThing do_not_use(this);
 
 class PrePost {
   int _offset;
@@ -670,6 +676,7 @@ public:
 
   void ZZZZZ();
   void ZZZZZ(int n);
+  void ZZZZZ(Register r, uint8_t n);
 
   enum { instruction_size = 4 };
 
@@ -702,45 +709,45 @@ public:
 
   static address locate_next_instruction(address inst);
 
-  Instruction_aarch64* current;
-
-  void set_current(Instruction_aarch64* i) { current = i; }
+  Instruction_aarch64 current;
 
   void f(unsigned val, int msb, int lsb) {
-    current->f(val, msb, lsb);
+    current.f(val, msb, lsb);
   }
   void f(unsigned val, int msb) {
-    current->f(val, msb, msb);
+    current.f(val, msb, msb);
   }
   void sf(int64_t val, int msb, int lsb) {
-    current->sf(val, msb, lsb);
+    current.sf(val, msb, lsb);
   }
   void rf(Register reg, int lsb) {
-    current->rf(reg, lsb);
+    current.rf(reg, lsb);
   }
   void srf(Register reg, int lsb) {
-    current->srf(reg, lsb);
+    current.srf(reg, lsb);
   }
   void zrf(Register reg, int lsb) {
-    current->zrf(reg, lsb);
+    current.zrf(reg, lsb);
   }
   void rf(FloatRegister reg, int lsb) {
-    current->rf(reg, lsb);
+    current.rf(reg, lsb);
   }
   void prf(PRegister reg, int lsb) {
-    current->prf(reg, lsb);
+    current.prf(reg, lsb);
   }
   void pgrf(PRegister reg, int lsb) {
-    current->pgrf(reg, lsb);
+    current.pgrf(reg, lsb);
   }
   void fixed(unsigned value, unsigned mask) {
-    current->fixed(value, mask);
+    current.fixed(value, mask);
   }
 
   void emit() {
-    emit_long(current->get_insn());
-    assert_cond(current->get_bits() == 0xffffffff);
-    current = NULL;
+    emit_long(current.get_insn());
+#ifndef PRODUCT
+    assert_cond(current.get_bits() == 0xffffffff);
+    current.clear();
+#endif
   }
 
   typedef void (Assembler::* uncond_branch_insn)(address dest);
@@ -1416,9 +1423,9 @@ public:
     f(opc, 31, 30), f(p1, 29, 27), f(V, 26), f(L, 22);
     zrf(Rt2, 10), zrf(Rt1, 0);
     if (no_allocate) {
-      adr.encode_nontemporal_pair(current);
+      adr.encode_nontemporal_pair(&current);
     } else {
-      adr.encode_pair(current);
+      adr.encode_pair(&current);
     }
   }
 
@@ -1444,7 +1451,7 @@ public:
 
 #define INSN(NAME, size, p1, V, L, no_allocate)                         \
   void NAME(FloatRegister Rt1, FloatRegister Rt2, Address adr) {        \
-    ld_st1(size, p1, V, L, (Register)Rt1, (Register)Rt2, adr, no_allocate); \
+    ld_st1(size, p1, V, L, as_Register(Rt1->encoding()), as_Register(Rt2->encoding()), adr, no_allocate); \
    }
 
   INSN(stps, 0b00, 0b101, 1, 0, false);
@@ -1479,7 +1486,7 @@ public:
 
     f(size, 31, 30);
     f(op, 23, 22); // str
-    adr.encode(current);
+    adr.encode(&current);
   }
 
 #define INSN(NAME, size, op)                            \
@@ -1518,7 +1525,7 @@ public:
 
 #define INSN(NAME, size, op)                            \
   void NAME(FloatRegister Rt, const Address &adr) {     \
-    ld_st2((Register)Rt, adr, size, op, 1);             \
+    ld_st2(as_Register(Rt->encoding()), adr, size, op, 1);             \
   }
 
   INSN(strd, 0b11, 0b00);
@@ -1883,7 +1890,7 @@ void mvnw(Register Rd, Register Rm,
 
 #define INSN(NAME, op54, op31, o0)                      \
   void NAME(Register Rd, Register Rn, Register Rm) {    \
-    data_processing(op54, op31, o0, Rd, Rn, Rm, (Register)31);  \
+    data_processing(op54, op31, o0, Rd, Rn, Rm, as_Register(31));       \
   }
 
   INSN(smulh, 0b100, 0b010, 0);
@@ -2062,7 +2069,7 @@ public:
 
 #define INSN(NAME, op31, type, rmode, opcode)                           \
   void NAME(Register Rd, FloatRegister Vn) {                            \
-    float_int_convert(op31, type, rmode, opcode, Rd, (Register)Vn);     \
+    float_int_convert(op31, type, rmode, opcode, Rd, as_Register(Vn->encoding()));     \
   }
 
   INSN(fcvtzsw, 0b000, 0b00, 0b11, 0b000);
@@ -2079,7 +2086,7 @@ public:
 
 #define INSN(NAME, op31, type, rmode, opcode)                           \
   void NAME(FloatRegister Vd, Register Rn) {                            \
-    float_int_convert(op31, type, rmode, opcode, (Register)Vd, Rn);     \
+    float_int_convert(op31, type, rmode, opcode, as_Register(Vd->encoding()), Rn); \
   }
 
   INSN(fmovs, 0b000, 0b00, 0b00, 0b111);
@@ -2134,7 +2141,7 @@ public:
   // Floating-point compare
   void float_compare(unsigned op31, unsigned type,
                      unsigned op, unsigned op2,
-                     FloatRegister Vn, FloatRegister Vm = (FloatRegister)0) {
+                     FloatRegister Vn, FloatRegister Vm = as_FloatRegister(0)) {
     starti;
     f(op31, 31, 29);
     f(0b11110, 28, 24);
@@ -2266,7 +2273,7 @@ private:
 public:
 #define INSN(NAME, op)                                            \
   void NAME(FloatRegister Rt, SIMD_RegVariant T, const Address &adr) {   \
-    ld_st2((Register)Rt, adr, (int)T & 3, op + ((T==Q) ? 0b10:0b00), 1); \
+    ld_st2(as_Register(Rt->encoding()), adr, (int)T & 3, op + ((T==Q) ? 0b10:0b00), 1); \
   }                                                                      \
 
   INSN(ldr, 1);
@@ -3272,9 +3279,11 @@ inline Assembler::Membar_mask_bits operator|(Assembler::Membar_mask_bits a,
   return Assembler::Membar_mask_bits(unsigned(a)|unsigned(b));
 }
 
-Instruction_aarch64::~Instruction_aarch64() {
-  assem->emit();
+
+inline DummyThing::~DummyThing() {
+  _as->emit();
 }
+inline DummyThing::DummyThing(Assembler *as) : _as(as) { as->current.clear(); }
 
 #undef starti
 
