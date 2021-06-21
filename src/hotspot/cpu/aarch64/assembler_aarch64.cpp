@@ -31,16 +31,20 @@
 #include "memory/resourceArea.hpp"
 
 void Assembler::ZZZZZ() {
-  // nop();
+  //   nop();
   add(r0, r0, zr);
 }
 void Assembler::ZZZZZ(int n) {
   // nop();
   add(rscratch1, rscratch1, (uint8_t)n);
 }
-void Assembler::ZZZZZ(Register r, uint8_t n) {
+void Assembler::ZZZZZ1(Register r, uint8_t n) {
   // nop();
   add(r, rscratch1, (uint8_t)n);
+}
+void Assembler::ZZZZZ(Register r, int n) {
+  // nop();
+  add(r, rscratch1, n);
 }
 
 #ifndef PRODUCT

@@ -84,16 +84,13 @@ class AbstractRegisterImpl {
 
 #define AS_REGISTER(type,name)         ((type)name##_##type##EnumValue)
 
-#define CONSTANT_REGISTER_DECLARATION(type, name, value) \
-extern const type name;                                  \
-enum { name##_##type##EnumValue = (value) }
+#define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
+const type name = ((type)value)
 
-#define REGISTER_DECLARATION(type, name, value) \
-extern const type name;                         \
-enum { name##_##type##EnumValue = value##_##type##EnumValue }
+#define REGISTER_DECLARATION(type, name, value)                 \
+const type name = ((type)value)
 
-#define REGISTER_DEFINITION(type, name) \
-const type name = ((type)name##_##type##EnumValue)
+#define REGISTER_DEFINITION(type, name)
 
 #include CPU_HEADER(register)
 

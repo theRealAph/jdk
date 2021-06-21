@@ -61,11 +61,6 @@ class Argument {
   };
 };
 
-#undef REGISTER_DECLARATION
-#define REGISTER_DECLARATION(type, alias, reg)  \
-  constexpr type alias = reg
-
-
 REGISTER_DECLARATION(Register, c_rarg0, r0);
 REGISTER_DECLARATION(Register, c_rarg1, r1);
 REGISTER_DECLARATION(Register, c_rarg2, r2);
@@ -158,7 +153,7 @@ REGISTER_DECLARATION(Register, rdispatch, r21);
 REGISTER_DECLARATION(Register, esp,      r20);
 
 // Preserved predicate register with all elements set TRUE.
-const PRegister ptrue = p7;
+REGISTER_DECLARATION(PRegister, ptrue, p7);
 
 #define assert_cond(ARG1) assert(ARG1, #ARG1)
 
@@ -673,7 +668,8 @@ public:
 
   void ZZZZZ();
   void ZZZZZ(int n);
-  void ZZZZZ(Register r, uint8_t n);
+  void ZZZZZ(Register r, int n);
+  void ZZZZZ1(Register r, uint8_t n);
 
   enum { instruction_size = 4 };
 
