@@ -35,7 +35,7 @@ typedef VMRegImpl* VMReg;
 // Use Register as shortcut
 class RegisterImpl;
 typedef RegisterImpl* Register;
-extern RegisterImpl regs[64];
+extern RegisterImpl regs[64] __attribute__ ((visibility ("hidden")));
 
 inline Register as_Register(int encoding);
 
