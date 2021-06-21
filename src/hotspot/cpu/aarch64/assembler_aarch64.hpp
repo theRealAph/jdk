@@ -176,17 +176,19 @@ class Instruction_aarch64 {
 #ifdef ASSERT
   unsigned bits;
 #endif
+  Assembler *assem;
 
 public:
 
-  void clear() {
+  Instruction_aarch64(class Assembler *as) {
 #ifdef ASSERT
     bits = 0;
 #endif
     insn = 0;
+    assem = as;
   }
 
-  Instruction_aarch64() {  clear(); }
+  inline ~Instruction_aarch64();
 
   unsigned &get_insn() { return insn; }
 #ifdef ASSERT
@@ -246,8 +248,11 @@ public:
     *(unsigned *)a = target;
   }
 
-  void f(unsigned val, int msb, int lsb) {
+  inline void f(unsigned val, int msb, int lsb) {
     int nbits = msb - lsb + 1;
+    if (!((val < (1ULL << nbits)))) {
+      fprintf(stderr, "%x\n", val);
+    }
     guarantee(val < (1ULL << nbits), "Field too big for insn");
     assert_cond(msb >= lsb);
     val <<= lsb;
@@ -316,15 +321,7 @@ public:
   }
 };
 
-class DummyThing {
-  Assembler *const _as;
-
-public:
-  DummyThing(Assembler *as);
-  ~DummyThing();
-};
-
-#define starti DummyThing do_not_use(this);
+#define starti Instruction_aarch64 current_insn(this);
 
 class PrePost {
   int _offset;
@@ -709,46 +706,14 @@ public:
 
   static address locate_next_instruction(address inst);
 
-  Instruction_aarch64 current;
-
-  void f(unsigned val, int msb, int lsb) {
-    current.f(val, msb, lsb);
-  }
-  void f(unsigned val, int msb) {
-    current.f(val, msb, msb);
-  }
-  void sf(int64_t val, int msb, int lsb) {
-    current.sf(val, msb, lsb);
-  }
-  void rf(Register reg, int lsb) {
-    current.rf(reg, lsb);
-  }
-  void srf(Register reg, int lsb) {
-    current.srf(reg, lsb);
-  }
-  void zrf(Register reg, int lsb) {
-    current.zrf(reg, lsb);
-  }
-  void rf(FloatRegister reg, int lsb) {
-    current.rf(reg, lsb);
-  }
-  void prf(PRegister reg, int lsb) {
-    current.prf(reg, lsb);
-  }
-  void pgrf(PRegister reg, int lsb) {
-    current.pgrf(reg, lsb);
-  }
-  void fixed(unsigned value, unsigned mask) {
-    current.fixed(value, mask);
-  }
-
-  void emit() {
-    emit_long(current.get_insn());
-#ifndef PRODUCT
-    assert_cond(current.get_bits() == 0xffffffff);
-    current.clear();
-#endif
-  }
+#define f current_insn.f
+#define sf current_insn.sf
+#define rf current_insn.rf
+#define srf current_insn.srf
+#define zrf current_insn.zrf
+#define prf current_insn.prf
+#define pgrf current_insn.pgrf
+#define fixed current_insn.fixed
 
   typedef void (Assembler::* uncond_branch_insn)(address dest);
   typedef void (Assembler::* compare_and_branch_insn)(Register Rt, address dest);
@@ -779,7 +744,7 @@ public:
 
 #undef INSN
 
-  void add_sub_immediate(Register Rd, Register Rn, unsigned uimm, int op,
+  void add_sub_immediate(Instruction_aarch64 &current_insn, Register Rd, Register Rn, unsigned uimm, int op,
                          int negated_op);
 
   // Add/subtract (immediate)
@@ -792,7 +757,7 @@ public:
                                                                         \
   void NAME(Register Rd, Register Rn, unsigned imm) {                   \
     starti;                                                             \
-    add_sub_immediate(Rd, Rn, imm, decode, negated);                    \
+    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);            \
   }
 
   INSN(addsw, 0b001, 0b011);
@@ -805,7 +770,7 @@ public:
 #define INSN(NAME, decode, negated)                     \
   void NAME(Register Rd, Register Rn, unsigned imm) {   \
     starti;                                             \
-    add_sub_immediate(Rd, Rn, imm, decode, negated);    \
+    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);     \
   }
 
   INSN(addw, 0b000, 0b010);
@@ -1107,7 +1072,7 @@ public:
   }
 
   void sys(int op1, int CRn, int CRm, int op2,
-           Register rt = (Register)0b11111) {
+           Register rt = as_Register(0b11111)) {
     system(0b01, op1, CRn, CRm, op2, rt);
   }
 
@@ -1376,7 +1341,7 @@ public:
     starti;                                                             \
     f(opc, 31, 30), f(0b011, 29, 27), f(V, 26), f(0b00, 25, 24),        \
       sf(offset, 23, 5);                                                \
-    rf((Register)Rt, 0);                                                \
+    rf(as_Register(Rt->encoding()), 0);                                 \
   }
 
   INSN(ldrs, 0b00, 1);
@@ -1390,7 +1355,7 @@ public:
     starti;                                                             \
     f(size, 31, 30), f(0b111100, 29, 24), f(opc, 23, 22), f(0, 21);     \
     f(0, 20, 12), f(0b01, 11, 10);                                      \
-    rf(Rn, 5), rf((Register)Rt, 0);                                     \
+    rf(Rn, 5), rf(as_Register(Rt->encoding()), 0);                      \
   }
 
   INSN(ldrs, 0b10, 0b01);
@@ -1423,9 +1388,9 @@ public:
     f(opc, 31, 30), f(p1, 29, 27), f(V, 26), f(L, 22);
     zrf(Rt2, 10), zrf(Rt1, 0);
     if (no_allocate) {
-      adr.encode_nontemporal_pair(&current);
+      adr.encode_nontemporal_pair(&current_insn);
     } else {
-      adr.encode_pair(&current);
+      adr.encode_pair(&current_insn);
     }
   }
 
@@ -1486,7 +1451,7 @@ public:
 
     f(size, 31, 30);
     f(op, 23, 22); // str
-    adr.encode(&current);
+    adr.encode(&current_insn);
   }
 
 #define INSN(NAME, size, op)                            \
@@ -1514,7 +1479,7 @@ public:
 
 #define INSN(NAME, size, op)                                    \
   void NAME(const Address &adr, prfop pfop = PLDL1KEEP) {       \
-    ld_st2((Register)pfop, adr, size, op);                      \
+    ld_st2(as_Register(pfop), adr, size, op);                   \
   }
 
   INSN(prfm, 0b11, 0b10); // FIXME: PRFM should not be used with
@@ -1562,7 +1527,7 @@ public:
 
   enum shift_kind { LSL, LSR, ASR, ROR };
 
-  void op_shifted_reg(unsigned decode,
+  void op_shifted_reg(Instruction_aarch64 &current_insn, unsigned decode,
                       enum shift_kind kind, unsigned shift,
                       unsigned size, unsigned op) {
     f(size, 31);
@@ -1580,7 +1545,7 @@ public:
     guarantee(size == 1 || shift < 32, "incorrect shift");      \
     f(N, 21);                                                   \
     zrf(Rm, 16), zrf(Rn, 5), zrf(Rd, 0);                        \
-    op_shifted_reg(0b01010, kind, shift, size, op);             \
+    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op);      \
   }
 
   INSN(andr, 1, 0b00, 0);
@@ -1600,7 +1565,7 @@ public:
     starti;                                                             \
     f(N, 21);                                                           \
     zrf(Rm, 16), zrf(Rn, 5), zrf(Rd, 0);                                \
-    op_shifted_reg(0b01010, kind, shift, size, op);                     \
+    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op);              \
   }                                                                     \
                                                                         \
   /* These instructions have no immediate form. Provide an overload so  \
@@ -1647,7 +1612,7 @@ void mvnw(Register Rd, Register Rm,
     assert_cond(kind != ROR);                           \
     guarantee(size == 1 || shift < 32, "incorrect shift");\
     zrf(Rd, 0), zrf(Rn, 5), zrf(Rm, 16);                \
-    op_shifted_reg(0b01011, kind, shift, size, op);     \
+    op_shifted_reg(current_insn, 0b01011, kind, shift, size, op);      \
   }
 
   INSN(add, 1, 0b000);
@@ -1668,10 +1633,10 @@ void mvnw(Register Rd, Register Rm,
            ext::operation option, int amount = 0) {                     \
     starti;                                                             \
     zrf(Rm, 16), srf(Rn, 5), srf(Rd, 0);                                \
-    add_sub_extended_reg(op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
+    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
   }
 
-  void add_sub_extended_reg(unsigned op, unsigned decode,
+  void add_sub_extended_reg(Instruction_aarch64 &current_insn, unsigned op, unsigned decode,
     Register Rd, Register Rn, Register Rm,
     unsigned opt, ext::operation option, unsigned imm) {
     guarantee(imm <= 4, "shift amount must be <= 4");
@@ -1691,7 +1656,7 @@ void mvnw(Register Rd, Register Rm,
            ext::operation option, int amount = 0) {                     \
     starti;                                                             \
     zrf(Rm, 16), srf(Rn, 5), zrf(Rd, 0);                                \
-    add_sub_extended_reg(op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
+    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
   }
 
   INSN(addsw, 0b001);
@@ -1808,7 +1773,7 @@ void mvnw(Register Rd, Register Rm,
 #undef INSN
 
   // Data processing
-  void data_processing(unsigned op29, unsigned opcode,
+  void data_processing(Instruction_aarch64 &current_insn, unsigned op29, unsigned opcode,
                        Register Rd, Register Rn) {
     f(op29, 31, 29), f(0b11010110, 28, 21);
     f(opcode, 15, 10);
@@ -1820,7 +1785,7 @@ void mvnw(Register Rd, Register Rm,
   void NAME(Register Rd, Register Rn) {         \
     starti;                                     \
     f(opcode2, 20, 16);                         \
-    data_processing(op29, opcode, Rd, Rn);      \
+    data_processing(current_insn, op29, opcode, Rd, Rn);       \
   }
 
   INSN(rbitw,  0b010, 0b00000, 0b00000);
@@ -1843,7 +1808,7 @@ void mvnw(Register Rd, Register Rm,
   void NAME(Register Rd, Register Rn, Register Rm) {    \
     starti;                                             \
     rf(Rm, 16);                                         \
-    data_processing(op29, opcode, Rd, Rn);              \
+    data_processing(current_insn, op29, opcode, Rd, Rn);       \
   }
 
   INSN(udivw, 0b000, 0b000010);
@@ -1890,7 +1855,7 @@ void mvnw(Register Rd, Register Rm,
 
 #define INSN(NAME, op54, op31, o0)                      \
   void NAME(Register Rd, Register Rn, Register Rm) {    \
-    data_processing(op54, op31, o0, Rd, Rn, Rm, as_Register(31));       \
+    data_processing(op54, op31, o0, Rd, Rn, Rm, as_Register(31)); \
   }
 
   INSN(smulh, 0b100, 0b010, 0);
@@ -1910,7 +1875,7 @@ void mvnw(Register Rd, Register Rm,
 
 #define INSN(NAME, op31, type, opcode)                  \
   void NAME(FloatRegister Vd, FloatRegister Vn) {       \
-    data_processing(op31, type, opcode, Vd, Vn);        \
+    data_processing(op31, type, opcode, Vd, Vn); \
   }
 
 private:
@@ -3279,11 +3244,19 @@ inline Assembler::Membar_mask_bits operator|(Assembler::Membar_mask_bits a,
   return Assembler::Membar_mask_bits(unsigned(a)|unsigned(b));
 }
 
-
-inline DummyThing::~DummyThing() {
-  _as->emit();
+Instruction_aarch64::~Instruction_aarch64() {
+  assem->emit_int32(insn);
+  assert_cond(get_bits() == 0xffffffff);
 }
-inline DummyThing::DummyThing(Assembler *as) : _as(as) { as->current.clear(); }
+
+#undef f
+#undef sf
+#undef rf
+#undef srf
+#undef zrf
+#undef prf
+#undef pgrf
+#undef fixed
 
 #undef starti
 
