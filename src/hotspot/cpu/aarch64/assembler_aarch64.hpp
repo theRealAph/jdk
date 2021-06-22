@@ -243,19 +243,16 @@ public:
     *(unsigned *)a = target;
   }
 
-  inline void f(unsigned val, int msb, int lsb) {
+  void f(unsigned val, int msb, int lsb) {
     int nbits = msb - lsb + 1;
-    if (!((val < (1ULL << nbits)))) {
-      fprintf(stderr, "%x\n", val);
-    }
     guarantee(val < (1ULL << nbits), "Field too big for insn");
     assert_cond(msb >= lsb);
-    val <<= lsb;
-    insn |= val;
-#ifdef ASSERT
     unsigned mask = checked_cast<unsigned>(right_n_bits(nbits));
+    val <<= lsb;
     mask <<= lsb;
+    insn |= val;
     assert_cond((bits & mask) == 0);
+#ifdef ASSERT
     bits |= mask;
 #endif
   }
