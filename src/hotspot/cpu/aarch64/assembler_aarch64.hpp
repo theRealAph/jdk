@@ -745,7 +745,7 @@ public:
                                                                         \
   void NAME(Register Rd, Register Rn, unsigned imm) {                   \
     starti;                                                             \
-    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);            \
+    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);      \
   }
 
   INSN(addsw, 0b001, 0b011);
@@ -755,10 +755,10 @@ public:
 
 #undef INSN
 
-#define INSN(NAME, decode, negated)                     \
-  void NAME(Register Rd, Register Rn, unsigned imm) {   \
-    starti;                                             \
-    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);     \
+#define INSN(NAME, decode, negated)                                     \
+  void NAME(Register Rd, Register Rn, unsigned imm) {                   \
+    starti;                                                             \
+    add_sub_immediate(current_insn, Rd, Rn, imm, decode, negated);      \
   }
 
   INSN(addw, 0b000, 0b010);
@@ -1476,9 +1476,9 @@ public:
 
 #undef INSN
 
-#define INSN(NAME, size, op)                            \
-  void NAME(FloatRegister Rt, const Address &adr) {     \
-    ld_st2(as_Register(Rt->encoding()), adr, size, op, 1);             \
+#define INSN(NAME, size, op)                                    \
+  void NAME(FloatRegister Rt, const Address &adr) {             \
+    ld_st2(as_Register(Rt->encoding()), adr, size, op, 1);      \
   }
 
   INSN(strd, 0b11, 0b00);
@@ -1533,7 +1533,7 @@ public:
     guarantee(size == 1 || shift < 32, "incorrect shift");      \
     f(N, 21);                                                   \
     zrf(Rm, 16), zrf(Rn, 5), zrf(Rd, 0);                        \
-    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op);      \
+    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op); \
   }
 
   INSN(andr, 1, 0b00, 0);
@@ -1553,7 +1553,7 @@ public:
     starti;                                                             \
     f(N, 21);                                                           \
     zrf(Rm, 16), zrf(Rn, 5), zrf(Rd, 0);                                \
-    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op);              \
+    op_shifted_reg(current_insn, 0b01010, kind, shift, size, op);       \
   }                                                                     \
                                                                         \
   /* These instructions have no immediate form. Provide an overload so  \
@@ -1621,15 +1621,17 @@ void mvnw(Register Rd, Register Rm,
            ext::operation option, int amount = 0) {                     \
     starti;                                                             \
     zrf(Rm, 16), srf(Rn, 5), srf(Rd, 0);                                \
-    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
-  }
-
-  void add_sub_extended_reg(Instruction_aarch64 &current_insn, unsigned op, unsigned decode,
-    Register Rd, Register Rn, Register Rm,
-    unsigned opt, ext::operation option, unsigned imm) {
-    guarantee(imm <= 4, "shift amount must be <= 4");
-    f(op, 31, 29), f(decode, 28, 24), f(opt, 23, 22), f(1, 21);
-    f(option, 15, 13), f(imm, 12, 10);
+    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm,         \
+                         0b00, option, amount);                         \
+  }                                                                     \
+                                                                        \
+  void add_sub_extended_reg(Instruction_aarch64 &current_insn, unsigned op, \
+    unsigned decode,                                                    \
+    Register Rd, Register Rn, Register Rm,                              \
+    unsigned opt, ext::operation option, unsigned imm) {                \
+    guarantee(imm <= 4, "shift amount must be <= 4");                   \
+    f(op, 31, 29), f(decode, 28, 24), f(opt, 23, 22), f(1, 21);         \
+    f(option, 15, 13), f(imm, 12, 10);                                  \
   }
 
   INSN(addw, 0b000);
@@ -1639,12 +1641,13 @@ void mvnw(Register Rd, Register Rm,
 
 #undef INSN
 
-#define INSN(NAME, op)                                                  \
-  void NAME(Register Rd, Register Rn, Register Rm,                      \
-           ext::operation option, int amount = 0) {                     \
-    starti;                                                             \
-    zrf(Rm, 16), srf(Rn, 5), zrf(Rd, 0);                                \
-    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm, 0b00, option, amount); \
+#define INSN(NAME, op)                                          \
+  void NAME(Register Rd, Register Rn, Register Rm,              \
+           ext::operation option, int amount = 0) {             \
+    starti;                                                     \
+    zrf(Rm, 16), srf(Rn, 5), zrf(Rd, 0);                        \
+    add_sub_extended_reg(current_insn, op, 0b01011, Rd, Rn, Rm, \
+                         0b00, option, amount);                 \
   }
 
   INSN(addsw, 0b001);
@@ -1773,7 +1776,7 @@ void mvnw(Register Rd, Register Rm,
   void NAME(Register Rd, Register Rn) {         \
     starti;                                     \
     f(opcode2, 20, 16);                         \
-    data_processing(current_insn, op29, opcode, Rd, Rn);       \
+    data_processing(current_insn, op29, opcode, Rd, Rn); \
   }
 
   INSN(rbitw,  0b010, 0b00000, 0b00000);
@@ -1796,7 +1799,7 @@ void mvnw(Register Rd, Register Rm,
   void NAME(Register Rd, Register Rn, Register Rm) {    \
     starti;                                             \
     rf(Rm, 16);                                         \
-    data_processing(current_insn, op29, opcode, Rd, Rn);       \
+    data_processing(current_insn, op29, opcode, Rd, Rn); \
   }
 
   INSN(udivw, 0b000, 0b000010);
@@ -1863,7 +1866,7 @@ void mvnw(Register Rd, Register Rm,
 
 #define INSN(NAME, op31, type, opcode)                  \
   void NAME(FloatRegister Vd, FloatRegister Vn) {       \
-    data_processing(op31, type, opcode, Vd, Vn); \
+    data_processing(op31, type, opcode, Vd, Vn);        \
   }
 
 private:
@@ -2020,9 +2023,10 @@ public:
     zrf(Rn, 5), zrf(Rd, 0);
   }
 
-#define INSN(NAME, op31, type, rmode, opcode)                           \
-  void NAME(Register Rd, FloatRegister Vn) {                            \
-    float_int_convert(op31, type, rmode, opcode, Rd, as_Register(Vn->encoding()));     \
+#define INSN(NAME, op31, type, rmode, opcode)           \
+  void NAME(Register Rd, FloatRegister Vn) {            \
+    float_int_convert(op31, type, rmode, opcode, Rd,    \
+                      as_Register(Vn->encoding()));     \
   }
 
   INSN(fcvtzsw, 0b000, 0b00, 0b11, 0b000);
@@ -2037,9 +2041,10 @@ public:
 
 #undef INSN
 
-#define INSN(NAME, op31, type, rmode, opcode)                           \
-  void NAME(FloatRegister Vd, Register Rn) {                            \
-    float_int_convert(op31, type, rmode, opcode, as_Register(Vd->encoding()), Rn); \
+#define INSN(NAME, op31, type, rmode, opcode)           \
+  void NAME(FloatRegister Vd, Register Rn) {            \
+    float_int_convert(op31, type, rmode, opcode,        \
+                      as_Register(Vd->encoding()), Rn); \
   }
 
   INSN(fmovs, 0b000, 0b00, 0b00, 0b111);
@@ -2224,10 +2229,11 @@ private:
   static short SIMD_Size_in_bytes[];
 
 public:
-#define INSN(NAME, op)                                            \
-  void NAME(FloatRegister Rt, SIMD_RegVariant T, const Address &adr) {   \
-    ld_st2(as_Register(Rt->encoding()), adr, (int)T & 3, op + ((T==Q) ? 0b10:0b00), 1); \
-  }                                                                      \
+#define INSN(NAME, op)                                                  \
+  void NAME(FloatRegister Rt, SIMD_RegVariant T, const Address &adr) {  \
+    ld_st2(as_Register(Rt->encoding()), adr, (int)T & 3,                \
+           op + ((T==Q) ? 0b10:0b00), 1);                               \
+  }
 
   INSN(ldr, 1);
   INSN(str, 0);
