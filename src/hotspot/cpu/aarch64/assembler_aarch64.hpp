@@ -666,11 +666,6 @@ class Assembler : public AbstractAssembler {
 
 public:
 
-  void ZZZZZ();
-  void ZZZZZ(int n);
-  void ZZZZZ(Register r, int n);
-  void ZZZZZ1(Register r, uint8_t n);
-
   enum { instruction_size = 4 };
 
   //---<  calculate length of instruction  >---

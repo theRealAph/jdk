@@ -30,23 +30,6 @@
 #include "immediate_aarch64.hpp"
 #include "memory/resourceArea.hpp"
 
-void Assembler::ZZZZZ() {
-  //   nop();
-  add(r0, r0, zr);
-}
-void Assembler::ZZZZZ(int n) {
-  // nop();
-  add(rscratch1, rscratch1, (uint8_t)n);
-}
-void Assembler::ZZZZZ1(Register r, uint8_t n) {
-  // nop();
-  add(r, rscratch1, (uint8_t)n);
-}
-void Assembler::ZZZZZ(Register r, int n) {
-  // nop();
-  add(r, rscratch1, n);
-}
-
 #ifndef PRODUCT
 const uintptr_t Assembler::asm_bp = 0x00007fffee09ac88;
 #endif
