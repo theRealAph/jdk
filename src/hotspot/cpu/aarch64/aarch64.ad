@@ -670,6 +670,12 @@ reg_class int_r3_reg(R3);
 // Singleton class for R4 int register
 reg_class int_r4_reg(R4);
 
+// Singleton class for R5 int register
+reg_class int_r5_reg(R5);
+
+// Singleton class for R6 int register
+reg_class int_r6_reg(R6);
+
 // Singleton class for R31 int register
 reg_class int_r31_reg(R31);
 
@@ -5045,6 +5051,28 @@ operand iRegI_R3()
 operand iRegI_R4()
 %{
   constraint(ALLOC_IN_RC(int_r4_reg));
+  match(RegI);
+  match(iRegINoSp);
+  op_cost(0);
+  format %{ %}
+  interface(REG_INTER);
+%}
+
+// Register R5 only
+operand iRegI_R5()
+%{
+  constraint(ALLOC_IN_RC(int_r5_reg));
+  match(RegI);
+  match(iRegINoSp);
+  op_cost(0);
+  format %{ %}
+  interface(REG_INTER);
+%}
+
+// Register R6 only
+operand iRegI_R6()
+%{
+  constraint(ALLOC_IN_RC(int_r6_reg));
   match(RegI);
   match(iRegINoSp);
   op_cost(0);
@@ -16665,11 +16693,12 @@ instruct stringL_indexof_char(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
 %}
 
 instruct string_equalsL(iRegP_R1 str1, iRegP_R3 str2, iRegI_R4 cnt,
-                        iRegI_R0 result, rFlagsReg cr)
+                        iRegI_R0 result, iRegI_R5 r5_tmp, iRegI_R6 r6_tmp,
+			rFlagsReg cr)
 %{
   predicate(((StrEqualsNode*)n)->encoding() == StrIntrinsicNode::LL);
   match(Set result (StrEquals (Binary str1 str2) cnt));
-  effect(USE_KILL str1, USE_KILL str2, USE_KILL cnt, KILL cr);
+  effect(USE_KILL str1, USE_KILL str2, USE_KILL cnt, TEMP r5_tmp, TEMP r6_tmp, KILL cr);
 
   format %{ "String Equals $str1,$str2,$cnt -> $result" %}
   ins_encode %{

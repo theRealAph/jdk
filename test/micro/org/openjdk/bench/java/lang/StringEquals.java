@@ -31,8 +31,11 @@ import java.util.concurrent.TimeUnit;
  * This benchmark naively explores String::equals performance
  */
 @BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@Warmup(iterations=3, time=1)
+@Measurement(iterations=5, time=1)
 @State(Scope.Benchmark)
+@Fork(value=1)
 public class StringEquals {
     @Param({"8", "16", "32", "64", "128"})
     int size;
@@ -48,10 +51,12 @@ public class StringEquals {
     public String str;
     public String strh;
     public String strt;
+    public String strDup;
 
     @Setup()
     public void init() {
         str = newString(size, 'c', -1, 'a');
+        strDup = new String (str.toCharArray());
         strh = newString(size, 'c', size / 3, 'a');
         strt = newString(size, 'c', size - 1 - size / 3, 'a');
     }
@@ -68,79 +73,84 @@ public class StringEquals {
         return "";
     }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean different_simple() {
-        return test.equals(test2);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean different_simple() {
+    //     return test.equals(test2);
+    // }
 
-    public boolean different() {
-        return test.equals(test2);
-    }
+    // public boolean different() {
+    //     return test.equals(test2);
+    // }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean equal_simple() {
-        return test.equals(test3);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean equal_simple() {
+    //     return test.equals(test3);
+    // }
 
+    @Benchmark
     public boolean equal() {
-        return test.equals(test3);
+        boolean result = false;
+        for (int i = 0; i < 1000; i++) {
+            result ^= str.equals(strDup);
+        }
+        return result;
     }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean almostEqual_simple() {
-        return test.equals(test6);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean almostEqual_simple() {
+    //     return test.equals(test6);
+    // }
 
-    public boolean almostEqual() {
-        return test.equals(test6);
-    }
+    // public boolean almostEqual() {
+    //     return test.equals(test6);
+    // }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean almostEqualUTF16_simple() {
-        return test4.equals(test7);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean almostEqualUTF16_simple() {
+    //     return test4.equals(test7);
+    // }
 
-    public boolean almostEqualUTF16() {
-        return test4.equals(test7);
-    }
+    // public boolean almostEqualUTF16() {
+    //     return test4.equals(test7);
+    // }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean differentCoders_simple() {
-        return test.equals(test4);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean differentCoders_simple() {
+    //     return test.equals(test4);
+    // }
 
-    public boolean differentCoders() {
-        return test.equals(test4);
-    }
+    // public boolean differentCoders() {
+    //     return test.equals(test4);
+    // }
 
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean equalsUTF16_simple() {
-        return test5.equals(test4);
-    }
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean equalsUTF16_simple() {
+    //     return test5.equals(test4);
+    // }
 
-    public boolean equalsUTF16() {
-        return test5.equals(test4);
-    }
+    // public boolean equalsUTF16() {
+    //     return test5.equals(test4);
+    // }
 
-    @Benchmark
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean equalsLenH_simple() {
-        return str.equals(strh);
-    }
+    // @Benchmark
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean equalsLenH_simple() {
+    //     return str.equals(strh);
+    // }
 
-    @Benchmark
-    public boolean equalsLenH() {
-        return str.equals(strh);
-    }
+    // @Benchmark
+    // public boolean equalsLenH() {
+    //     return str.equals(strh);
+    // }
 
-    @Benchmark
-    @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
-    public boolean equalsLenT_simple() {
-        return str.equals(strt);
-    }
+    // @Benchmark
+    // @Fork(jvmArgsAppend = {"-XX:+UseSimpleStringEquals"})
+    // public boolean equalsLenT_simple() {
+    //     return str.equals(strt);
+    // }
 
-    @Benchmark
-    public boolean equalsLenT() {
-        return str.equals(strt);
-    }
+    // @Benchmark
+    // public boolean equalsLenT() {
+    //     return str.equals(strt);
+    // }
 }
