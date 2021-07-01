@@ -236,6 +236,12 @@ void BarrierSetAssembler::incr_allocated_bytes(MacroAssembler* masm,
   __ str(t1, Address(rthread, in_bytes(JavaThread::allocated_bytes_offset())));
 }
 
+volatile uint64_t executed_barriers;
+
+static void atexit_function(void) {
+  fprintf(stderr, "\n%ld nmethod entry barriers executed\n", executed_barriers);
+}
+
 void BarrierSetAssembler::nmethod_entry_barrier(MacroAssembler* masm) {
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
 
@@ -245,6 +251,17 @@ void BarrierSetAssembler::nmethod_entry_barrier(MacroAssembler* masm) {
 
   Label skip, guard;
   Address thread_disarmed_addr(rthread, in_bytes(bs_nm->thread_disarmed_offset()));
+
+  if (getenv("HS_COUNT_NMETHOD_BARRIERS")) {
+    __ lea(rscratch2, ExternalAddress((address)&executed_barriers));
+    __ mov(rscratch1, 1);
+    __ ldadd(Assembler::xword, rscratch1, zr, rscratch2);
+
+    if (!executed_barriers) {
+      executed_barriers = 1;
+      atexit(atexit_function);
+    }
+  }
 
   __ ldrw(rscratch1, guard);
 
