@@ -4782,6 +4782,7 @@ void MacroAssembler::string_equals(Register a1, Register a2,
   br(LT, SHORT);
 
   if (!UseSimpleStringEquals) {
+    BLOCK_COMMENT("    NEW { " );
     Label STUB, LOOP;
     subs(zr, cnt1, stubBytesThreshold);
     br(GE, STUB);
@@ -4812,7 +4813,9 @@ void MacroAssembler::string_equals(Register a1, Register a2,
       return;
     }
     b(DONE);
+    BLOCK_COMMENT("    } NEW " );
   } else {
+    BLOCK_COMMENT("    OLD { " );
     Label NEXT_WORD;
 
     // Main 8 byte comparison loop.
@@ -4833,6 +4836,7 @@ void MacroAssembler::string_equals(Register a1, Register a2,
     eor(tmp2, tmp1, tmp2);
     cbnz(tmp2, DONE);
     b(SAME);
+    BLOCK_COMMENT("    } OLD " );
   }
 
   bind(SHORT);
