@@ -1297,6 +1297,16 @@ JVMState* PredicatedIntrinsicGenerator::generate(JVMState* jvms) {
   int n_predicates = _intrinsic->predicates_count();
   assert(n_predicates > 0, "sanity");
 
+  {
+    char *s = method()->get_Method()->name_and_sig_as_C_string();
+
+#define NAME "com.sun.crypto.provider.GaloisCounterMode.implGCMCrypt"
+    if (strncmp(s, NAME, strlen(NAME)) == 0) {
+      asm("nop");
+      // fprintf(stderr, "Whip!");
+    }
+  }
+
   JVMState** result_jvms = NEW_RESOURCE_ARRAY(JVMState*, (n_predicates+1));
 
   // Region for normal compilation code if intrinsic failed.
