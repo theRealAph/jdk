@@ -2891,6 +2891,7 @@ class StubGenerator: public StubCodeGenerator {
       __ st1(v1, __ T16B, out);
 
       __ add(in, in, 16);
+      __ add(out, out, 16);
       __ subw(len, len, 16);
       __ cbnzw(len, L_CTR_loop);
     }
