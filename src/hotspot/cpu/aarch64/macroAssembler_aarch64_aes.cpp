@@ -107,6 +107,10 @@ void MacroAssembler::aesecb_decrypt(Register from, Register to, Register key, Re
   sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
 }
 
+// Clobbers v1, v2, v3, v4
+// Returns encrypted value in v0.
+// If to != noreg, store value at to
+// Preserves from, to, key, keylen
 void MacroAssembler::aesecb_encrypt(Register from, Register to, Register key, Register keylen) {
   Label L_doLast;
 
@@ -178,7 +182,9 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register key, Re
   rev32(v1, T16B, v1);
   eor(v0, T16B, v0, v1);
 
-  st1(v0, T16B, to);
+  if (to != noreg) {
+    st1(v0, T16B, to);
+  }
 
   // Preserve the address of the start of the key
   sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));

@@ -2875,7 +2875,10 @@ class StubGenerator: public StubCodeGenerator {
 
       __ BIND(L_CTR_loop);
       // Encrypt the counter
-      __ aesecb_encrypt(counter, out, key, keylen);
+      __ aesecb_encrypt(counter, noreg, key, keylen);
+      // Returns the encrypted value in v0
+
+      __ ld1(v2, __ T16B, in); // Get input data
 
       // Incrememnt the counter
       __ ldrw(rscratch1, Address(counter, 12));
@@ -2885,9 +2888,9 @@ class StubGenerator: public StubCodeGenerator {
       __ strw(rscratch1, Address(counter, 12));
 
       // XOR the encrypted counter into the output
-      __ ld1(v1, __ T16B, out);
-      __ ld1(v2, __ T16B, in);
-      __ eor(v1, __ T16B, v1, v2);
+      // __ ld1(v2, __ T16B, in);
+      // __ ld1(v1, __ T16B, out);
+      __ eor(v1, __ T16B, v0, v2);
       __ st1(v1, __ T16B, out);
 
       __ add(in, in, 16);
