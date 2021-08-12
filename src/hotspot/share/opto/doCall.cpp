@@ -553,6 +553,17 @@ void Parse::do_call() {
   int       vtable_index       = Method::invalid_vtable_index;
   bool      call_does_dispatch = false;
 
+  {
+    char *s = callee->get_Method()->name_and_sig_as_C_string();
+
+#define NAME "com.sun.crypto.provider.GaloisCounterMode.implGCMCrypt"
+    if (strncmp(s, NAME, strlen(NAME)) == 0) {
+      char *caller = method()->get_Method()->name_and_sig_as_C_string();
+      // fprintf(stderr, "Whip! %s\n", caller);
+      asm("nop");
+    }
+  }
+
   // Speculative type of the receiver if any
   ciKlass* speculative_receiver_type = NULL;
   if (is_virtual_or_interface) {

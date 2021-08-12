@@ -5176,3 +5176,4 @@ void MacroAssembler::verify_cross_modify_fence_not_required() {
   }
 }
 #endif
+

@@ -248,10 +248,10 @@ void VM_Version::initialize() {
     }
   }
 
-  if (UseAESCTRIntrinsics) {
-    warning("AES/CTR intrinsics are not available on this CPU");
-    FLAG_SET_DEFAULT(UseAESCTRIntrinsics, false);
-  }
+  // if (UseAESCTRIntrinsics) {
+  //   warning("AES/CTR intrinsics are not available on this CPU");
+  //   FLAG_SET_DEFAULT(UseAESCTRIntrinsics, false);
+  // }
 
   if (FLAG_IS_DEFAULT(UseCRC32Intrinsics)) {
     UseCRC32Intrinsics = true;
