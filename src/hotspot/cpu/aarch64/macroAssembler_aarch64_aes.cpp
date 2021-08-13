@@ -151,7 +151,9 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen)
   Label L_doLast;
   // BIND(L_aes_loop);
   // ld1(v0,  T16B,  post(from, 16));
-  ld1(v0, T16B, from); // get 16 bytes of input
+  if (from != noreg) {
+    ld1(v0, T16B, from); // get 16 bytes of input
+  }
 
   cmpw(keylen, 52);
   br(Assembler::LO, L_rounds_44);

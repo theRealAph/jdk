@@ -2871,37 +2871,45 @@ class StubGenerator: public StubCodeGenerator {
     __ ldrw(keylen, Address(key, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT)));
 
     __ aesenc_loadkeys(key, keylen);
+    __ ld1(v3, __ T16B, counter);
 
     // AES/CTR loop
     {
-
       Label L_CTR_loop;
       __ BIND(L_CTR_loop);
 
       // Encrypt the counter
-      __ aesecb_encrypt(counter, noreg, keylen);
-      // Returns the encrypted value in v0
+      __ orr(v0, __ T16B, v3, v3);
+      // Accepts and returns the encrypted value in v0
+      __ aesecb_encrypt(noreg, noreg, keylen);
 
-      __ ld1(v2, __ T16B, in); // Get input data
+      __ ld1(v4, __ T16B, in); // Get input data
 
-      // Incrememnt the counter
-      __ ldrw(rscratch1, Address(counter, 12));
-      __ rev32(rscratch1, rscratch1);
-      __ add(rscratch1, rscratch1, 1);
-      __ rev32(rscratch1, rscratch1);
-      __ strw(rscratch1, Address(counter, 12));
+      // // Incrememnt the counter
+      // __ ldrw(rscratch1, Address(counter, 12));
+      // __ rev32(rscratch1, rscratch1);
+      // __ add(rscratch1, rscratch1, 1);
+      // __ rev32(rscratch1, rscratch1);
+      // __ strw(rscratch1, Address(counter, 12));
 
-      // XOR the encrypted counter into the output
-      // __ ld1(v2, __ T16B, in);
-      // __ ld1(v1, __ T16B, out);
-      __ eor(v1, __ T16B, v0, v2);
-      __ st1(v1, __ T16B, out);
+      // Increment the (big-endian) counter
+      __ rev32(v2, __ T16B, v3);
+      __ movi(v1, __ T4S, 1);
+      __ addv(v1, __ T4S, v1, v2);
+      __ ins(v2, __ S, v1, 3, 3);
+      __ rev32(v3, __ T16B, v2);
+
+      // XOR the encrypted counter with the input
+      __ eor(v0, __ T16B, v0, v4);
+      __ st1(v0, __ T16B, out);
 
       __ add(in, in, 16);
       __ add(out, out, 16);
       __ subw(len, len, 16);
       __ cbnzw(len, L_CTR_loop);
     }
+
+    __ st1(v3, __ T16B, counter);
 
     __ ldr(len, Address(sp));
 
