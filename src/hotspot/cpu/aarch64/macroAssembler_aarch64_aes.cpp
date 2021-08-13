@@ -107,87 +107,77 @@ void MacroAssembler::aesecb_decrypt(Register from, Register to, Register key, Re
   sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
 }
 
+// Load expanded key into v17..v31
+void MacroAssembler::aesenc_loadkeys(Register key, Register keylen) {
+  Label L_loadkeys_44, L_loadkeys_52;
+  cmpw(keylen, 52);
+  br(Assembler::LO, L_loadkeys_44);
+  br(Assembler::EQ, L_loadkeys_52);
+
+  ld1(v17, v18,  T16B,  post(key, 32));
+  rev32(v17,  T16B, v17);
+  rev32(v18,  T16B, v18);
+  bind(L_loadkeys_52);
+  ld1(v19, v20,  T16B,  post(key, 32));
+  rev32(v19,  T16B, v19);
+  rev32(v20,  T16B, v20);
+  bind(L_loadkeys_44);
+  ld1(v21, v22, v23, v24,  T16B,  post(key, 64));
+  rev32(v21,  T16B, v21);
+  rev32(v22,  T16B, v22);
+  rev32(v23,  T16B, v23);
+  rev32(v24,  T16B, v24);
+  ld1(v25, v26, v27, v28,  T16B,  post(key, 64));
+  rev32(v25,  T16B, v25);
+  rev32(v26,  T16B, v26);
+  rev32(v27,  T16B, v27);
+  rev32(v28,  T16B, v28);
+  ld1(v29, v30, v31,  T16B, post(key, 48));
+  rev32(v29,  T16B, v29);
+  rev32(v30,  T16B, v30);
+  rev32(v31,  T16B, v31);
+
+  // Preserve the address of the start of the key
+  sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
+}
+
 // Clobbers v1, v2, v3, v4
+// Uses expanded key in v17..v31
 // Returns encrypted value in v0.
 // If to != noreg, store value at to
 // Preserves from, to, key, keylen
-void MacroAssembler::aesecb_encrypt(Register from, Register to, Register key, Register keylen) {
+void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen) {
+  Label L_rounds_44, L_rounds_52;
   Label L_doLast;
-
+  // BIND(L_aes_loop);
+  // ld1(v0,  T16B,  post(from, 16));
   ld1(v0, T16B, from); // get 16 bytes of input
 
-  ld1(v1, v2, v3, v4, T16B, post(key, 64));
-  rev32(v1, T16B, v1);
-  rev32(v2, T16B, v2);
-  rev32(v3, T16B, v3);
-  rev32(v4, T16B, v4);
-  aese(v0, v1);
-  aesmc(v0, v0);
-  aese(v0, v2);
-  aesmc(v0, v0);
-  aese(v0, v3);
-  aesmc(v0, v0);
-  aese(v0, v4);
-  aesmc(v0, v0);
-
-  ld1(v1, v2, v3, v4, T16B, post(key, 64));
-  rev32(v1, T16B, v1);
-  rev32(v2, T16B, v2);
-  rev32(v3, T16B, v3);
-  rev32(v4, T16B, v4);
-  aese(v0, v1);
-  aesmc(v0, v0);
-  aese(v0, v2);
-  aesmc(v0, v0);
-  aese(v0, v3);
-  aesmc(v0, v0);
-  aese(v0, v4);
-  aesmc(v0, v0);
-
-  ld1(v1, v2, T16B, post(key, 32));
-  rev32(v1, T16B, v1);
-  rev32(v2, T16B, v2);
-
-  cmpw(keylen, 44);
-  br(Assembler::EQ, L_doLast);
-
-  aese(v0, v1);
-  aesmc(v0, v0);
-  aese(v0, v2);
-  aesmc(v0, v0);
-
-  ld1(v1, v2, T16B, post(key, 32));
-  rev32(v1, T16B, v1);
-  rev32(v2, T16B, v2);
-
   cmpw(keylen, 52);
-  br(Assembler::EQ, L_doLast);
+  br(Assembler::LO, L_rounds_44);
+  br(Assembler::EQ, L_rounds_52);
 
-  aese(v0, v1);
-  aesmc(v0, v0);
-  aese(v0, v2);
-  aesmc(v0, v0);
-
-  ld1(v1, v2, T16B, post(key, 32));
-  rev32(v1, T16B, v1);
-  rev32(v2, T16B, v2);
-
-  bind(L_doLast);
-
-  aese(v0, v1);
-  aesmc(v0, v0);
-  aese(v0, v2);
-
-  ld1(v1, T16B, post(key, 16));
-  rev32(v1, T16B, v1);
-  eor(v0, T16B, v0, v1);
+  aese(v0, v17);  aesmc(v0, v0);
+  aese(v0, v18);  aesmc(v0, v0);
+  bind(L_rounds_52);
+  aese(v0, v19);  aesmc(v0, v0);
+  aese(v0, v20);  aesmc(v0, v0);
+  bind(L_rounds_44);
+  aese(v0, v21);  aesmc(v0, v0);
+  aese(v0, v22);  aesmc(v0, v0);
+  aese(v0, v23);  aesmc(v0, v0);
+  aese(v0, v24);  aesmc(v0, v0);
+  aese(v0, v25);  aesmc(v0, v0);
+  aese(v0, v26);  aesmc(v0, v0);
+  aese(v0, v27);  aesmc(v0, v0);
+  aese(v0, v28);  aesmc(v0, v0);
+  aese(v0, v29);  aesmc(v0, v0);
+  aese(v0, v30);
+  eor(v0, T16B, v0, v31);
 
   if (to != noreg) {
     st1(v0, T16B, to);
   }
-
-  // Preserve the address of the start of the key
-  sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
 }
 
 void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister result_hi,

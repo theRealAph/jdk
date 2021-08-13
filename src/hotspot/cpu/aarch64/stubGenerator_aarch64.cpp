@@ -2570,7 +2570,8 @@ class StubGenerator: public StubCodeGenerator {
 
     __ ldrw(keylen, Address(key, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT)));
 
-    __ aesecb_encrypt(from, to, key, keylen);
+    __ aesenc_loadkeys(key, keylen);
+    __ aesecb_encrypt(from, to, keylen);
 
     __ mov(r0, 0);
 
@@ -2869,13 +2870,16 @@ class StubGenerator: public StubCodeGenerator {
     // Compute #rounds for AES based on the length of the key array
     __ ldrw(keylen, Address(key, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT)));
 
+    __ aesenc_loadkeys(key, keylen);
+
     // AES/CTR loop
     {
-      Label L_CTR_loop;
 
+      Label L_CTR_loop;
       __ BIND(L_CTR_loop);
+
       // Encrypt the counter
-      __ aesecb_encrypt(counter, noreg, key, keylen);
+      __ aesecb_encrypt(counter, noreg, keylen);
       // Returns the encrypted value in v0
 
       __ ld1(v2, __ T16B, in); // Get input data

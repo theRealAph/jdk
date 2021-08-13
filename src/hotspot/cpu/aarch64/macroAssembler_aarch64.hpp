@@ -1309,7 +1309,8 @@ public:
   void ghash_reduce(FloatRegister result, FloatRegister lo, FloatRegister hi,
                     FloatRegister p, FloatRegister z, FloatRegister t1);
 
-  void aesecb_encrypt(Register from, Register to, Register key, Register keylen);
+  void aesenc_loadkeys(Register key, Register keylen);
+  void aesecb_encrypt(Register from, Register to, Register keylen);
   void aesecb_decrypt(Register from, Register to, Register key, Register keylen);
   
   // Place an ISB after code may have been modified due to a safepoint.
