@@ -203,7 +203,7 @@ static void forAll(FloatRegSet floatRegs,
   }
 }
 
-// Uses forAlled key in v17..v31
+// Uses expanded key in v17..v31
 // Returns encrypted values in inputs.
 // If to != noreg, store value at to; likewise from
 // Preserves key, keylen

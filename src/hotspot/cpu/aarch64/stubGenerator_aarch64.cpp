@@ -56,6 +56,8 @@
 #include "gc/z/zThreadLocalData.hpp"
 #endif
 
+#include <functional>
+
 // Declaration and definition of StubGenerator (no .hpp file).
 // For a more detailed description of the stub routine structure
 // see the comment in stubRoutines.hpp
@@ -2823,7 +2825,14 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
- // Vector AES Galois Counter Mode implementation. Parameters:
+  static void forAll(FloatRegSet floatRegs,
+                   std::function<void (FloatRegister)> f1) {
+    for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
+      f1(*i);
+    }
+  }
+
+  // Vector AES Galois Counter Mode implementation. Parameters:
   //
   // in = c_rarg0
   // len = c_rarg1
@@ -2861,55 +2870,56 @@ class StubGenerator: public StubCodeGenerator {
     const Register keylen = r10;
     __ enter();
     // Save state before entering routine
-    __ andr(len, len, -16);
+    __ sub(sp, sp, 4 * 16);
+    __ st4(v12, v13, v14, v15, __ T16B, Address(sp));
+    __ sub(sp, sp, 4 * 16);
+    __ st4(v8, v9, v10, v11, __ T16B, Address(sp));
+
+    __ andr(len, len, -16 * 8);  // 8 rounds, 16 bytes per round
     __ str(len, __ pre(sp, -2 * wordSize));
 
     Label DONE;
     __ cbz(len, DONE);
 
+
     // Compute #rounds for AES based on the length of the key array
     __ ldrw(keylen, Address(key, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT)));
 
     __ aesenc_loadkeys(key, keylen);
-    __ ld1(v3, __ T16B, counter);
+    __ ld1(v0, __ T16B, counter); // v0 contains the first counter
+    __ rev32(v16, __ T16B, v0); // v16 contains byte-reversed counter
 
     // AES/CTR loop
     {
       Label L_CTR_loop;
       __ BIND(L_CTR_loop);
 
-      // Encrypt the counter
-      __ orr(v0, __ T16B, v3, v3);
-      // Accepts and returns the encrypted value in v0
-      __ aesecb_encrypt(noreg, noreg, keylen);
+      // Setup the counters
+      __ movi(v8, __ T4S, 0);
+      __ movi(v9, __ T4S, 1);
+      __ ins(v8, __ S, v9, 3, 3); // v8 contains { 0, 0, 0, 1 }
+      for (FloatRegister f = v0; f < v8; f++) {
+        __ rev32(f, __ T16B, v16);
+        __ addv(v16, __ T4S, v16, v8);
+      }
 
-      __ ld1(v4, __ T16B, in); // Get input data
+      // Encrypt the counters
+      __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v8));
 
-      // // Incrememnt the counter
-      // __ ldrw(rscratch1, Address(counter, 12));
-      // __ rev32(rscratch1, rscratch1);
-      // __ add(rscratch1, rscratch1, 1);
-      // __ rev32(rscratch1, rscratch1);
-      // __ strw(rscratch1, Address(counter, 12));
+      // XOR the encrypted counters with the inputs
+      __ ld4(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
+      __ ld4(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
+      forAll(FloatRegSet::range(v0, v8),
+             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      __ st4(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
+      __ st4(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
 
-      // Increment the (big-endian) counter
-      __ rev32(v2, __ T16B, v3);
-      __ movi(v1, __ T4S, 1);
-      __ addv(v1, __ T4S, v1, v2);
-      __ ins(v2, __ S, v1, 3, 3);
-      __ rev32(v3, __ T16B, v2);
-
-      // XOR the encrypted counter with the input
-      __ eor(v0, __ T16B, v0, v4);
-      __ st1(v0, __ T16B, out);
-
-      __ add(in, in, 16);
-      __ add(out, out, 16);
-      __ subw(len, len, 16);
+      __ subw(len, len, 16 * 8);
       __ cbnzw(len, L_CTR_loop);
     }
 
-    __ st1(v3, __ T16B, counter);
+    __ rev32(v16, __ T16B, v16);
+    __ st1(v16, __ T16B, counter);
 
     __ ldr(len, Address(sp));
 
@@ -2958,12 +2968,15 @@ class StubGenerator: public StubCodeGenerator {
       __ st1(v1, __ T16B, state);
     }
 
-
     // __ aesgcm_encrypt(in, len, ct, out, key, state, subkeyHtbl, counter);
+
 
     __ bind(DONE);
     // Return the number of bytes processed
     __ ldr(r0, __ post(sp, 2 * wordSize));
+
+    __ ld4(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
+    __ ld4(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
 
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(lr);
