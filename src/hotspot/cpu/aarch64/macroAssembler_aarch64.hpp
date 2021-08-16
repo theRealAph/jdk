@@ -1310,7 +1310,9 @@ public:
                     FloatRegister p, FloatRegister z, FloatRegister t1);
 
   void aesenc_loadkeys(Register key, Register keylen);
-  void aesecb_encrypt(Register from, Register to, Register keylen);
+  void aesecb_wide_encrypt(Register from, Register to, Register keylen);
+  void aesecb_encrypt(Register from, Register to, Register keylen,
+                      FloatRegSet inputs = FloatRegSet::of(v0));
   void aesecb_decrypt(Register from, Register to, Register key, Register keylen);
   
   // Place an ISB after code may have been modified due to a safepoint.

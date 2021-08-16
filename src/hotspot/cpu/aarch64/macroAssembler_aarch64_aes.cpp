@@ -141,6 +141,7 @@ void MacroAssembler::aesenc_loadkeys(Register key, Register keylen) {
   sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
 }
 
+#if 0
 // Clobbers v1, v2, v3, v4
 // Uses expanded key in v17..v31
 // Returns encrypted value in v0.
@@ -179,6 +180,69 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen)
 
   if (to != noreg) {
     st1(v0, T16B, to);
+  }
+}
+#endif
+
+#include <functional>
+static void forAll(FloatRegSet floatRegs,
+                   std::function<void (FloatRegister)> f1) {
+  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
+    f1(*i);
+  }
+}
+
+static void forAll(FloatRegSet floatRegs,
+                   std::function<void (FloatRegister)> f1,
+                   std::function<void (FloatRegister)> f2) {
+  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
+    f1(*i);
+  }
+  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
+    f2(*i);
+  }
+}
+
+// Uses forAlled key in v17..v31
+// Returns encrypted values in inputs.
+// If to != noreg, store value at to; likewise from
+// Preserves key, keylen
+// Increments from, to
+void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
+                                    FloatRegSet inputs) {
+  Label L_rounds_44, L_rounds_52;
+  if (from != noreg) {
+    forAll(inputs,
+           [&](FloatRegister reg) { ld1(reg, T16B, post(from, 16)); });// get 16 bytes of input
+  }
+
+  cmpw(keylen, 52);
+  br(Assembler::LO, L_rounds_44);
+  br(Assembler::EQ, L_rounds_52);
+
+  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v17, v18);
+       *subkeys != fnoreg; ++subkeys) {
+    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+  }
+  bind(L_rounds_52);
+  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v19, v20);
+       *subkeys != fnoreg; ++subkeys) {
+    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+  }
+  bind(L_rounds_44);
+  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v21, v29);
+       *subkeys != fnoreg; ++subkeys) {
+    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+  }
+  forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); });
+  forAll(inputs, [&](FloatRegister reg) { eor(reg, T16B, reg, v31); });
+
+  if (to != noreg) {
+    forAll(inputs,
+           [&](FloatRegister reg) { st1(v0, T16B, post(to, 16)); });
   }
 }
 

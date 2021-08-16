@@ -150,12 +150,12 @@ abstract class GaloisCounterMode extends CipherSpi {
 
         // Check for reuse
         if (encryption) {
-            if (MessageDigest.isEqual(keyValue, lastKey) &&
-                MessageDigest.isEqual(iv, lastIv)) {
-                Arrays.fill(keyValue, (byte) 0);
-                throw new InvalidAlgorithmParameterException(
-                    "Cannot reuse iv for GCM encryption");
-            }
+            // if (MessageDigest.isEqual(keyValue, lastKey) &&
+            //     MessageDigest.isEqual(iv, lastIv)) {
+            //     Arrays.fill(keyValue, (byte) 0);
+            //     throw new InvalidAlgorithmParameterException(
+            //         "Cannot reuse iv for GCM encryption");
+            // }
 
             // Both values are already clones
             if (lastKey != null) {
