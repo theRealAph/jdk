@@ -2871,9 +2871,9 @@ class StubGenerator: public StubCodeGenerator {
     __ enter();
     // Save state before entering routine
     __ sub(sp, sp, 4 * 16);
-    __ st4(v12, v13, v14, v15, __ T16B, Address(sp));
+    __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
     __ sub(sp, sp, 4 * 16);
-    __ st4(v8, v9, v10, v11, __ T16B, Address(sp));
+    __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
 
     __ andr(len, len, -16 * 8);  // 8 rounds, 16 bytes per round
     __ str(len, __ pre(sp, -2 * wordSize));
@@ -2907,12 +2907,12 @@ class StubGenerator: public StubCodeGenerator {
       __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v8));
 
       // XOR the encrypted counters with the inputs
-      __ ld4(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
-      __ ld4(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
-      forAll(FloatRegSet::range(v0, v8),
+      __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
+      __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
+      forAll(FloatRegSet::range(v0, v7),
              [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
-      __ st4(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
-      __ st4(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
+      __ st1(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
+      __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
 
       __ subw(len, len, 16 * 8);
       __ cbnzw(len, L_CTR_loop);
@@ -2975,8 +2975,8 @@ class StubGenerator: public StubCodeGenerator {
     // Return the number of bytes processed
     __ ldr(r0, __ post(sp, 2 * wordSize));
 
-    __ ld4(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
-    __ ld4(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
+    __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
+    __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
 
     __ leave(); // required for proper stackwalking of RuntimeStub frame
     __ ret(lr);
