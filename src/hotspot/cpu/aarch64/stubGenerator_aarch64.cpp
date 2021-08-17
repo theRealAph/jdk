@@ -2875,7 +2875,7 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(sp, sp, 4 * 16);
     __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
 
-    __ andr(len, len, -16 * 8);  // 8 rounds, 16 bytes per round
+    __ andr(len, len, -16 * 8);  // 8 encryptions, 16 bytes per encryption
     __ str(len, __ pre(sp, -2 * wordSize));
 
     Label DONE;
@@ -2894,6 +2894,7 @@ class StubGenerator: public StubCodeGenerator {
       Label L_CTR_loop;
       __ BIND(L_CTR_loop);
 
+
       // Setup the counters
       __ movi(v8, __ T4S, 0);
       __ movi(v9, __ T4S, 1);
@@ -2903,13 +2904,17 @@ class StubGenerator: public StubCodeGenerator {
         __ addv(v16, __ T4S, v16, v8);
       }
 
+      __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
+
       // Encrypt the counters
-      __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v8));
+      __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v7));
+
+      __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
 
       // XOR the encrypted counters with the inputs
-      __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
-      __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
-      forAll(FloatRegSet::range(v0, v7),
+      forAll(FloatRegSet::range(v0, v3),
+             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      forAll(FloatRegSet::range(v4, v7),
              [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
       __ st1(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
       __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
@@ -2943,17 +2948,19 @@ class StubGenerator: public StubCodeGenerator {
 
       {
         Label L_ghash_loop;
+
         __ bind(L_ghash_loop);
 
-        __ ldrq(v2, Address(__ post(ct, 0x10))); // Load the data, bit
-                                                 // reversing each byte
+        __ ld1(v2, __ T16B, __ post(ct, 0x10)); // Load the data, bit reversing
+                                                // each byte
         __ rbit(v2, __ T16B, v2);
         __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
 
         // Multiply state in v2 by subkey in v1
         __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
                           /*a*/v1, /*b*/v2, /*a1_xor_a0*/v16,
-                          /*temps*/v6, v20, v18, v21);
+                          /*temps*/v6, v20, v18, noreg);
+
         // Reduce v7:v5 by the field polynomial
         __ ghash_reduce(v0, v5, v7, v26, vzr, v20);
 

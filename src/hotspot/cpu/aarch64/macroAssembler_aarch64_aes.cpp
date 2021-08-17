@@ -203,6 +203,14 @@ static void forAll(FloatRegSet floatRegs,
   }
 }
 
+// NeoverseTM N1Software Optimization Guide:
+// Adjacent AESE/AESMC instruction pairs and adjacent AESD/AESIMC
+// instruction pairs will exhibit the performance characteristics
+// described in Section 4.6.
+void MacroAssembler::aes_round(FloatRegister input, FloatRegister subkey) {
+  aese(input, subkey); aesmc(input, input);
+}
+
 // Uses expanded key in v17..v31
 // Returns encrypted values in inputs.
 // If to != noreg, store value at to; likewise from
@@ -222,21 +230,25 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
 
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v17, v18);
        *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
   bind(L_rounds_52);
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v19, v20);
        *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
   bind(L_rounds_44);
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v21, v29);
        *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
+    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
+    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
+  // forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); eor(reg, T16B, reg, v31); });
   forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); });
   forAll(inputs, [&](FloatRegister reg) { eor(reg, T16B, reg, v31); });
 
@@ -248,7 +260,7 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
 
 void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister result_hi,
                     FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
-                    FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4) {
+                    FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3, FloatRegister) {
     // Karatsuba multiplication performs a 128*128 -> 256-bit
     // multiplication in three 128-bit multiplications and a few
     // additions.
@@ -271,9 +283,9 @@ void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister resul
     pmull(result_lo,  T1Q, b, a, T1D);  // A0*B0
     pmull(tmp2, T1Q, tmp1, a1_xor_a0, T1D); // (A1+A0)(B1+B0)
 
-    ext(tmp4, T16B, result_lo, result_hi, 0x08);
+    ext(tmp1, T16B, result_lo, result_hi, 0x08);
     eor(tmp3, T16B, result_hi, result_lo); // A1*B1+A0*B0
-    eor(tmp2, T16B, tmp2, tmp4);
+    eor(tmp2, T16B, tmp2, tmp1);
     eor(tmp2, T16B, tmp2, tmp3);
 
     // Register pair <result_hi:result_lo> holds the result of carry-less multiplication
@@ -282,7 +294,7 @@ void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister resul
   }
 
 void MacroAssembler::ghash_reduce(FloatRegister result, FloatRegister lo, FloatRegister hi,
-                  FloatRegister p, FloatRegister z, FloatRegister t1) {
+                  FloatRegister p, FloatRegister vzr, FloatRegister t1) {
   const FloatRegister t0 = result;
 
   // The GCM field polynomial f is z^128 + p(z), where p =
@@ -301,9 +313,9 @@ void MacroAssembler::ghash_reduce(FloatRegister result, FloatRegister lo, FloatR
   // hi*p.
 
   pmull2(t0, T1Q, hi, p, T2D);
-  ext(t1, T16B, t0, z, 8);
+  ext(t1, T16B, t0, vzr, 8);
   eor(hi, T16B, hi, t1);
-  ext(t1, T16B, z, t0, 8);
+  ext(t1, T16B, vzr, t0, 8);
   eor(lo, T16B, lo, t1);
   pmull(t0, T1Q, hi, p, T1D);
   eor(result, T16B, lo, t0);

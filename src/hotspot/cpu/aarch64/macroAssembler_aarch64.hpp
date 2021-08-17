@@ -1314,7 +1314,8 @@ public:
   void aesecb_encrypt(Register from, Register to, Register keylen,
                       FloatRegSet inputs = FloatRegSet::of(v0));
   void aesecb_decrypt(Register from, Register to, Register key, Register keylen);
-  
+  void aes_round(FloatRegister input, FloatRegister subkey);
+
   // Place an ISB after code may have been modified due to a safepoint.
   void safepoint_isb();
 
