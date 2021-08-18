@@ -5358,7 +5358,7 @@ class StubGenerator: public StubCodeGenerator {
     __ rev64(v1, __ T16B, v1);
     __ rbit(v1, __ T16B, v1);
 
-    __ ldrq(v3, p);
+    __ ldrq(v24, p);
 
     __ ext(v4, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
     __ eor(v4, __ T16B, v4, v1);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
@@ -5375,9 +5375,9 @@ class StubGenerator: public StubCodeGenerator {
       // Multiply state in v2 by subkey in v1
       __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
                         /*a*/v1, /*b*/v2, /*a1_xor_a0*/v4,
-                        /*temps*/v6, v20, fnoreg, fnoreg);
+                        /*temps*/v6, v3, fnoreg, fnoreg);
       // Reduce v7:v5 by the field polynomial
-      __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v3, vzr, /*temp*/v20);
+      __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
 
       __ sub(blocks, blocks, 1);
       __ cbnz(blocks, L_ghash_loop);
