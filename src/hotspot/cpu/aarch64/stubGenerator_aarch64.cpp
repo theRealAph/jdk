@@ -2959,7 +2959,7 @@ class StubGenerator: public StubCodeGenerator {
         // Multiply state in v2 by subkey in v1
         __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v6,
                           /*a*/v1, /*b*/v2, /*a1_xor_a0*/v4,
-                          /*temps*/v7, v3, v9, fnoreg);
+                          /*temps*/v7, v3);
 
         // Reduce v6:v5 by the field polynomial
         __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v6, /*p*/v26, vzr, /*tmp*/v3);
@@ -5350,6 +5350,8 @@ class StubGenerator: public StubCodeGenerator {
     FloatRegister vzr = v30;
     __ eor(vzr, __ T16B, vzr, vzr); // zero register
 
+    __ ldrq(v24, p);    // The field polynomial
+
     __ ldrq(v0, Address(state));
     __ ldrq(v1, Address(subkeyH));
 
@@ -5357,8 +5359,6 @@ class StubGenerator: public StubCodeGenerator {
     __ rbit(v0, __ T16B, v0);
     __ rev64(v1, __ T16B, v1);
     __ rbit(v1, __ T16B, v1);
-
-    __ ldrq(v24, p);
 
     __ ext(v4, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
     __ eor(v4, __ T16B, v4, v1);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
@@ -5375,7 +5375,7 @@ class StubGenerator: public StubCodeGenerator {
       // Multiply state in v2 by subkey in v1
       __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
                         /*a*/v1, /*b*/v2, /*a1_xor_a0*/v4,
-                        /*temps*/v6, v3, fnoreg, fnoreg);
+                        /*temps*/v6, v3);
       // Reduce v7:v5 by the field polynomial
       __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
 

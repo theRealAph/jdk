@@ -1304,7 +1304,7 @@ public:
   void mul_add(Register out, Register in, Register offs, Register len, Register k);
   void ghash_multiply(FloatRegister result_lo, FloatRegister result_hi,
                       FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
-                      FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4);
+                      FloatRegister tmp1, FloatRegister tmp2);
 
   void ghash_reduce(FloatRegister result, FloatRegister lo, FloatRegister hi,
                     FloatRegister p, FloatRegister z, FloatRegister t1);

@@ -260,7 +260,56 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
 
 void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister result_hi,
                     FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
-                    FloatRegister tmp1, FloatRegister tmp2, FloatRegister, FloatRegister) {
+                    FloatRegister tmp1, FloatRegister tmp2) {
+  // Karatsuba multiplication performs a 128*128 -> 256-bit
+  // multiplication in three 128-bit multiplications and a few
+  // additions.
+  //
+  // (C1:C0) = A1*B1, (D1:D0) = A0*B0, (E1:E0) = (A0+A1)(B0+B1)
+  // (A1:A0)(B1:B0) = C1:(C0+C1+D1+E1):(D1+C0+D0+E0):D0
+  //
+  // Inputs:
+  //
+  // A0 in a.d[0]     (subkey)
+  // A1 in a.d[1]
+  // (A1+A0) in a1_xor_a0.d[0]
+  //
+  // B0 in b.d[0]     (state)
+  // B1 in b.d[1]
+
+  ext(tmp1, T16B, b, b, 0x08);
+  pmull2(result_hi, T1Q, b, a, T2D);  // A1*B1
+  eor(tmp1, T16B, tmp1, b);           // (B1+B0)
+  pmull(result_lo,  T1Q, b, a, T1D);  // A0*B0
+  pmull(tmp2, T1Q, tmp1, a1_xor_a0, T1D); // (A1+A0)(B1+B0)
+
+  // Input register b is dead. We'll reuse it as temp.
+  FloatRegister tmp3 = b;
+
+  ext(tmp1, T16B, result_lo, result_hi, 0x08);
+  eor(tmp3, T16B, result_hi, result_lo); // A1*B1+A0*B0
+  eor(tmp2, T16B, tmp2, tmp1);
+  eor(tmp2, T16B, tmp2, tmp3);
+
+  // Register pair <result_hi:result_lo> holds the result of carry-less multiplication
+  ins(result_hi, D, tmp2, 0, 1);
+  ins(result_lo, D, tmp2, 1, 0);
+}
+
+void iter(std::function<void (FloatRegister, FloatRegister, FloatRegister, FloatRegister,
+                              FloatRegister, FloatRegister, FloatRegister, FloatRegister)> f1,
+          FloatRegister result_lo, FloatRegister result_hi,
+          FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
+          FloatRegister tmp1, FloatRegister tmp2) {
+  int ofs = 0;
+  f1(result_lo + ofs, result_hi + ofs, a + ofs, b + ofs,
+     a1_xor_a0 + ofs, tmp1 + ofs, tmp2 + ofs);
+}
+
+void MacroAssembler::ghash_multiply_wide(int unroll, int register_offset,
+                    FloatRegister result_lo, FloatRegister result_hi,
+                    FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
+                    FloatRegister tmp1, FloatRegister tmp2) {
   // Karatsuba multiplication performs a 128*128 -> 256-bit
   // multiplication in three 128-bit multiplications and a few
   // additions.
