@@ -2943,8 +2943,8 @@ class StubGenerator: public StubCodeGenerator {
 
       __ ldrq(v26, ghash_polynomial);
 
-      __ ext(v16, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
-      __ eor(v16, __ T16B, v16, v1);      // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+      __ ext(v4, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
+      __ eor(v4, __ T16B, v4, v1);      // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
       {
         Label L_ghash_loop;
@@ -2957,12 +2957,12 @@ class StubGenerator: public StubCodeGenerator {
         __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
 
         // Multiply state in v2 by subkey in v1
-        __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
-                          /*a*/v1, /*b*/v2, /*a1_xor_a0*/v16,
-                          /*temps*/v6, v20, v18, noreg);
+        __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v6,
+                          /*a*/v1, /*b*/v2, /*a1_xor_a0*/v4,
+                          /*temps*/v7, v3, v9, fnoreg);
 
-        // Reduce v7:v5 by the field polynomial
-        __ ghash_reduce(v0, v5, v7, v26, vzr, v20);
+        // Reduce v6:v5 by the field polynomial
+        __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v6, /*p*/v26, vzr, /*tmp*/v3);
 
         __ subw(len, len, 16);
         __ cbnz(len, L_ghash_loop);
@@ -5374,20 +5374,20 @@ class StubGenerator: public StubCodeGenerator {
 
       // Multiply state in v2 by subkey in v1
       __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
-                     /*a*/v1, /*b*/v2, /*a1_xor_a0*/v16,
-                     /*temps*/v6, v20, v18, v21);
+                        /*a*/v1, /*b*/v2, /*a1_xor_a0*/v16,
+                        /*temps*/v6, v20, fnoreg, fnoreg);
       // Reduce v7:v5 by the field polynomial
-      __ ghash_reduce(v0, v5, v7, v26, vzr, v20);
+      __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*temp*/v26, vzr, /*temp*/v20);
 
       __ sub(blocks, blocks, 1);
       __ cbnz(blocks, L_ghash_loop);
     }
 
     // The bit-reversed result is at this point in v0
-    __ rev64(v1, __ T16B, v0);
-    __ rbit(v1, __ T16B, v1);
+    __ rev64(v0, __ T16B, v0);
+    __ rbit(v0, __ T16B, v0);
 
-    __ st1(v1, __ T16B, state);
+    __ st1(v0, __ T16B, state);
     __ ret(lr);
 
     return start;
