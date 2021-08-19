@@ -34,6 +34,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.ProviderException;
+import java.util.Arrays;
 
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 
@@ -62,6 +63,19 @@ final class GHASH implements Cloneable, GCM {
 
     // Multiplies state[0], state[1] by subkeyH[0], subkeyH[1].
     private static void blockMult(long[] st, long[] subH) {
+        var s = System.getProperty("com.foo.bar.Test");
+
+        if (s != null) {
+            System.out.printf("subkey %016x:%016x\n", subH[0], subH[1]);
+            System.out.printf("state  %016x:%016x\n", st[0], st[1]);
+            if (subH.length > 2 && subH[2] == 0 && subH[3] == 0) {
+                long[] H0 = Arrays.copyOf(subH, 2);
+                long[] H1 = Arrays.copyOf(subH, 2);
+                blockMult(H0, H1);
+                System.arraycopy(H0, 0, subH, 2, 2);
+                System.out.printf("### square %016x:%016x\n", H0[0], H0[1]);
+            }
+        }
         long Z0 = 0;
         long Z1 = 0;
         long V0 = subH[0];
@@ -163,6 +177,12 @@ final class GHASH implements Cloneable, GCM {
 
     private static void processBlock(byte[] data, int ofs, long[] st,
         long[] subH) {
+        var s = System.getProperty("com.foo.bar.Test");
+
+        if (s != null) {
+            System.out.printf("preX  0x%016xl, 0x%016xl\n", st[0], st[1]);
+            System.out.printf("data  0x%016xl, 0x%016xl\n", (long)asLongView.get(data, ofs), asLongView.get(data, ofs + 8));
+        }
         st[0] ^= (long)asLongView.get(data, ofs);
         st[1] ^= (long)asLongView.get(data, ofs + 8);
         blockMult(st, subH);
