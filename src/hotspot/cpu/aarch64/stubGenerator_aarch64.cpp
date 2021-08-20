@@ -2927,56 +2927,10 @@ class StubGenerator: public StubCodeGenerator {
     __ st1(v16, __ T16B, counter);
 
     __ ldr(len, Address(sp));
+    __ lsr(len, len, exact_log2(16));  // We want the count of blocks
 
     // GHASH/CTR loop
-    {
-      FloatRegister vzr = v30;
-      __ eor(vzr, __ T16B, vzr, vzr); // zero register
-
-      __ ldrq(v0, Address(state));
-      __ ldrq(v1, Address(subkeyHtbl));
-
-      __ rev64(v0, __ T16B, v0);          // Bit-reverse words in state and subkeyH
-      __ rbit(v0, __ T16B, v0);
-      __ rev64(v1, __ T16B, v1);
-      __ rbit(v1, __ T16B, v1);
-
-      __ ldrq(v26, ghash_polynomial);
-
-      __ ext(v4, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
-      __ eor(v4, __ T16B, v4, v1);      // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-
-      {
-        Label L_ghash_loop;
-
-        __ bind(L_ghash_loop);
-
-        __ ld1(v2, __ T16B, __ post(ct, 0x10)); // Load the data, bit reversing
-                                                // each byte
-        __ rbit(v2, __ T16B, v2);
-        __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-
-        // Multiply state in v2 by subkey in v1
-        __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v6,
-                          /*a*/v1, /*b*/v2, /*a1_xor_a0*/v4,
-                          /*temps*/v7, v3, /*reuse/clobber b*/v2);
-
-        // Reduce v6:v5 by the field polynomial
-        __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v6, /*p*/v26, vzr, /*tmp*/v3);
-
-        __ subw(len, len, 16);
-        __ cbnz(len, L_ghash_loop);
-      }
-
-      // The bit-reversed result is at this point in v0
-      __ rev64(v1, __ T16B, v0);
-      __ rbit(v1, __ T16B, v1);
-
-      __ st1(v1, __ T16B, state);
-    }
-
-    // __ aesgcm_encrypt(in, len, ct, out, key, state, subkeyHtbl, counter);
-
+    __ ghash_processBlocks_wide(ghash_polynomial, state, subkeyHtbl, ct, len);
 
     __ bind(DONE);
     // Return the number of bytes processed
@@ -5393,26 +5347,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  FloatRegister ofs(FloatRegister r) { return r + 8; }
-
-  void ghash_modmul0 (FloatRegister H, FloatRegister vzr) {
-      // Multiply state in v2 by H
-      __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
-                        /*a*/H, /*b*/v2, /*a1_xor_a0*/v4,
-                        /*temps*/v6, v3, /*reuse b*/v2);
-      // Reduce v7:v5 by the field polynomial
-      __ ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
-  }
-
-  void ghash_modmul1 (FloatRegister H, FloatRegister vzr) {
-      // Multiply state in v2 by H
-      __ ghash_multiply(/*result_lo*/ofs(v5), /*result_hi*/ofs(v7),
-                        /*a*/H, /*b*/ofs(v2), /*a1_xor_a0*/v4,
-                        /*temps*/ofs(v6), ofs(v3), /*reuse b*/ofs(v2));
-      // Reduce v7:v5 by the field polynomial
-      __ ghash_reduce(/*result*/ofs(v0), /*lo*/ofs(v5), /*hi*/ofs(v7), /*p*/v24, vzr, /*temp*/ofs(v3));
-  }
-
   address generate_ghash_processBlocks_wide() {
     // Bafflingly, GCM uses little-endian for the byte order, but
     // big-endian for the bit order.  For example, the polynomial 1 is
@@ -5447,92 +5381,21 @@ class StubGenerator: public StubCodeGenerator {
     __ cmp(blocks, (unsigned char)4);
     __ br(__ LT, small);
 
-    FloatRegister vzr = v30;
-    __ eor(vzr, __ T16B, vzr, vzr); // zero register
+    // Save state before entering routine
+    __ sub(sp, sp, 4 * 16);
+    __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
+    __ sub(sp, sp, 4 * 16);
+    __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
 
-    __ ldrq(v24, p);    // The field polynomial
+    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks);
 
-    __ ldrq(v0, Address(state));
-    __ ldrq(v29, Address(subkeyH));
+    // And restore it
+    __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
+    __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
 
-    __ rev64(v0, __ T16B, v0);          // Bit-reverse words in state and subkeyH
-    __ rbit(v0, __ T16B, v0);
-    __ rev64(v29, __ T16B, v29);
-    __ rbit(v29, __ T16B, v29);
+    __ subs(blocks, blocks, 2);
+    __ br(__ GT, small);
 
-    // Square H
-    __ ext(v4, __ T16B, v29, v29, 0x08); // long-swap subkeyH into v1
-    __ eor(v4, __ T16B, v4, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-    __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
-                      /*a*/v29, /*b*/v29, /*a1_xor_a0*/v4,
-                      /*temps*/v6, v3, v8);
-    // Reduce v7:v5 by the field polynomial
-    __ ghash_reduce(/*result*/v1, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
-    __ rev64(v1, __ T16B, v1);
-    __ rbit(v1, __ T16B, v1);
-    __ strq(v1, Address(subkeyH, 16));
-    __ rev64(v1, __ T16B, v1);
-    __ rbit(v1, __ T16B, v1);
-
-    __ ext(v4, __ T16B, v1, v1, 0x08); // long-swap subkeyH into v1
-    __ eor(v4, __ T16B, v4, v1);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-
-    // v1 contains (H**2), ofs(v1) contains(H)
-    // v0 and ofs(v0) contain the initial state
-    __ eor(ofs(v0), __ T16B, ofs(v0), ofs(v0)); // zero odd state register
-
-    {
-      Label L_ghash_loop;
-      __ bind(L_ghash_loop);
-
-      __ ldrq(v2, Address(__ post(data, 0x10))); // Load the data, bit
-                                                 // reversing each byte
-      __ rbit(v2, __ T16B, v2);
-      __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-      ghash_modmul0(v1, vzr);             // Multiply state in v2 by H**2 in v1
-
-      __ nop();
-
-      __ ldrq(ofs(v2), Address(__ post(data, 0x10))); // Load the data, bit
-                                                      // reversing each byte
-      __ rbit(ofs(v2), __ T16B, ofs(v2));
-      __ eor(ofs(v2), __ T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
-      ghash_modmul1(v1, vzr);             // Multiply state in v2 by H**2 in v1
-      __ nop();
-
-      __ sub(blocks, blocks, 2);
-      __ cmp(blocks, (unsigned char)2);
-      __ br(__ GT, L_ghash_loop);
-    }
-
-    // Final go-around
-    {
-      __ ldrq(v2, Address(__ post(data, 0x10))); // Load the data, bit
-                                                 // reversing each byte
-      __ rbit(v2, __ T16B, v2);
-      __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-      ghash_modmul0(v1, vzr);             // Multiply state in v2 by H**2 in v1
-
-      __ nop();
-
-      __ ldrq(ofs(v2), Address(__ post(data, 0x10))); // Load the data, bit
-                                                      // reversing each byte
-      __ rbit(ofs(v2), __ T16B, ofs(v2));
-      __ eor(ofs(v2), __ T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
-
-      __ ext(v4, __ T16B, v29, v29, 0x08); // long-swap subkeyH into v1
-      __ eor(v4, __ T16B, v4, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-      ghash_modmul1(v29, vzr);             // Multiply state in v2 by H in v29
-      __ nop();
-    }
-
-    // The bit-reversed result is at this point in v0 ^ ofs(v0)
-    __ eor(v0, __ T16B, v0, ofs(v0));
-    __ rev64(v0, __ T16B, v0);
-    __ rbit(v0, __ T16B, v0);
-    __ nop();
-
-    __ st1(v0, __ T16B, state);
     __ ret(lr);
 
     return start;
