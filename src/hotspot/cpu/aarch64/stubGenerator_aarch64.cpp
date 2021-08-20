@@ -5407,7 +5407,7 @@ class StubGenerator: public StubCodeGenerator {
   void ghash_modmul1 (FloatRegister H, FloatRegister vzr) {
       // Multiply state in v2 by H
       __ ghash_multiply(/*result_lo*/ofs(v5), /*result_hi*/ofs(v7),
-                        /*a*/H, /*b*/ofs(v2), /*a1_xor_a0*/ofs(v4),
+                        /*a*/H, /*b*/ofs(v2), /*a1_xor_a0*/v4,
                         /*temps*/ofs(v6), ofs(v3), /*reuse b*/ofs(v2));
       // Reduce v7:v5 by the field polynomial
       __ ghash_reduce(/*result*/ofs(v0), /*lo*/ofs(v5), /*hi*/ofs(v7), /*p*/v24, vzr, /*temp*/ofs(v3));
@@ -5424,6 +5424,8 @@ class StubGenerator: public StubCodeGenerator {
     // the bits in each byte (we have an instruction, RBIT, to do
     // that) and keep the data in little-endian bit order throught the
     // calculation, bit-reversing the inputs and outputs.
+
+    address small = generate_ghash_processBlocks();
 
     StubCodeMark mark(this, "StubRoutines", "ghash_processBlocks");
     __ align(wordSize * 2);
@@ -5442,25 +5444,27 @@ class StubGenerator: public StubCodeGenerator {
     Register data    = c_rarg2;
     Register blocks  = c_rarg3;
 
+    __ cmp(blocks, (unsigned char)4);
+    __ br(__ LT, small);
+
     FloatRegister vzr = v30;
     __ eor(vzr, __ T16B, vzr, vzr); // zero register
 
     __ ldrq(v24, p);    // The field polynomial
 
     __ ldrq(v0, Address(state));
-    __ ldrq(ofs(v1), Address(subkeyH));
+    __ ldrq(v29, Address(subkeyH));
 
     __ rev64(v0, __ T16B, v0);          // Bit-reverse words in state and subkeyH
     __ rbit(v0, __ T16B, v0);
-    __ rev64(ofs(v1), __ T16B, ofs(v1));
-    __ rbit(ofs(v1), __ T16B, ofs(v1));
-
-    __ ext(ofs(v4), __ T16B, ofs(v1), ofs(v1), 0x08); // long-swap subkeyH into v1
-    __ eor(ofs(v4), __ T16B, ofs(v4), ofs(v1));        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    __ rev64(v29, __ T16B, v29);
+    __ rbit(v29, __ T16B, v29);
 
     // Square H
+    __ ext(v4, __ T16B, v29, v29, 0x08); // long-swap subkeyH into v1
+    __ eor(v4, __ T16B, v4, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
     __ ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
-                      /*a*/ofs(v1), /*b*/ofs(v1), /*a1_xor_a0*/ofs(v4),
+                      /*a*/v29, /*b*/v29, /*a1_xor_a0*/v4,
                       /*temps*/v6, v3, v8);
     // Reduce v7:v5 by the field polynomial
     __ ghash_reduce(/*result*/v1, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
@@ -5474,6 +5478,8 @@ class StubGenerator: public StubCodeGenerator {
     __ eor(v4, __ T16B, v4, v1);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
     // v1 contains (H**2), ofs(v1) contains(H)
+    // v0 and ofs(v0) contain the initial state
+    __ eor(ofs(v0), __ T16B, ofs(v0), ofs(v0)); // zero odd state register
 
     {
       Label L_ghash_loop;
@@ -5485,21 +5491,14 @@ class StubGenerator: public StubCodeGenerator {
       __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
       ghash_modmul0(v1, vzr);             // Multiply state in v2 by H**2 in v1
 
-      __ rev64(v0, __ T16B, v0);
-      __ rbit(v0, __ T16B, v0);
-      __ rev64(v0, __ T16B, v0);
-      __ rbit(v0, __ T16B, v0);
+      __ nop();
 
       __ ldrq(ofs(v2), Address(__ post(data, 0x10))); // Load the data, bit
                                                       // reversing each byte
       __ rbit(ofs(v2), __ T16B, ofs(v2));
       __ eor(ofs(v2), __ T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
       ghash_modmul1(v1, vzr);             // Multiply state in v2 by H**2 in v1
-
-      __ rev64(ofs(v0), __ T16B, ofs(v0));
-      __ rbit(ofs(v0), __ T16B, ofs(v0));
-      __ rev64(ofs(v0), __ T16B, ofs(v0));
-      __ rbit(ofs(v0), __ T16B, ofs(v0));
+      __ nop();
 
       __ sub(blocks, blocks, 2);
       __ cmp(blocks, (unsigned char)2);
@@ -5507,23 +5506,31 @@ class StubGenerator: public StubCodeGenerator {
     }
 
     // Final go-around
+    {
+      __ ldrq(v2, Address(__ post(data, 0x10))); // Load the data, bit
+                                                 // reversing each byte
+      __ rbit(v2, __ T16B, v2);
+      __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
+      ghash_modmul0(v1, vzr);             // Multiply state in v2 by H**2 in v1
 
-    __ ldrq(v2, Address(__ post(data, 0x10))); // Load the data, bit
-                                               // reversing each byte
-    __ rbit(v2, __ T16B, v2);
-    __ eor(v2, __ T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul0(v1, vzr);             // Multiply state in v2 by H**2 in v1
+      __ nop();
 
-    __ ldrq(ofs(v2), Address(__ post(data, 0x10))); // Load the data, bit
-                                                    // reversing each byte
-    __ rbit(ofs(v2), __ T16B, ofs(v2));
-    __ eor(ofs(v2), __ T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
-    ghash_modmul1(ofs(v1), vzr);             // Multiply state in v2 by H**2 in v1
+      __ ldrq(ofs(v2), Address(__ post(data, 0x10))); // Load the data, bit
+                                                      // reversing each byte
+      __ rbit(ofs(v2), __ T16B, ofs(v2));
+      __ eor(ofs(v2), __ T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
+
+      __ ext(v4, __ T16B, v29, v29, 0x08); // long-swap subkeyH into v1
+      __ eor(v4, __ T16B, v4, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+      ghash_modmul1(v29, vzr);             // Multiply state in v2 by H in v29
+      __ nop();
+    }
 
     // The bit-reversed result is at this point in v0 ^ ofs(v0)
     __ eor(v0, __ T16B, v0, ofs(v0));
     __ rev64(v0, __ T16B, v0);
     __ rbit(v0, __ T16B, v0);
+    __ nop();
 
     __ st1(v0, __ T16B, state);
     __ ret(lr);
@@ -7232,7 +7239,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
     }
 
     if (UseBASE64Intrinsics) {
