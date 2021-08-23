@@ -29,6 +29,7 @@
 
 package com.sun.crypto.provider;
 
+import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
@@ -49,7 +50,7 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
  * @since 1.8
  */
 
-final class GHASH implements Cloneable, GCM {
+public final class GHASH implements Cloneable, GCM {
 
     private static final int AES_BLOCK_SIZE = 16;
 
@@ -61,13 +62,43 @@ final class GHASH implements Cloneable, GCM {
     // Maximum buffer size rotating ByteBuffer->byte[] intrinsic copy
     private static final int MAX_LEN = 1024;
 
-    // Multiplies state[0], state[1] by subkeyH[0], subkeyH[1].
-    private static void blockMult(long[] st, long[] subH) {
+    static void printx(PrintStream stream, String s, long[] longs) {
+        var reversed = new long[longs.length];
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        for (int i = 0; i < longs.length; i++) {
+            var l = longs[i];
+            buffer.putLong(0, l);
+            if (1 == 2) {
+                var bytes = buffer.array();
+                for (int lo = 0, hi = bytes.length - 1; lo < hi; lo++, hi--) {
+                    var t = bytes[lo];
+                    bytes[lo] = bytes[hi];
+                    bytes[hi] = t;
+                }
+                buffer.put(0, bytes);
+            }
+            reversed[i] = buffer.getLong(0);
+        }
+        stream.printf("%14s 0x%016xl, 0x%016xl rev: 0x%016xl, 0x%016xl\n", s, reversed[0], reversed[1],
+                Long.reverse(longs[0]), Long.reverse(longs[1]));
+    }
+
+                // Multiplies state[0], state[1] by subkeyH[0], subkeyH[1].
+
+                /**
+     * Multiplies state[0], state[1] by subkeyH[0], subkeyH[1].
+     * @param st thing
+     * @param subH other thing
+     */
+    public static void blockMult(long[] st, long[] subH) {
         var s = System.getProperty("com.foo.bar.Test");
 
         if (s != null) {
-            System.out.printf("subkey %016x:%016x\n", subH[0], subH[1]);
-            System.out.printf("state  %016x:%016x\n", st[0], st[1]);
+            printx(System.out, "subH", subH);
+            printx(System.out, "st", st);
+            // System.out.printf("subH   0x%016xl, 0x%016xl\n", subH[0], subH[1]);
+            // System.out.printf("state  0x%016xl, 0x%016xl\n", st[0], st[1]);
+            /*
             if (subH.length > 2 && subH[2] == 0 && subH[3] == 0) {
                 long[] H0 = Arrays.copyOf(subH, 2);
                 long[] H1 = Arrays.copyOf(subH, 2);
@@ -75,6 +106,7 @@ final class GHASH implements Cloneable, GCM {
                 System.arraycopy(H0, 0, subH, 2, 2);
                 System.out.printf("### square %016x:%016x\n", H0[0], H0[1]);
             }
+            */
         }
         long Z0 = 0;
         long Z1 = 0;
@@ -132,6 +164,11 @@ final class GHASH implements Cloneable, GCM {
         st[0] = Z0;
         st[1] = Z1;
 
+        if (s != null) {
+            printx(System.out, "result", st);
+            System.out.println();
+            // System.out.printf("result 0x%016xl, 0x%016xl\n\n", st[0], st[1]);
+        }
     }
 
     /* subkeyHtbl and state are stored in long[] for GHASH intrinsic use */
@@ -180,11 +217,18 @@ final class GHASH implements Cloneable, GCM {
         var s = System.getProperty("com.foo.bar.Test");
 
         if (s != null) {
-            System.out.printf("preX  0x%016xl, 0x%016xl\n", st[0], st[1]);
-            System.out.printf("data  0x%016xl, 0x%016xl\n", (long)asLongView.get(data, ofs), asLongView.get(data, ofs + 8));
+            printx(System.out, "preX", st);
+            printx(System.out, "data", new long[] {(long)asLongView.get(data, ofs),
+                    (long)asLongView.get(data, ofs + 8)});
         }
+
         st[0] ^= (long)asLongView.get(data, ofs);
         st[1] ^= (long)asLongView.get(data, ofs + 8);
+
+        if (s != null) {
+            printx(System.out, "postX", st);
+        }
+
         blockMult(st, subH);
     }
 
@@ -296,8 +340,17 @@ final class GHASH implements Cloneable, GCM {
      * the hotspot signature.  This method and methods called by it, cannot
      * throw exceptions or allocate arrays as it will breaking intrinsics
      */
+
+    /**
+     * TBD
+     * @param data TBD
+     * @param inOfs TBD
+     * @param blocks TBD
+     * @param st TBD
+     * @param subH TBD
+     */
     @IntrinsicCandidate
-    private static void processBlocks(byte[] data, int inOfs, int blocks,
+    public static void processBlocks(byte[] data, int inOfs, int blocks,
         long[] st, long[] subH) {
         int offset = inOfs;
         while (blocks > 0) {
