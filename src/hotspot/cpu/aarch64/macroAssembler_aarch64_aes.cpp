@@ -392,7 +392,7 @@ void MacroAssembler::ghash_modmul1 (FloatRegister H, FloatRegister vzr, FloatReg
 void MacroAssembler::ghash_processBlocks_wide(address p, Register state, Register subkeyH,
                                               Register data, Register blocks) {
   FloatRegister vzr = v30;
-  FloatRegister a1_xor_a0 = v4;
+  FloatRegister a1_xor_a0 = v28;
   eor(vzr, T16B, vzr, vzr); // zero register
 
   ldrq(v24, p);    // The field polynomial
