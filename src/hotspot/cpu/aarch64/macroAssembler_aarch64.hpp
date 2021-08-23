@@ -1315,7 +1315,7 @@ public:
                            FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
                            FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3);
   void ghash_processBlocks_wide(address p, Register state, Register subkeyH,
-                                Register data, Register blocks);
+                                Register data, Register blocks, int unrolls);
 
   void ghash_reduce(FloatRegister result, FloatRegister lo, FloatRegister hi,
                     FloatRegister p, FloatRegister z, FloatRegister t1);

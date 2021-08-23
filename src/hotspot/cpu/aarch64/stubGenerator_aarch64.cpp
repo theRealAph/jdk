@@ -2930,7 +2930,7 @@ class StubGenerator: public StubCodeGenerator {
     __ lsr(len, len, exact_log2(16));  // We want the count of blocks
 
     // GHASH/CTR loop
-    __ ghash_processBlocks_wide(ghash_polynomial, state, subkeyHtbl, ct, len);
+    __ ghash_processBlocks_wide(ghash_polynomial, state, subkeyHtbl, ct, len, 2);
 
     __ bind(DONE);
     // Return the number of bytes processed
@@ -5387,7 +5387,7 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(sp, sp, 4 * 16);
     __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
 
-    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks);
+    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks, 2);
 
     // And restore it
     __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));

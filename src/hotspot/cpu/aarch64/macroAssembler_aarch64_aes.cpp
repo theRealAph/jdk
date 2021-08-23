@@ -382,42 +382,42 @@ void MacroAssembler::ghash_modmul_wide (FloatRegister result,
 }
 
 void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register state, Register subkeyH,
-                                              Register data, Register blocks) {
+                                              Register data, Register blocks, int unrolls) {
   int unroll_step = 7;
-  int unrolls = 2;
 
-  FloatRegister vzr = v30;
   FloatRegister a1_xor_a0 = v28;
+  FloatRegister Hprime = v29;
+  FloatRegister vzr = v30;
   FloatRegister p = v31;
   eor(vzr, T16B, vzr, vzr); // zero register
 
   ldrq(p, field_polynomial);    // The field polynomial
 
   ldrq(v0, Address(state));
-  ldrq(v29, Address(subkeyH));
+  ldrq(Hprime, Address(subkeyH));
 
   rev64(v0, T16B, v0);          // Bit-reverse words in state and subkeyH
   rbit(v0, T16B, v0);
-  rev64(v29, T16B, v29);
-  rbit(v29, T16B, v29);
+  rev64(Hprime, T16B, Hprime);
+  rbit(Hprime, T16B, Hprime);
 
-  // Square H -> v29
+  // Square H -> Hprime
 
-  orr(v6, T16B, v29, v29);  // Start with H in v6 and v29
+  orr(v6, T16B, Hprime, Hprime);  // Start with H in v6 and Hprime
   for (int i = 1; i < unrolls; i++) {
-    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-    eor(a1_xor_a0, T16B, a1_xor_a0, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
     ghash_modmul_wide(/*result*/v6, /*result_lo*/v5, /*result_hi*/v4, /*b*/v6,
-                      /*a*/v29, vzr, a1_xor_a0, p,
+                      Hprime, vzr, a1_xor_a0, p,
                       /*temps*/v1, v3, v2);
     rev64(v1, T16B, v6);
     rbit(v1, T16B, v1);
     strq(v1, Address(subkeyH, 16 * i));
   }
 
-  orr(v29, T16B, v6, v6);
+  orr(Hprime, T16B, v6, v6);
 
-  // v29 contains (H**unrolls)
+  // Hprime contains (H**unrolls)
   // v0 and ofs + (v0) contain the initial state
   for (int ofs = unroll_step; ofs < unrolls * unroll_step; ofs += unroll_step) {
     eor(ofs + (v0), T16B, ofs + (v0), ofs + (v0)); // zero odd state register
@@ -427,15 +427,15 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     Label L_ghash_loop;
     bind(L_ghash_loop);
 
-    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-    eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
     for (int ofs = 0; ofs < unrolls * unroll_step; ofs += unroll_step) {
       ld1(ofs + (v2), T16B, post(data, 0x10));
       rbit(ofs + (v2), T16B, ofs + (v2));
       eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
       ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
-                        /*H*/v29, vzr, a1_xor_a0, p,
+                        Hprime, vzr, a1_xor_a0, p,
                         /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
       nop();
     }
@@ -452,13 +452,13 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     rbit(ofs + (v2), T16B, ofs + (v2));
     eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
 
-    ldrq(v29, Address(subkeyH, 16 * (unrolls - i - 1)));
-    rev64(v29, T16B, v29);
-    rbit(v29, T16B, v29);
-    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-    eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    ldrq(Hprime, Address(subkeyH, 16 * (unrolls - i - 1)));
+    rev64(Hprime, T16B, Hprime);
+    rbit(Hprime, T16B, Hprime);
+    ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
     ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
-                      /*H*/v29, vzr, a1_xor_a0, p,
+                      Hprime, vzr, a1_xor_a0, p,
                       /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
     nop();
   }
