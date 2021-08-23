@@ -378,7 +378,7 @@ void MacroAssembler::ghash_modmul_wide (FloatRegister result,
                     /*a*/a, /*b*/b, /*a1_xor_a0*/a1_xor_a0,
                     /*temps*/t1, t2, /*reuse b*/b);
   // Reduce v4:v5 by the field polynomial
-  ghash_reduce(/*result*/result, /*lo*/result_lo, /*hi*/result_hi, /*p*/p, vzr, /*temp*/t3);
+  ghash_reduce(/*result*/result, /*lo*/result_lo, /*hi*/result_hi, /*p*/p, vzr, /*temp*/t2);
 }
 
 void MacroAssembler::ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p) {
@@ -435,13 +435,15 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     ld1(v2, T16B, post(data, 0x10));
     ld1(ofs + (v2), T16B, post(data, 0x10));
 
-    rbit(v2, T16B, v2);
-    eor(v2, T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul_wide(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
+    ofs = 0;
+    rbit(ofs + (v2), T16B, ofs + (v2));
+    eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
+    ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
                       /*H*/v29, vzr, a1_xor_a0, p,
-                      /*temps*/v1, v3, /* reuse b*/v2);
+                      /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
     nop();
 
+    ofs = 8;
     rbit(ofs + (v2), T16B, ofs + (v2));
     eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
     ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
@@ -477,7 +479,10 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     rbit(v29, T16B, v29);
     ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
     eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-    ghash_modmul0(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H in v29
+    ofs = 8;
+    ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
+                      /*H*/v29, vzr, a1_xor_a0, p,
+                      /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
     nop();
   }
 
