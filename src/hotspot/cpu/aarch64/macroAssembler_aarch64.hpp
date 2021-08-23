@@ -1298,7 +1298,10 @@ public:
         Register len, Register tmp0, Register tmp1, Register tmp2,
         Register tmp3);
   void ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p);
-  void ghash_modmul1 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p);
+  void ghash_modmul_wide (FloatRegister result,
+                          FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
+                          FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                          FloatRegister t1, FloatRegister t2, FloatRegister t3);
 public:
   void multiply_to_len(Register x, Register xlen, Register y, Register ylen, Register z,
                        Register zlen, Register tmp1, Register tmp2, Register tmp3,

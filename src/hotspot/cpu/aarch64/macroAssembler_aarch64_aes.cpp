@@ -369,28 +369,31 @@ void MacroAssembler::ghash_multiply_wide(int unroll, int register_offset,
   ins(result_lo, D, tmp2, 1, 0);
 }
 
-static FloatRegister ofs(FloatRegister r) { return r + 8; }
+void MacroAssembler::ghash_modmul_wide (FloatRegister result,
+                                        FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
+                                        FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                                        FloatRegister t1, FloatRegister t2, FloatRegister t3) {
+  // Multiply state in v2 by H
+  ghash_multiply(/*result_lo*/result_lo, /*result_hi*/result_hi,
+                    /*a*/a, /*b*/b, /*a1_xor_a0*/a1_xor_a0,
+                    /*temps*/t1, t2, /*reuse b*/b);
+  // Reduce v4:v5 by the field polynomial
+  ghash_reduce(/*result*/result, /*lo*/result_lo, /*hi*/result_hi, /*p*/p, vzr, /*temp*/t3);
+}
 
 void MacroAssembler::ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p) {
   // Multiply state in v2 by H
   ghash_multiply(/*result_lo*/v5, /*result_hi*/v4,
-                    /*a*/H, /*b*/v2, /*a1_xor_a0*/a1_xor_a0,
-                    /*temps*/v1, v3, /*reuse b*/v2);
+                 /*a*/H, /*b*/v2, /*a1_xor_a0*/a1_xor_a0,
+                 /*temps*/v1, v3, /*reuse b*/v2);
   // Reduce v4:v5 by the field polynomial
   ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v4, /*p*/v31, vzr, /*temp*/v3);
 }
 
-void MacroAssembler::ghash_modmul1 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p) {
-  // Multiply state in v2 by H
-  ghash_multiply(/*result_lo*/ofs(v5), /*result_hi*/ofs(v4),
-                    /*a*/H, /*b*/ofs(v2), /*a1_xor_a0*/a1_xor_a0,
-                    /*temps*/ofs(v1), ofs(v3), /*reuse b*/ofs(v2));
-  // Reduce v4:v5 by the field polynomial
-  ghash_reduce(/*result*/ofs(v0), /*lo*/ofs(v5), /*hi*/ofs(v4), /*p*/v31, vzr, /*temp*/ofs(v3));
-}
-
 void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register state, Register subkeyH,
                                               Register data, Register blocks) {
+  int ofs = 8;
+
   FloatRegister vzr = v30;
   FloatRegister a1_xor_a0 = v28;
   FloatRegister p = v31;
@@ -422,24 +425,28 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
   // v29 contains (H**2)
-  // v0 and ofs(v0) contain the initial state
-  eor(ofs(v0), T16B, ofs(v0), ofs(v0)); // zero odd state register
+  // v0 and ofs + (v0) contain the initial state
+  eor(ofs + (v0), T16B, ofs + (v0), ofs + (v0)); // zero odd state register
 
   {
     Label L_ghash_loop;
     bind(L_ghash_loop);
 
     ld1(v2, T16B, post(data, 0x10));
-    ld1(ofs(v2), T16B, post(data, 0x10));
+    ld1(ofs + (v2), T16B, post(data, 0x10));
 
     rbit(v2, T16B, v2);
     eor(v2, T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul0(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v29
+    ghash_modmul_wide(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
+                      /*H*/v29, vzr, a1_xor_a0, p,
+                      /*temps*/v1, v3, /* reuse b*/v2);
     nop();
 
-    rbit(ofs(v2), T16B, ofs(v2));
-    eor(ofs(v2), T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
-    ghash_modmul1(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v29
+    rbit(ofs + (v2), T16B, ofs + (v2));
+    eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
+    ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
+                      /*H*/v29, vzr, a1_xor_a0, p,
+                      /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
     nop();
 
     sub(blocks, blocks, 2);
@@ -450,7 +457,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   // Final go-around
   {
     ld1(v2, T16B, post(data, 0x10));
-    ld1(ofs(v2), T16B, post(data, 0x10));
+    ld1(ofs + (v2), T16B, post(data, 0x10));
 
     // ldrq(v2, Address(post(data, 0x10))); // Load the data, bit
     //                                            // reversing each byte
@@ -460,22 +467,22 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
     nop();
 
-    // ldrq(ofs(v2), Address(post(data, 0x10))); // Load the data, bit
+    // ldrq(ofs + (v2), Address(post(data, 0x10))); // Load the data, bit
     //                                                 // reversing each byte
-    rbit(ofs(v2), T16B, ofs(v2));
-    eor(ofs(v2), T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
+    rbit(ofs + (v2), T16B, ofs + (v2));
+    eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
 
     ldrq(v29, Address(subkeyH));
     rev64(v29, T16B, v29);
     rbit(v29, T16B, v29);
     ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
     eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-    ghash_modmul1(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H in v29
+    ghash_modmul0(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H in v29
     nop();
   }
 
-  // The bit-reversed result is at this point in v0 ^ ofs(v0)
-  eor(v0, T16B, v0, ofs(v0));
+  // The bit-reversed result is at this point in v0 ^ ofs + (v0)
+  eor(v0, T16B, v0, ofs + (v0));
   rev64(v0, T16B, v0);
   rbit(v0, T16B, v0);
   nop();
