@@ -410,23 +410,26 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   rbit(v29, T16B, v29);
 
   // Square H -> v29
-  ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-  eor(a1_xor_a0, T16B, a1_xor_a0, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-  ghash_multiply(/*result_lo*/v5, /*result_hi*/v4,
-                 /*a*/v29, /*b*/v29, /*a1_xor_a0*/a1_xor_a0,
-                 /*temps*/v1, v3, v8);
-  // Reduce v4:v5 by the field polynomial
-  ghash_reduce(/*result*/v29, /*lo*/v5, /*hi*/v4, /*p*/p, vzr, /*temp*/v3);
-  rev64(v1, T16B, v29);
-  rbit(v1, T16B, v1);
-  strq(v1, Address(subkeyH, 16));
 
+  orr(v6, T16B, v29, v29);  // Start with H in v6 and v29
+  for (int i = 1; i < 2; i++) {
+    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    ghash_modmul_wide(/*result*/v6, /*result_lo*/v5, /*result_hi*/v4, /*b*/v6,
+                      /*a*/v29, vzr, a1_xor_a0, p,
+                      /*temps*/v1, v3, v2);
+    rev64(v1, T16B, v6);
+    rbit(v1, T16B, v1);
+    strq(v1, Address(subkeyH, 16 * i));
+  }
+
+  orr(v29, T16B, v6, v6);
   ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
   eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
   // v29 contains (H**2)
   // v0 and ofs + (v0) contain the initial state
-  for (int ofs = unroll_step; ofs < 14; ofs++) {
+  for (int ofs = unroll_step; ofs < 14; ofs += unroll_step) {
     eor(ofs + (v0), T16B, ofs + (v0), ofs + (v0)); // zero odd state register
   }
 
