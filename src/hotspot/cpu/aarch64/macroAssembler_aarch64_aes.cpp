@@ -393,6 +393,7 @@ void MacroAssembler::ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatReg
 void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register state, Register subkeyH,
                                               Register data, Register blocks) {
   int unroll_step = 7;
+  int unrolls = 2;
 
   FloatRegister vzr = v30;
   FloatRegister a1_xor_a0 = v28;
@@ -412,7 +413,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   // Square H -> v29
 
   orr(v6, T16B, v29, v29);  // Start with H in v6 and v29
-  for (int i = 1; i < 2; i++) {
+  for (int i = 1; i < 4; i++) {
     ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
     eor(a1_xor_a0, T16B, a1_xor_a0, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
     ghash_modmul_wide(/*result*/v6, /*result_lo*/v5, /*result_hi*/v4, /*b*/v6,
@@ -421,15 +422,15 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     rev64(v1, T16B, v6);
     rbit(v1, T16B, v1);
     strq(v1, Address(subkeyH, 16 * i));
-  }
 
-  orr(v29, T16B, v6, v6);
-  ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-  eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    if (i == 1) {
+      orr(v29, T16B, v6, v6);  // TEMPORARY HACK
+    }
+  }
 
   // v29 contains (H**2)
   // v0 and ofs + (v0) contain the initial state
-  for (int ofs = unroll_step; ofs < 14; ofs += unroll_step) {
+  for (int ofs = unroll_step; ofs < unrolls * unroll_step; ofs += unroll_step) {
     eor(ofs + (v0), T16B, ofs + (v0), ofs + (v0)); // zero odd state register
   }
 
@@ -437,7 +438,10 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     Label L_ghash_loop;
     bind(L_ghash_loop);
 
-    for (int ofs = 0; ofs < 2 * unroll_step; ofs += unroll_step) {
+    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+
+    for (int ofs = 0; ofs < unrolls * unroll_step; ofs += unroll_step) {
       ld1(ofs + (v2), T16B, post(data, 0x10));
       rbit(ofs + (v2), T16B, ofs + (v2));
       eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
@@ -453,31 +457,21 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   }
 
   // Final go-around
-  {
-    ld1(v2, T16B, post(data, 0x10));
-    ld1(unroll_step + (v2), T16B, post(data, 0x10));
+  for (int i = 0; i < unrolls; i++) {
+    int ofs = unroll_step * i;
+    ld1(v2+ofs, T16B, post(data, 0x10));
+    rbit(ofs + (v2), T16B, ofs + (v2));
+    eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
 
-    rbit(v2, T16B, v2);
-    eor(v2, T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul0(v29, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v29
-
+    ldrq(v29, Address(subkeyH, 16 * (unrolls - i - 1)));
+    rev64(v29, T16B, v29);
+    rbit(v29, T16B, v29);
+    ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
+    eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+    ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
+                      /*H*/v29, vzr, a1_xor_a0, p,
+                      /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
     nop();
-
-    {
-      int ofs = unroll_step;
-      rbit(ofs + (v2), T16B, ofs + (v2));
-      eor(ofs + (v2), T16B, ofs + (v0), ofs + (v2));   // bit-swapped data ^ bit-swapped state
-
-      ldrq(v29, Address(subkeyH));
-      rev64(v29, T16B, v29);
-      rbit(v29, T16B, v29);
-      ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
-      eor(a1_xor_a0, T16B, a1_xor_a0, v29);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-      ghash_modmul_wide(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
-                        /*H*/v29, vzr, a1_xor_a0, p,
-                        /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
-      nop();
-    }
   }
 
   // The bit-reversed result is at this point in v0 ^ ofs + (v0)
