@@ -385,6 +385,8 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                                               Register data, Register blocks, int unrolls) {
   int unroll_step = 7;
 
+  assert(unrolls <= 4, "out of registers");
+
   FloatRegister a1_xor_a0 = v28;
   FloatRegister Hprime = v29;
   FloatRegister vzr = v30;
@@ -440,8 +442,8 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
       nop();
     }
 
-    sub(blocks, blocks, 2);
-    cmp(blocks, (unsigned char)2);
+    sub(blocks, blocks, unrolls);
+    cmp(blocks, (unsigned char)unrolls);
     br(GT, L_ghash_loop);
   }
 
