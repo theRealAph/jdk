@@ -1297,8 +1297,8 @@ public:
   void kernel_crc32c_using_crc32c(Register crc, Register buf,
         Register len, Register tmp0, Register tmp1, Register tmp2,
         Register tmp3);
-  void ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p);
-  void ghash_modmul1 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p);
+  void ghash_modmul0 (FloatRegister H, FloatRegister vzr);
+  void ghash_modmul1 (FloatRegister H, FloatRegister vzr);
 public:
   void multiply_to_len(Register x, Register xlen, Register y, Register ylen, Register z,
                        Register zlen, Register tmp1, Register tmp2, Register tmp3,
