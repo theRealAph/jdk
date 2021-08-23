@@ -416,17 +416,16 @@ void MacroAssembler::ghash_processBlocks_wide(address poly, Register state, Regi
                  /*a*/H, /*b*/H, /*a1_xor_a0*/a1_xor_a0,
                  /*temps*/v6, v3, v8);
   // Reduce v7:v5 by the field polynomial
-  ghash_reduce(/*result*/v1, /*lo*/v5, /*hi*/v7, /*p*/p, vzr, /*temp*/v3);
+  ghash_reduce(/*result*/H, /*lo*/v5, /*hi*/v7, /*p*/p, vzr, /*temp*/v3);
 
   // Store into subH[1]
-  rev64(v1, T16B, v1);
+  rev64(v1, T16B, H);
   rbit(v1, T16B, v1);
   strq(v1, Address(subkeyH, 16));
 
   ext(a1_xor_a0, T16B, v1, v1, 0x08); // long-swap subkeyH into a1_xor_a0
   eor(a1_xor_a0, T16B, a1_xor_a0, v1);      // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
 
-  // v1 contains (H**2), ofs(v1) contains(H)
   // v0 and ofs(v0) contain the initial state
   eor(ofs(v0), T16B, ofs(v0), ofs(v0)); // zero odd state register
 
@@ -439,12 +438,12 @@ void MacroAssembler::ghash_processBlocks_wide(address poly, Register state, Regi
 
     rbit(v2, T16B, v2);
     eor(v2, T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul0(v1, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v1
+    ghash_modmul0(H, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in H
     nop();
 
     rbit(ofs(v2), T16B, ofs(v2));
     eor(ofs(v2), T16B, ofs(v0), ofs(v2));   // bit-swapped data ^ bit-swapped state
-    ghash_modmul1(v1, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v1
+    ghash_modmul1(H, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in H
     nop();
 
     sub(blocks, blocks, 2);
@@ -461,7 +460,7 @@ void MacroAssembler::ghash_processBlocks_wide(address poly, Register state, Regi
     //                                            // reversing each byte
     rbit(v2, T16B, v2);
     eor(v2, T16B, v0, v2);   // bit-swapped data ^ bit-swapped state
-    ghash_modmul0(v1, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in v1
+    ghash_modmul0(H, vzr, a1_xor_a0, p);             // Multiply state in v2 by H**2 in H
 
     nop();
 
@@ -473,7 +472,7 @@ void MacroAssembler::ghash_processBlocks_wide(address poly, Register state, Regi
     ldrq(H, Address(subkeyH));
     ext(a1_xor_a0, T16B, H, H, 0x08); // long-swap subkeyH into a1_xor_a0
     eor(a1_xor_a0, T16B, H, H);       // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-    ghash_modmul1(H, vzr, a1_xor_a0, p);             // Multiply state in v2 by H in v29
+    ghash_modmul1(H, vzr, a1_xor_a0, p);             // Multiply state in v2 by H in H
     nop();
   }
 
