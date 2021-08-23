@@ -373,20 +373,20 @@ static FloatRegister ofs(FloatRegister r) { return r + 8; }
 
 void MacroAssembler::ghash_modmul0 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p) {
   // Multiply state in v2 by H
-  ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
+  ghash_multiply(/*result_lo*/v5, /*result_hi*/v4,
                     /*a*/H, /*b*/v2, /*a1_xor_a0*/a1_xor_a0,
                     /*temps*/v6, v3, /*reuse b*/v2);
-  // Reduce v7:v5 by the field polynomial
-  ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
+  // Reduce v4:v5 by the field polynomial
+  ghash_reduce(/*result*/v0, /*lo*/v5, /*hi*/v4, /*p*/v24, vzr, /*temp*/v3);
 }
 
 void MacroAssembler::ghash_modmul1 (FloatRegister H, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p) {
   // Multiply state in v2 by H
-  ghash_multiply(/*result_lo*/ofs(v5), /*result_hi*/ofs(v7),
+  ghash_multiply(/*result_lo*/ofs(v5), /*result_hi*/ofs(v4),
                     /*a*/H, /*b*/ofs(v2), /*a1_xor_a0*/a1_xor_a0,
                     /*temps*/ofs(v6), ofs(v3), /*reuse b*/ofs(v2));
-  // Reduce v7:v5 by the field polynomial
-  ghash_reduce(/*result*/ofs(v0), /*lo*/ofs(v5), /*hi*/ofs(v7), /*p*/v24, vzr, /*temp*/ofs(v3));
+  // Reduce v4:v5 by the field polynomial
+  ghash_reduce(/*result*/ofs(v0), /*lo*/ofs(v5), /*hi*/ofs(v4), /*p*/v24, vzr, /*temp*/ofs(v3));
 }
 
 void MacroAssembler::ghash_processBlocks_wide(address p, Register state, Register subkeyH,
@@ -408,11 +408,11 @@ void MacroAssembler::ghash_processBlocks_wide(address p, Register state, Registe
   // Square H
   ext(a1_xor_a0, T16B, v29, v29, 0x08); // long-swap subkeyH into a1_xor_a0
   eor(a1_xor_a0, T16B, a1_xor_a0, v29);        // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-  ghash_multiply(/*result_lo*/v5, /*result_hi*/v7,
+  ghash_multiply(/*result_lo*/v5, /*result_hi*/v4,
                  /*a*/v29, /*b*/v29, /*a1_xor_a0*/a1_xor_a0,
                  /*temps*/v6, v3, v8);
-  // Reduce v7:v5 by the field polynomial
-  ghash_reduce(/*result*/v1, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3);
+  // Reduce v4:v5 by the field polynomial
+  ghash_reduce(/*result*/v1, /*lo*/v5, /*hi*/v4, /*p*/v24, vzr, /*temp*/v3);
   orr(v29, T16B, v1, v1); // Save H in v29
   rev64(v1, T16B, v1);
   rbit(v1, T16B, v1);
