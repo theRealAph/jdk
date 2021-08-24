@@ -546,6 +546,8 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     eor(v0, T16B, v0, v0 + register_stride + ofs);
   }
 
+  sub(blocks, blocks, (unsigned char)unrolls);
+
   rev64(v0, T16B, v0);
   rbit(v0, T16B, v0);
   st1(v0, T16B, state);

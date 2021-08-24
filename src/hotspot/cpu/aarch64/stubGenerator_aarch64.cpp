@@ -5378,9 +5378,9 @@ class StubGenerator: public StubCodeGenerator {
     Register data    = c_rarg2;
     Register blocks  = c_rarg3;
 
-    const int unroll = 1;
+    const int unroll = 4;
 
-    __ cmp(blocks, (unsigned char)4);
+    __ cmp(blocks, (unsigned char)(unroll * 2));
     __ br(__ LT, small);
 
     if (unroll > 1) {
@@ -5391,14 +5391,16 @@ class StubGenerator: public StubCodeGenerator {
       __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
     }
 
-    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks, 1);
+    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks, unroll);
 
     if (unroll > 1) {
       // And restore state
       __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
       __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
     }
-    __ subs(blocks, blocks, 1);
+    // __ subs(blocks, blocks, 1);
+
+    __ cmp(blocks, (unsigned char)0);
     __ br(__ GT, small);
 
     __ ret(lr);
