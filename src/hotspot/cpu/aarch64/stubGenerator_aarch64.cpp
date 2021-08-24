@@ -5378,22 +5378,27 @@ class StubGenerator: public StubCodeGenerator {
     Register data    = c_rarg2;
     Register blocks  = c_rarg3;
 
+    const int unroll = 1;
+
     __ cmp(blocks, (unsigned char)4);
     __ br(__ LT, small);
 
+    if (unroll > 1) {
     // Save state before entering routine
-    __ sub(sp, sp, 4 * 16);
-    __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
-    __ sub(sp, sp, 4 * 16);
-    __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
+      __ sub(sp, sp, 4 * 16);
+      __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
+      __ sub(sp, sp, 4 * 16);
+      __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
+    }
 
-    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks, 2);
+    __ ghash_processBlocks_wide(p, state, subkeyH, data, blocks, 1);
 
-    // And restore it
-    __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
-    __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
-
-    __ subs(blocks, blocks, 2);
+    if (unroll > 1) {
+      // And restore state
+      __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
+      __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
+    }
+    __ subs(blocks, blocks, 1);
     __ br(__ GT, small);
 
     __ ret(lr);
