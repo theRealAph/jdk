@@ -456,6 +456,11 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
   // Powers of H -> Hprime
 
+  Label already_calculated, done;
+  ldp(rscratch1, rscratch2, Address(subkeyH, 16 * (unrolls - 1)));
+  orr(rscratch1, rscratch1, rscratch2);
+  cbnz(rscratch1, already_calculated);
+
   orr(v6, T16B, Hprime, Hprime);  // Start with H in v6 and Hprime
   for (int i = 1; i < unrolls; i++) {
     ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
@@ -467,12 +472,22 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     rbit(v1, T16B, v1);
     strq(v1, Address(subkeyH, 16 * i));
   }
+  b(done);
+
+  bind(already_calculated);
+  ldrq(v6, Address(subkeyH, 16 * (unrolls - 1)));
+  rev64(v6, T16B, v6);
+  rbit(v6, T16B, v6);
+
+  bind(done);
 
   orr(Hprime, T16B, v6, v6);     // Move H ** unrolls into Hprime
 
   // Hprime contains (H ** unrolls)
   // v0 contains the initial state. Clear the others.
-  for (int ofs = register_stride; ofs < unrolls * register_stride; ofs += register_stride) {
+  for (int i = 1; i < unrolls; i++) {
+    int ofs = register_stride * i;
+  // for (int ofs = register_stride; ofs < unrolls * register_stride; ofs += register_stride) {
     eor(ofs+v0, T16B, ofs+v0, ofs+v0); // zero odd state register
   }
 
