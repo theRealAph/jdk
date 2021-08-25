@@ -321,20 +321,21 @@ void MacroAssembler::ghash_reduce(FloatRegister result, FloatRegister lo, FloatR
   eor(result, T16B, lo, t0);
 }
 
-class AlgoKernelMacroAssembler: public MacroAssembler {
+class KernelGenerator: public MacroAssembler {
 
  public:
-  AlgoKernelMacroAssembler(Assembler *as): MacroAssembler(as->code()) { }
+  KernelGenerator(Assembler *as): MacroAssembler(as->code()) { }
   virtual void generate(int index) = 0;
+  virtual int length() = 0;
 };
 
-class GHASHMultiplyAssembler: public AlgoKernelMacroAssembler {
+class GHASHMultiplyGenerator: public KernelGenerator {
   FloatRegister _result, _result_lo, _result_hi, _b,
     _a, _vzr, _a1_xor_a0, _p,
     _tmp1, _tmp2, _tmp3;
 
 public:
-  GHASHMultiplyAssembler(Assembler *as, int ofs,
+  GHASHMultiplyGenerator(Assembler *as, int ofs,
                          /* offsetted registers */
                          FloatRegister result, FloatRegister result_lo, FloatRegister result_hi,
                          FloatRegister b,
@@ -342,7 +343,7 @@ public:
                          FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
                          /* offseted (temp) registers */
                          FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3)
-    : AlgoKernelMacroAssembler(as),
+    : KernelGenerator(as),
       _result(result+ofs), _result_lo(result_lo+ofs), _result_hi(result_hi+ofs), _b(b+ofs),
       _a(a), _vzr(vzr), _a1_xor_a0(a1_xor_a0), _p(p),
       _tmp1(tmp1+ofs), _tmp2(tmp2+ofs), _tmp3(tmp3+ofs) { }
@@ -388,20 +389,20 @@ public:
     }
   }
 
-  static int length() { return 11; }
+  virtual int length() { return 11; }
 };
 
-class GHASHReduceAssembler: public AlgoKernelMacroAssembler {
+class GHASHReduceGenerator: public KernelGenerator {
   FloatRegister _result, _lo, _hi, _p, _vzr, _t1;
 public:
-  GHASHReduceAssembler(Assembler *as, int ofs,
+  GHASHReduceGenerator(Assembler *as, int ofs,
                        /* offsetted registers */
                        FloatRegister result, FloatRegister lo, FloatRegister hi,
                        /* non-offsetted (shared) registers */
                        FloatRegister p, FloatRegister vzr,
                        /* offseted (temp) registers */
                        FloatRegister t1)
-    : AlgoKernelMacroAssembler(as),
+    : KernelGenerator(as),
       _result(result+ofs), _lo(lo+ofs), _hi(hi+ofs),
       _p(p), _vzr(vzr), _t1(t1+ofs) { }
 
@@ -435,13 +436,24 @@ public:
     }
   }
 
-  static int length() { return 7; }
+ int length() { return 7; }
 };
 
-class GHASHModmulGenerator {
-  int _unrolls, _register_stride;
-  GHASHMultiplyAssembler *multipliers[4];
-  GHASHReduceAssembler *reducers[4];
+class AbstractInterleavingGenerator {
+public:
+  void unroll(KernelGenerator **generators, int unrolls) {
+    for (int j = 0; j < generators[0]->length(); j++) {
+      for (int i = 0; i < unrolls; i++) {
+        generators[i]->generate(j);
+      }
+    }
+  }
+};
+
+class GHASHModmulGenerator: AbstractInterleavingGenerator {
+  int _unrolls;
+  KernelGenerator *_multipliers[4];
+  KernelGenerator *_reducers[4];
 
 public:
   GHASHModmulGenerator(Assembler *as, int unrolls, int register_stride,
@@ -449,28 +461,20 @@ public:
                        FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
                        FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
                        FloatRegister t1, FloatRegister t2, FloatRegister t3)
-    : _unrolls(unrolls), _register_stride(register_stride) {
+    : _unrolls(unrolls) {
     for (int i = 0; i < unrolls; i++) {
-      multipliers[i] = new GHASHMultiplyAssembler(as, /*offset*/i * register_stride,
-                                                  result, result_lo, result_hi,
-                                                  b, a, vzr, a1_xor_a0, p,
-                                                  /*temps*/t1, t2, t3);
-      reducers[i] = new GHASHReduceAssembler(as, /*offset*/i * register_stride,
-                                             result, result_lo, result_hi, p, vzr, t2);
+      _multipliers[i] = new GHASHMultiplyGenerator(as, /*offset*/i * register_stride,
+                                                   result, result_lo, result_hi,
+                                                   b, a, vzr, a1_xor_a0, p,
+                                                   /*temps*/t1, t2, t3);
+      _reducers[i] = new GHASHReduceGenerator(as, /*offset*/i * register_stride,
+                                              result, result_lo, result_hi, p, vzr, t2);
     }
   }
 
   void generate() {
-    for (int j = 0; j < GHASHMultiplyAssembler::length(); j++) {
-      for (int i = 0; i < _unrolls; i++) {
-        multipliers[i]->generate(j);
-      }
-    }
-    for (int j = 0; j < GHASHReduceAssembler::length(); j++) {
-      for (int i = 0; i < _unrolls; i++) {
-        reducers[i]->generate(j);
-      }
-    }
+    unroll(_multipliers, _unrolls);
+    unroll(_reducers, _unrolls);
   }
 };
 
@@ -651,6 +655,8 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
     Label L_ghash_loop;
     bind(L_ghash_loop);
+
+    // prfm(Address(data, 128), PLDL1KEEP);
 
     for (int index = 0; index < 3; index++) {
       for (int ofs = 0; ofs < unrolls * register_stride; ofs += register_stride) {
