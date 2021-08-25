@@ -1302,6 +1302,10 @@ public:
                           FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
                           FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
                           FloatRegister t1, FloatRegister t2, FloatRegister t3);
+  void ghash_modmul_thing(int index, FloatRegister result,
+                          FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
+                          FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                          FloatRegister t1, FloatRegister t2, FloatRegister t3);
   void ghash_modmul (FloatRegister result,
                      FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
                      FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,

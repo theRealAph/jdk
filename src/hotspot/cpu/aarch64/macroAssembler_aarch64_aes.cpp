@@ -321,6 +321,159 @@ void MacroAssembler::ghash_reduce(FloatRegister result, FloatRegister lo, FloatR
   eor(result, T16B, lo, t0);
 }
 
+class AlgoKernelMacroAssembler: public MacroAssembler {
+
+ public:
+  AlgoKernelMacroAssembler(Assembler *as): MacroAssembler(as->code()) { }
+  virtual void generate(int index) = 0;
+};
+
+class GHASHMultiplyAssembler: public AlgoKernelMacroAssembler {
+  FloatRegister _result, _result_lo, _result_hi, _b,
+    _a, _vzr, _a1_xor_a0, _p,
+    _tmp1, _tmp2, _tmp3;
+
+public:
+  GHASHMultiplyAssembler(Assembler *as, int ofs,
+                         /* offsetted registers */
+                         FloatRegister result, FloatRegister result_lo, FloatRegister result_hi,
+                         FloatRegister b,
+                         /* non-offsetted (shared) registers */
+                         FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                         /* offseted (temp) registers */
+                         FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3)
+    : AlgoKernelMacroAssembler(as),
+      _result(result+ofs), _result_lo(result_lo+ofs), _result_hi(result_hi+ofs), _b(b+ofs),
+      _a(a), _vzr(vzr), _a1_xor_a0(a1_xor_a0), _p(p),
+      _tmp1(tmp1+ofs), _tmp2(tmp2+ofs), _tmp3(tmp3+ofs) { }
+
+  virtual void generate(int index) {
+    // Karatsuba multiplication performs a 128*128 -> 256-bit
+    // multiplication in three 128-bit multiplications and a few
+    // additions.
+    //
+    // (C1:C0) = A1*B1, (D1:D0) = A0*B0, (E1:E0) = (A0+A1)(B0+B1)
+    // (A1:A0)(B1:B0) = C1:(C0+C1+D1+E1):(D1+C0+D0+E0):D0
+    //
+    // Inputs:
+    //
+    // A0 in a.d[0]     (subkey)
+    // A1 in a.d[1]
+    // (A1+A0) in a1_xor_a0.d[0]
+    //
+    // B0 in b.d[0]     (state)
+    // B1 in b.d[1]
+
+    switch (index) {
+      case  0:  ext(_tmp1, T16B, _b, _b, 0x08);  break;
+      case  1:  pmull2(_result_hi, T1Q, _b, _a, T2D);  // A1*B1
+        break;
+      case  2:  eor(_tmp1, T16B, _tmp1, _b);           // (B1+B0)
+        break;
+      case  3:  pmull(_result_lo,  T1Q, _b, _a, T1D);  // A0*B0
+        break;
+      case  4:  pmull(_tmp2, T1Q, _tmp1, _a1_xor_a0, T1D); // (A1+A0)(B1+B0)
+        break;
+
+      case  5:  ext(_tmp1, T16B, _result_lo, _result_hi, 0x08);  break;
+      case  6:  eor(_tmp3, T16B, _result_hi, _result_lo); // A1*B1+A0*B0
+        break;
+      case  7:  eor(_tmp2, T16B, _tmp2, _tmp1);  break;
+      case  8:  eor(_tmp2, T16B, _tmp2, _tmp3);  break;
+
+        // Register pair <_result_hi:_result_lo> holds the _result of carry-less multiplication
+      case  9:  ins(_result_hi, D, _tmp2, 0, 1);  break;
+      case 10:  ins(_result_lo, D, _tmp2, 1, 0);  break;
+      default: ShouldNotReachHere();
+    }
+  }
+
+  static int length() { return 11; }
+};
+
+class GHASHReduceAssembler: public AlgoKernelMacroAssembler {
+  FloatRegister _result, _lo, _hi, _p, _vzr, _t1;
+public:
+  GHASHReduceAssembler(Assembler *as, int ofs,
+                       /* offsetted registers */
+                       FloatRegister result, FloatRegister lo, FloatRegister hi,
+                       /* non-offsetted (shared) registers */
+                       FloatRegister p, FloatRegister vzr,
+                       /* offseted (temp) registers */
+                       FloatRegister t1)
+    : AlgoKernelMacroAssembler(as),
+      _result(result+ofs), _lo(lo+ofs), _hi(hi+ofs),
+      _p(p), _vzr(vzr), _t1(t1+ofs) { }
+
+  virtual void generate(int index) {
+    const FloatRegister t0 = _result;
+
+    switch (index) {
+      // The GCM field polynomial f is z^128 + p(z), where p =
+      // z^7+z^2+z+1.
+      //
+      //    z^128 === -p(z)  (mod (z^128 + p(z)))
+      //
+      // so, given that the product we're reducing is
+      //    a == lo + hi * z^128
+      // substituting,
+      //      === lo - hi * p(z)  (mod (z^128 + p(z)))
+      //
+      // we reduce by multiplying hi by p(z) and subtracting the _result
+      // from (i.e. XORing it with) lo.  Because p has no nonzero high
+      // bits we can do this with two 64-bit multiplications, lo*p and
+      // hi*p.
+
+      case  0:  pmull2(t0, T1Q, _hi, _p, T2D);  break;
+      case  1:  ext(_t1, T16B, t0, _vzr, 8);  break;
+      case  2:  eor(_hi, T16B, _hi, _t1);  break;
+      case  3:  ext(_t1, T16B, _vzr, t0, 8);  break;
+      case  4:  eor(_lo, T16B, _lo, _t1);  break;
+      case  5:  pmull(t0, T1Q, _hi, _p, T1D);  break;
+      case  6:  eor(_result, T16B, _lo, t0);  break;
+      default: ShouldNotReachHere();
+    }
+  }
+
+  static int length() { return 7; }
+};
+
+class GHASHModmulGenerator {
+  int _unrolls, _register_stride;
+  GHASHMultiplyAssembler *multipliers[4];
+  GHASHReduceAssembler *reducers[4];
+
+public:
+  GHASHModmulGenerator(Assembler *as, int unrolls, int register_stride,
+                       FloatRegister result,
+                       FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
+                       FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                       FloatRegister t1, FloatRegister t2, FloatRegister t3)
+    : _unrolls(unrolls), _register_stride(register_stride) {
+    for (int i = 0; i < unrolls; i++) {
+      multipliers[i] = new GHASHMultiplyAssembler(as, /*offset*/i * register_stride,
+                                                  result, result_lo, result_hi,
+                                                  b, a, vzr, a1_xor_a0, p,
+                                                  /*temps*/t1, t2, t3);
+      reducers[i] = new GHASHReduceAssembler(as, /*offset*/i * register_stride,
+                                             result, result_lo, result_hi, p, vzr, t2);
+    }
+  }
+
+  void generate() {
+    for (int j = 0; j < GHASHMultiplyAssembler::length(); j++) {
+      for (int i = 0; i < _unrolls; i++) {
+        multipliers[i]->generate(j);
+      }
+    }
+    for (int j = 0; j < GHASHReduceAssembler::length(); j++) {
+      for (int i = 0; i < _unrolls; i++) {
+        reducers[i]->generate(j);
+      }
+    }
+  }
+};
+
 void MacroAssembler::ghash_multiply_wide(int index, FloatRegister result_lo, FloatRegister result_hi,
                                          FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
                                          FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3) {
@@ -505,6 +658,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
       }
     }
 
+#if 0
     for (int index = 0; index < 18; index++) {
       for (int ofs = 0; ofs < unrolls * register_stride; ofs += register_stride) {
         ghash_modmul_wide(index,
@@ -513,6 +667,12 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                           /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
       }
     }
+#else
+    GHASHModmulGenerator(this, /*unrolls*/4, register_stride,
+                         /*result*/v0, /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
+                         Hprime, vzr, a1_xor_a0, p,
+                         /*temps*/v1, v3, v2).generate();
+#endif
 
     sub(blocks, blocks, unrolls);
     cmp(blocks, (unsigned char)unrolls);
