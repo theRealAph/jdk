@@ -647,21 +647,15 @@ typedef enum {
 
 class Assembler : public AbstractAssembler {
 
-#ifndef PRODUCT
-  static const uintptr_t asm_bp;
+public:
 
-  void emit_long(jint x) {
-    if ((uintptr_t)pc() == asm_bp)
-      NOP();
-    AbstractAssembler::emit_int32(x);
-  }
+#ifndef PRODUCT
+  void emit_long(jint x);
 #else
   void emit_long(jint x) {
     AbstractAssembler::emit_int32(x);
   }
 #endif
-
-public:
 
   enum { instruction_size = 4 };
 
@@ -3298,7 +3292,7 @@ inline Assembler::Membar_mask_bits operator|(Assembler::Membar_mask_bits a,
 }
 
 Instruction_aarch64::~Instruction_aarch64() {
-  assem->emit_int32(insn);
+  assem->emit_long(insn);
   assert_cond(get_bits() == 0xffffffff);
 }
 

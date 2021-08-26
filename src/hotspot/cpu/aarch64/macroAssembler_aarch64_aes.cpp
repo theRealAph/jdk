@@ -327,24 +327,32 @@ class KernelGenerator: public MacroAssembler {
   KernelGenerator(Assembler *as): MacroAssembler(as->code()) { }
   virtual void generate(int index) = 0;
   virtual int length() = 0;
+  virtual KernelGenerator *withOffset(int n) = 0;
 };
 
 class GHASHMultiplyGenerator: public KernelGenerator {
-  FloatRegister _result, _result_lo, _result_hi, _b,
+  FloatRegister _result_lo, _result_hi, _b,
     _a, _vzr, _a1_xor_a0, _p,
     _tmp1, _tmp2, _tmp3;
 
 public:
+    // InterleavingGenerator(new GHASHMultiplyGenerator
+    //                       (this, 0,
+    //                        /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
+    //                        Hprime, a1_xor_a0, p, vzr,
+    //                        /*temps*/v1, v3, /* reuse b*/v2),
+    //                       register_stride, unrolls).unroll();
+
   GHASHMultiplyGenerator(Assembler *as, int ofs,
                          /* offsetted registers */
-                         FloatRegister result, FloatRegister result_lo, FloatRegister result_hi,
+                         FloatRegister result_lo, FloatRegister result_hi,
                          FloatRegister b,
                          /* non-offsetted (shared) registers */
-                         FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
+                         FloatRegister a, FloatRegister a1_xor_a0, FloatRegister p, FloatRegister vzr,
                          /* offseted (temp) registers */
                          FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3)
     : KernelGenerator(as),
-      _result(result+ofs), _result_lo(result_lo+ofs), _result_hi(result_hi+ofs), _b(b+ofs),
+      _result_lo(result_lo+ofs), _result_hi(result_hi+ofs), _b(b+ofs),
       _a(a), _vzr(vzr), _a1_xor_a0(a1_xor_a0), _p(p),
       _tmp1(tmp1+ofs), _tmp2(tmp2+ofs), _tmp3(tmp3+ofs) { }
 
@@ -389,12 +397,28 @@ public:
     }
   }
 
+  virtual KernelGenerator *withOffset(int n) {
+    GHASHMultiplyGenerator *result = new GHASHMultiplyGenerator(*this);
+    result->_result_lo += n;
+    result->_result_hi += n;
+    result->_b += n;
+    result->_tmp1 += n;
+    result->_tmp2 += n;
+    result->_tmp3 += n;
+    return result;
+  }
+
   virtual int length() { return 11; }
 };
 
 class GHASHReduceGenerator: public KernelGenerator {
   FloatRegister _result, _lo, _hi, _p, _vzr, _t1;
 public:
+    // InterleavingGenerator(new GHASHReduceGenerator
+    //                       (this, 0,
+    //                        /*result*/v0, /*lo*/v5, /*hi*/v7, /*p*/v24, vzr, /*temp*/v3),
+    //                       register_stride, unrolls).unroll();
+
   GHASHReduceGenerator(Assembler *as, int ofs,
                        /* offsetted registers */
                        FloatRegister result, FloatRegister lo, FloatRegister hi,
@@ -436,22 +460,42 @@ public:
     }
   }
 
+  virtual KernelGenerator *withOffset(int n) {
+    GHASHReduceGenerator *result = new GHASHReduceGenerator(*this);
+    result->_result += n;
+    result->_hi += n;
+    result->_lo += n;
+    result->_t1 += n;
+    return result;
+  }
+
  int length() { return 7; }
 };
 
-class AbstractInterleavingGenerator {
+class InterleavingGenerator {
+  KernelGenerator *_generators[4];
+  int _unrolls;
+
 public:
-  void unroll(KernelGenerator **generators, int unrolls) {
-    for (int j = 0; j < generators[0]->length(); j++) {
-      for (int i = 0; i < unrolls; i++) {
-        generators[i]->generate(j);
+  InterleavingGenerator(KernelGenerator *generator, int register_stride,
+                        int unrolls) : _unrolls(unrolls) {
+    _generators[0] = generator;
+    for (int i = 1; i < unrolls; i++) {
+      _generators[i] = generator->withOffset(register_stride * i);
+    }
+  }
+
+  void unroll() {
+    for (int j = 0; j < _generators[0]->length(); j++) {
+      for (int i = 0; i < _unrolls; i++) {
+        _generators[i]->generate(j);
       }
     }
   }
 };
 
-class GHASHModmulGenerator: AbstractInterleavingGenerator {
-  int _unrolls;
+#if 0
+class GHASHModmulGenerator: InterleavingGenerator {
   KernelGenerator *_multipliers[4];
   KernelGenerator *_reducers[4];
 
@@ -477,9 +521,10 @@ public:
     unroll(_reducers, _unrolls);
   }
 };
+#endif
 
 void MacroAssembler::ghash_multiply_wide(int index, FloatRegister result_lo, FloatRegister result_hi,
-                                         FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
+                                         FloatRegister b, FloatRegister a, FloatRegister a1_xor_a0,
                                          FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3) {
   // Karatsuba multiplication performs a 128*128 -> 256-bit
   // multiplication in three 128-bit multiplications and a few
@@ -570,7 +615,7 @@ void MacroAssembler::ghash_modmul_wide(int index, FloatRegister result,
   if (index  < 11) {
     // Multiply state in v2 by H
     ghash_multiply_wide(index, result_lo, result_hi,
-                   a, b, a1_xor_a0,
+                   b, a, a1_xor_a0,
                    /*temps*/t1, t2, t3);
   } else {
     // Reduce v4:v5 by the field polynomial
@@ -674,10 +719,16 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
       }
     }
 #else
-    GHASHModmulGenerator(this, /*unrolls*/4, register_stride,
-                         /*result*/v0, /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
-                         Hprime, vzr, a1_xor_a0, p,
-                         /*temps*/v1, v3, v2).generate();
+    InterleavingGenerator(new GHASHMultiplyGenerator
+                          (this, 0,
+                           /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
+                           Hprime, a1_xor_a0, p, vzr,
+                           /*temps*/v1, v3, /* reuse b*/v2),
+                          register_stride, unrolls).unroll();
+    InterleavingGenerator(new GHASHReduceGenerator
+                          (this, 0,
+                           /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr, /*temp*/v3),
+                          register_stride, unrolls).unroll();
 #endif
 
     sub(blocks, blocks, unrolls);

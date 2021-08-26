@@ -31,7 +31,13 @@
 #include "memory/resourceArea.hpp"
 
 #ifndef PRODUCT
-const uintptr_t Assembler::asm_bp = 0x00007fffee09ac88;
+static const uintptr_t asm_bp = 0xffffa907c538;
+
+void Assembler::emit_long(jint x) {
+  if ((uintptr_t)pc() == asm_bp)
+    NOP();
+  AbstractAssembler::emit_int32(x);
+}
 #endif
 
 static float unpack(unsigned value);
