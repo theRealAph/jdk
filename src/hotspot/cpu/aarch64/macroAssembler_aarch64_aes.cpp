@@ -327,7 +327,7 @@ class KernelGenerator: public MacroAssembler {
   KernelGenerator(Assembler *as): MacroAssembler(as->code()) { }
   virtual void generate(int index) = 0;
   virtual int length() = 0;
-  virtual KernelGenerator *withOffset(int n) = 0;
+  virtual KernelGenerator *next() = 0;
 };
 
 class GHASHMultiplyGenerator: public KernelGenerator {
@@ -355,6 +355,8 @@ public:
       _result_lo(result_lo+ofs), _result_hi(result_hi+ofs), _b(b+ofs),
       _a(a), _vzr(vzr), _a1_xor_a0(a1_xor_a0), _p(p),
       _tmp1(tmp1+ofs), _tmp2(tmp2+ofs), _tmp3(tmp3+ofs) { }
+
+  int register_stride = 7;
 
   virtual void generate(int index) {
     // Karatsuba multiplication performs a 128*128 -> 256-bit
@@ -397,14 +399,14 @@ public:
     }
   }
 
-  virtual KernelGenerator *withOffset(int n) {
+  virtual KernelGenerator *next() {
     GHASHMultiplyGenerator *result = new GHASHMultiplyGenerator(*this);
-    result->_result_lo += n;
-    result->_result_hi += n;
-    result->_b += n;
-    result->_tmp1 += n;
-    result->_tmp2 += n;
-    result->_tmp3 += n;
+    result->_result_lo += register_stride;
+    result->_result_hi += register_stride;
+    result->_b += register_stride;
+    result->_tmp1 += register_stride;
+    result->_tmp2 += register_stride;
+    result->_tmp3 += register_stride;
     return result;
   }
 
@@ -429,6 +431,8 @@ public:
     : KernelGenerator(as),
       _result(result+ofs), _lo(lo+ofs), _hi(hi+ofs),
       _p(p), _vzr(vzr), _t1(t1+ofs) { }
+
+  int register_stride = 7;
 
   virtual void generate(int index) {
     const FloatRegister t0 = _result;
@@ -460,12 +464,12 @@ public:
     }
   }
 
-  virtual KernelGenerator *withOffset(int n) {
+  virtual KernelGenerator *next() {
     GHASHReduceGenerator *result = new GHASHReduceGenerator(*this);
-    result->_result += n;
-    result->_hi += n;
-    result->_lo += n;
-    result->_t1 += n;
+    result->_result += register_stride;
+    result->_hi += register_stride;
+    result->_lo += register_stride;
+    result->_t1 += register_stride;
     return result;
   }
 
@@ -481,7 +485,7 @@ public:
                         int unrolls) : _unrolls(unrolls) {
     _generators[0] = generator;
     for (int i = 1; i < unrolls; i++) {
-      _generators[i] = generator->withOffset(register_stride * i);
+      _generators[i] = _generators[i-1]->next();
     }
   }
 
