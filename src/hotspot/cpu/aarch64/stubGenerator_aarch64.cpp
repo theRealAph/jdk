@@ -2860,7 +2860,7 @@ class StubGenerator: public StubCodeGenerator {
     const Register keylen = r11;
 
     const unsigned char block_size = 16;
-    const int bulk_width = 8;
+    const int bulk_width = 4;
 
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", "counterMode_AESCrypt");
@@ -2932,15 +2932,18 @@ class StubGenerator: public StubCodeGenerator {
     // Bulk encryption
 
     __ BIND (CTR_large_block);
+    assert(bulk_width == 4 || bulk_width == 8, "must be");
 
-    __ sub(sp, sp, 4 * 16);
-    __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
+    if (bulk_width == 8) {
+      __ sub(sp, sp, 4 * 16);
+      __ st1(v12, v13, v14, v15, __ T16B, Address(sp));
+    }
     __ sub(sp, sp, 4 * 16);
     __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
     RegSet saved_regs = (RegSet::of(in, out, offset)
                          + RegSet::of(saved_encrypted_ctr, used_ptr, len));
     __ push(saved_regs, sp);
-    __ andr(len, len, -16 * bulk_width);  // 8 encryptions, 16 bytes per encryption
+    __ andr(len, len, -16 * bulk_width);  // 8/4 encryptions, 16 bytes per encryption
     __ add(in, in, offset);
     __ add(out, out, offset);
 
@@ -2959,7 +2962,7 @@ class StubGenerator: public StubCodeGenerator {
       __ movi(v9, __ T4S, 1);
       __ ins(v8, __ S, v9, 3, 3); // v8 contains { 0, 0, 0, 1 }
 
-      for (FloatRegister f = v0; f < v8; f++) {
+      for (FloatRegister f = v0; f < v0 + bulk_width; f++) {
         __ rev32(f, __ T16B, v16);
         __ addv(v16, __ T4S, v16, v8);
       }
@@ -2967,17 +2970,25 @@ class StubGenerator: public StubCodeGenerator {
       __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
 
       // Encrypt the counters
-      __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v7));
-
-      __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
-
+      if (bulk_width == 8) {
+        __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v7));
+      } else {
+        __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v3));
+      }
+      if (bulk_width == 8) {
+        __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
+      }
       // XOR the encrypted counters with the inputs
       forAll(FloatRegSet::range(v0, v3),
              [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
-      forAll(FloatRegSet::range(v4, v7),
-             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      if (bulk_width == 8) {
+        forAll(FloatRegSet::range(v4, v7),
+               [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      }
       __ st1(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
-      __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
+      if (bulk_width == 8) {
+        __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
+      }
 
       __ subw(len, len, 16 * bulk_width);
       __ cbnzw(len, L_CTR_loop);
@@ -2988,6 +2999,12 @@ class StubGenerator: public StubCodeGenerator {
     __ st1(v16, __ T16B, counter);
 
     __ pop(saved_regs, sp);
+
+    __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
+    if (bulk_width == 8) {
+      __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
+    }
+
     __ andr(rscratch1, len, -16 * bulk_width);
     __ sub(len, len, rscratch1);
     __ add(offset, offset, rscratch1);
@@ -7274,7 +7291,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
+      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
     }
 
     if (UseBASE64Intrinsics) {
@@ -7291,8 +7308,8 @@ class StubGenerator: public StubCodeGenerator {
       StubRoutines::_aescrypt_decryptBlock = generate_aescrypt_decryptBlock();
       StubRoutines::_cipherBlockChaining_encryptAESCrypt = generate_cipherBlockChaining_encryptAESCrypt();
       StubRoutines::_cipherBlockChaining_decryptAESCrypt = generate_cipherBlockChaining_decryptAESCrypt();
-      StubRoutines::_galoisCounterMode_AESCrypt = generate_galoisCounterMode_AESCrypt();
-      StubRoutines::_counterMode_AESCrypt = generate_counterMode_AESCrypt();
+      // StubRoutines::_galoisCounterMode_AESCrypt = generate_galoisCounterMode_AESCrypt();
+      // StubRoutines::_counterMode_AESCrypt = generate_counterMode_AESCrypt();
     }
 
     if (UseSHA1Intrinsics) {
