@@ -232,24 +232,17 @@ void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v17, v18);
        *subkeys != fnoreg; ++subkeys) {
     forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
   bind(L_rounds_52);
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v19, v20);
        *subkeys != fnoreg; ++subkeys) {
     forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
   bind(L_rounds_44);
   for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v21, v29);
        *subkeys != fnoreg; ++subkeys) {
     forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aese(reg, *subkeys); });
-    // forAll(inputs, [&](FloatRegister reg) { aesmc(reg, reg); });
   }
-  // forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); eor(reg, T16B, reg, v31); });
   forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); });
   forAll(inputs, [&](FloatRegister reg) { eor(reg, T16B, reg, v31); });
 
@@ -355,13 +348,6 @@ class GHASHMultiplyGenerator: public KernelGenerator {
     _tmp1, _tmp2, _tmp3;
 
 public:
-    // InterleavingGenerator(new GHASHMultiplyGenerator
-    //                       (this, 0,
-    //                        /*result_lo*/v5, /*result_hi*/v4, /*b*/v2,
-    //                        Hprime, a1_xor_a0, p, vzr,
-    //                        /*temps*/v1, v3, /* reuse b*/v2),
-    //                       register_stride, unrolls).unroll();
-
   GHASHMultiplyGenerator(Assembler *as, int unrolls,
                          /* offsetted registers */
                          FloatRegister result_lo, FloatRegister result_hi,
