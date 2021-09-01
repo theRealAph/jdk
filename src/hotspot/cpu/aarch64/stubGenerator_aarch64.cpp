@@ -3058,6 +3058,7 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(sp, sp, 4 * 16);
     __ st1(v8, v9, v10, v11, __ T16B, Address(sp));
 
+    // __ andr(len, len, -512);
     __ andr(len, len, -16 * 8);  // 8 encryptions, 16 bytes per encryption
     __ str(len, __ pre(sp, -2 * wordSize));
 
@@ -3075,7 +3076,6 @@ class StubGenerator: public StubCodeGenerator {
     {
       Label L_CTR_loop;
       __ BIND(L_CTR_loop);
-
 
       // Setup the counters
       __ movi(v8, __ T4S, 0);
@@ -3114,7 +3114,16 @@ class StubGenerator: public StubCodeGenerator {
     // GHASH/CTR loop
     __ ghash_processBlocks_wide(ghash_polynomial, state, subkeyHtbl, ct, len, 4);
 
-    __ bind(DONE);
+#ifdef ASSERT
+    { Label L;
+      __ cmp(len, (unsigned char)0);
+      __ br(Assembler::EQ, L);
+      __ stop("stubGenerator: abort");
+      __ bind(L);
+  }
+#endif
+
+  __ bind(DONE);
     // Return the number of bytes processed
     __ ldr(r0, __ post(sp, 2 * wordSize));
 
@@ -7291,7 +7300,8 @@ class StubGenerator: public StubCodeGenerator {
 
     // generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      // StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
     }
 
     if (UseBASE64Intrinsics) {
@@ -7308,8 +7318,8 @@ class StubGenerator: public StubCodeGenerator {
       StubRoutines::_aescrypt_decryptBlock = generate_aescrypt_decryptBlock();
       StubRoutines::_cipherBlockChaining_encryptAESCrypt = generate_cipherBlockChaining_encryptAESCrypt();
       StubRoutines::_cipherBlockChaining_decryptAESCrypt = generate_cipherBlockChaining_decryptAESCrypt();
-      // StubRoutines::_galoisCounterMode_AESCrypt = generate_galoisCounterMode_AESCrypt();
-      // StubRoutines::_counterMode_AESCrypt = generate_counterMode_AESCrypt();
+      StubRoutines::_galoisCounterMode_AESCrypt = generate_galoisCounterMode_AESCrypt();
+      StubRoutines::_counterMode_AESCrypt = generate_counterMode_AESCrypt();
     }
 
     if (UseSHA1Intrinsics) {

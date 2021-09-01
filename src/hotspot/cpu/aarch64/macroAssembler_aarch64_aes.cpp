@@ -613,7 +613,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
     sub(blocks, blocks, unrolls);
     cmp(blocks, (unsigned char)(unrolls * 2));
-    br(GT, L_ghash_loop);
+    br(GE, L_ghash_loop);
   }
 
   // Merge the #unrolls columns.  Note that the data for the next
