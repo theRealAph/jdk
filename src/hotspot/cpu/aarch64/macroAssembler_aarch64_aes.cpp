@@ -612,7 +612,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
       ->unroll();
 
     sub(blocks, blocks, unrolls);
-    cmp(blocks, (unsigned char)unrolls);
+    cmp(blocks, (unsigned char)(unrolls * 2));
     br(GT, L_ghash_loop);
   }
 
