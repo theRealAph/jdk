@@ -2862,6 +2862,42 @@ class StubGenerator: public StubCodeGenerator {
     const unsigned char block_size = 16;
     const int bulk_width = 4;
 
+
+    // Algorithm:
+    //
+    // int result = len;
+    // while (len-- > 0) {
+    //     if (used >= blockSize) {
+    //         if (len >= bulk_width * blockSize()) {
+    //             CTR_large_block();
+    //             if (len == 0)
+    //                 break; /* goto DONE; */
+    //         }
+    //         for (;;) {
+    //             embeddedCipher.encryptBlock(counter, 0, encryptedCounter, 0);
+    //             used = 0;
+    //             if (len < blockSize)
+    //                 break;  /* goto NEXT */
+    //             16ByteVector v1 = load16Bytes(in, offset);
+    //             v1 = v1 ^ encryptedCounter;
+    //             store16Bytes(out, offset);
+    //             used = blockSize;
+    //             offset += blockSize;
+    //             len -= blockSize;
+    //             if (len == 0)
+    //                 goto DONE;
+    //             increment(counter);
+    //         }
+    //     }
+    //     NEXT:
+    //     out[outOff++] = (byte)(in[inOff++] ^ encryptedCounter[used++]);
+    // }
+    // DONE:
+    // return result;
+    //
+    // CTR_large_block()
+    //    Wide bulk encryption of whole blocks.
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", "counterMode_AESCrypt");
     const address start = __ pc();
@@ -2905,7 +2941,7 @@ class StubGenerator: public StubCodeGenerator {
       __ st1(v16, __ T16B, counter); // Save the incremented counter back
 
       {
-        // We have less than bulk_width blocks of data left. Encrypt
+        // We have fewer than bulk_width blocks of data left. Encrypt
         // them one by one until there is less than a full block
         // remaining, being careful to save both the encrypted counter
         // and the counter.
@@ -5620,7 +5656,6 @@ class StubGenerator: public StubCodeGenerator {
       __ ld1(v8, v9, v10, v11, __ T16B, __ post(sp, 4 * 16));
       __ ld1(v12, v13, v14, v15, __ T16B, __ post(sp, 4 * 16));
     }
-    // __ subs(blocks, blocks, 1);
 
     __ cmp(blocks, (unsigned char)0);
     __ br(__ GT, small);
