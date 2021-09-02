@@ -2868,6 +2868,7 @@ class StubGenerator: public StubCodeGenerator {
     __ enter();
 
     Label DONE, CTR_large_block, large_block_return;
+    __ ldrw(used, Address(used_ptr));
     __ cbzw(saved_len, DONE);
 
     __ mov(len, saved_len);
@@ -2883,8 +2884,6 @@ class StubGenerator: public StubCodeGenerator {
     __ movi(v5, __ T4S, 1);
     __ ins(v4, __ S, v5, 3, 3); // v4 contains { 0, 0, 0, 1 }
 
-    __ ldrw(used, Address(used_ptr));
-
     {
       Label L_CTR_loop, NEXT;
 
@@ -2894,21 +2893,53 @@ class StubGenerator: public StubCodeGenerator {
       __ br(__ LO, NEXT);
 
       // Maybe we have a lot of data
-      __ subs(rscratch1, len, bulk_width * block_size);
+      __ subsw(rscratch1, len, bulk_width * block_size);
       __ br(__ HS, CTR_large_block);
       __ BIND(large_block_return);
-      __ cbz(len, DONE);
+      __ cbzw(len, DONE);
 
-      __ ld1(v0, __ T16B, counter);
+      __ ld1(v0, __ T16B, counter); // Load the counter into v0
       __ rev32(v16, __ T16B, v0);
       __ addv(v16, __ T4S, v16, v4);
       __ rev32(v16, __ T16B, v16);
-      __ st1(v16, __ T16B, counter);
+      __ st1(v16, __ T16B, counter); // Save the incremented counter back
 
-      __ aesecb_encrypt(noreg, noreg, keylen);
-      __ st1(v0, __ T16B, saved_encrypted_ctr);
+      {
+        // We have less than bulk_width blocks of data left. Encrypt
+        // them one by one until there is less than a full block
+        // remaining, being careful to save both the encrypted counter
+        // and the counter.
 
-      __ mov(used, 0);
+        Label inner_loop;
+        __ bind(inner_loop);
+        // Counter to encrypt is in v0
+        __ aesecb_encrypt(noreg, noreg, keylen);
+        __ st1(v0, __ T16B, saved_encrypted_ctr);
+
+        // Do we have a remaining full block?
+
+        __ mov(used, 0);
+        __ cmp(len, block_size);
+        __ br(__ LO, NEXT);
+
+        // Yes, we have a full block
+        __ ldrq(v1, Address(in, offset));
+        __ eor(v1, __ T16B, v1, v0);
+        __ strq(v1, Address(out, offset));
+        __ mov(used, block_size);
+        __ add(offset, offset, block_size);
+
+        // Increment the counter, store it back
+        __ rev32(v0, __ T16B, v16);
+        __ addv(v16, __ T4S, v16, v4);
+        __ rev32(v16, __ T16B, v16);
+        __ st1(v16, __ T16B, counter);
+
+        __ subw(len, len, block_size);
+        __ cbzw(len, DONE);
+
+        __ b(inner_loop);
+      }
 
       __ BIND(NEXT);
 
@@ -2922,8 +2953,8 @@ class StubGenerator: public StubCodeGenerator {
       __ cbnzw(len, L_CTR_loop);
     }
 
-    __ strw(used, Address(used_ptr));
     __ bind(DONE);
+    __ strw(used, Address(used_ptr));
     __ mov(r0, saved_len);
 
     __ leave(); // required for proper stackwalking of RuntimeStub frame
