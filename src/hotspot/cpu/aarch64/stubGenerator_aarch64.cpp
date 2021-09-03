@@ -2918,11 +2918,6 @@ class StubGenerator: public StubCodeGenerator {
 
     __ aesenc_loadkeys(key, keylen);
 
-    // Setup the counter
-    __ movi(v4, __ T4S, 0);
-    __ movi(v5, __ T4S, 1);
-    __ ins(v4, __ S, v5, 3, 3); // v4 contains { 0, 0, 0, 1 }
-
     {
       Label L_CTR_loop, NEXT;
 
@@ -2988,6 +2983,7 @@ class StubGenerator: public StubCodeGenerator {
 
       __ BIND(NEXT);
 
+      // Encrypt a signle byte.
       __ ldrb(rscratch1, Address(in, offset));
       __ ldrb(rscratch2, Address(saved_encrypted_ctr, used));
       __ eor(rscratch1, rscratch1, rscratch2);

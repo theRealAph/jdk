@@ -31,7 +31,7 @@
 #include "memory/resourceArea.hpp"
 
 #ifndef PRODUCT
-static const uintptr_t asm_bp = 0xffffa907c538;
+static const uintptr_t asm_bp = 0xffffa907a710;
 
 void Assembler::emit_long(jint x) {
   if ((uintptr_t)pc() == asm_bp)
