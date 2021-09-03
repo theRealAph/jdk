@@ -2610,6 +2610,9 @@ class StubGenerator: public StubCodeGenerator {
 
     __ mov(r0, 0);
 
+    __ leave();
+    __ ret(lr);
+
     return start;
   }
 
@@ -2874,7 +2877,8 @@ class StubGenerator: public StubCodeGenerator {
     //                 break; /* goto DONE; */
     //         }
     //         for (;;) {
-    //             embeddedCipher.encryptBlock(counter, 0, encryptedCounter, 0);
+    //             16ByteVector v0 = counter;
+    //             embeddedCipher.encryptBlock(v0, 0, encryptedCounter, 0);
     //             used = 0;
     //             if (len < blockSize)
     //                 break;  /* goto NEXT */
@@ -2886,7 +2890,6 @@ class StubGenerator: public StubCodeGenerator {
     //             len -= blockSize;
     //             if (len == 0)
     //                 goto DONE;
-    //             increment(counter);
     //         }
     //     }
     //     NEXT:
@@ -2934,6 +2937,11 @@ class StubGenerator: public StubCodeGenerator {
       __ BIND(large_block_return);
       __ cbzw(len, DONE);
 
+      // Setup the counter
+      __ movi(v4, __ T4S, 0);
+      __ movi(v5, __ T4S, 1);
+      __ ins(v4, __ S, v5, 3, 3); // v4 contains { 0, 0, 0, 1 }
+
       __ ld1(v0, __ T16B, counter); // Load the counter into v0
       __ rev32(v16, __ T16B, v0);
       __ addv(v16, __ T4S, v16, v4);
@@ -2965,14 +2973,15 @@ class StubGenerator: public StubCodeGenerator {
         __ mov(used, block_size);
         __ add(offset, offset, block_size);
 
-        // Increment the counter, store it back
-        __ rev32(v0, __ T16B, v16);
-        __ addv(v16, __ T4S, v16, v4);
-        __ rev32(v16, __ T16B, v16);
-        __ st1(v16, __ T16B, counter);
-
         __ subw(len, len, block_size);
         __ cbzw(len, DONE);
+
+        // Increment the counter, store it back
+        __ orr(v0, __ T16B, v16, v16);
+        __ rev32(v16, __ T16B, v16);
+        __ addv(v16, __ T4S, v16, v4);
+        __ rev32(v16, __ T16B, v16);
+        __ st1(v16, __ T16B, counter); // Save the incremented counter back
 
         __ b(inner_loop);
       }
@@ -7366,8 +7375,8 @@ class StubGenerator: public StubCodeGenerator {
 
     // generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      // StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
+      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      // StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
     }
 
     if (UseBASE64Intrinsics) {
