@@ -150,6 +150,9 @@ void MacroAssembler::aes_round(FloatRegister input, FloatRegister subkey) {
   aese(input, subkey); aesmc(input, input);
 }
 
+// The abstract base class of an unrolled funtion
+// generator. Subclasses override generate(), length(), and next() to
+// generate unrolled and interleaved functions.
 class KernelGenerator: public MacroAssembler {
 protected:
   const int _unrolls;
@@ -177,6 +180,8 @@ void KernelGenerator::unroll() {
   }
 }
 
+// An unrolled and interleaved generator for the kernel AES
+// encryption.
 class AESKernelGenerator: public KernelGenerator {
   Register _from, _to;
   const Register _keylen;
@@ -256,9 +261,7 @@ public:
 // unrolls controls the number of times to unroll the generated function
 void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
                                     FloatRegister data, int unrolls) {
-  AESKernelGenerator g(this, unrolls,
-                       from, to, keylen, data, v17);
-  g.unroll();
+  AESKernelGenerator(this, unrolls, from, to, keylen, data, v17) .unroll();
 }
 
 // ghash_multiply and ghash_reduce are the non-unrolled versions of
@@ -479,16 +482,8 @@ void MacroAssembler::ghash_modmul(FloatRegister result,
                                   FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
                                   FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
                                   FloatRegister t1, FloatRegister t2, FloatRegister t3) {
-  (new GHASHMultiplyGenerator(this, /*unrolls*/1,
-                              result_lo, result_hi, b,
-                              a, a1_xor_a0, p, vzr,
-                              t1, t2, t3))
-    ->unroll();
-
-  (new GHASHReduceGenerator (this, /*unrolls*/1,
-                             result, result_lo, result_hi, p, vzr,
-                             fnoreg, t3))
-    ->unroll();
+  ghash_multiply(result_lo, result_hi, a, b, a1_xor_a0, t1, t2, t3);
+  ghash_reduce(result, result_lo, result_hi, p, vzr, t1);
 }
 
 void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register state,
@@ -594,18 +589,16 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
     // Generate fully-unrolled multiply-reduce in two stages.
 
-    (new GHASHMultiplyGenerator(this, unrolls,
-                                /*result_lo*/v5, /*result_hi*/v4, /*data*/v2,
-                                Hprime, a1_xor_a0, p, vzr,
-                                /*temps*/v1, v3, /* reuse b*/v2))
-      ->unroll();
+    GHASHMultiplyGenerator(this, unrolls,
+                           /*result_lo*/v5, /*result_hi*/v4, /*data*/v2,
+                           Hprime, a1_xor_a0, p, vzr,
+                           /*temps*/v1, v3, /* reuse b*/v2) .unroll();
 
     // NB: GHASHReduceGenerator also loads the next #unrolls blocks of
     // data.
-    (new GHASHReduceGenerator (this, unrolls,
-                               /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr,
-                               /*data*/v2, /*temp*/v3))
-      ->unroll();
+    GHASHReduceGenerator (this, unrolls,
+                          /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr,
+                          /*data*/v2, /*temp*/v3) .unroll();
 
     sub(blocks, blocks, unrolls);
     cmp(blocks, (unsigned char)(unrolls * 2));
