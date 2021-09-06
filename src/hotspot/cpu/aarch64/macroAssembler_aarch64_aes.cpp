@@ -142,68 +142,6 @@ void MacroAssembler::aesenc_loadkeys(Register key, Register keylen) {
   sub(key, key, keylen, LSL, exact_log2(sizeof (jint)));
 }
 
-#if 0
-// Clobbers v1, v2, v3, v4
-// Uses expanded key in v17..v31
-// Returns encrypted value in v0.
-// If to != noreg, store value at to
-// Preserves from, to, key, keylen
-void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen) {
-  Label L_rounds_44, L_rounds_52;
-  Label L_doLast;
-  // BIND(L_aes_loop);
-  // ld1(v0,  T16B,  post(from, 16));
-  if (from != noreg) {
-    ld1(v0, T16B, from); // get 16 bytes of input
-  }
-
-  cmpw(keylen, 52);
-  br(Assembler::LO, L_rounds_44);
-  br(Assembler::EQ, L_rounds_52);
-
-  aese(v0, v17);  aesmc(v0, v0);
-  aese(v0, v18);  aesmc(v0, v0);
-  bind(L_rounds_52);
-  aese(v0, v19);  aesmc(v0, v0);
-  aese(v0, v20);  aesmc(v0, v0);
-  bind(L_rounds_44);
-  aese(v0, v21);  aesmc(v0, v0);
-  aese(v0, v22);  aesmc(v0, v0);
-  aese(v0, v23);  aesmc(v0, v0);
-  aese(v0, v24);  aesmc(v0, v0);
-  aese(v0, v25);  aesmc(v0, v0);
-  aese(v0, v26);  aesmc(v0, v0);
-  aese(v0, v27);  aesmc(v0, v0);
-  aese(v0, v28);  aesmc(v0, v0);
-  aese(v0, v29);  aesmc(v0, v0);
-  aese(v0, v30);
-  eor(v0, T16B, v0, v31);
-
-  if (to != noreg) {
-    st1(v0, T16B, to);
-  }
-}
-#endif
-
-#include <functional>
-static void forAll(FloatRegSet floatRegs,
-                   std::function<void (FloatRegister)> f1) {
-  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
-    f1(*i);
-  }
-}
-
-static void forAll(FloatRegSet floatRegs,
-                   std::function<void (FloatRegister)> f1,
-                   std::function<void (FloatRegister)> f2) {
-  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
-    f1(*i);
-  }
-  for (RegSetIterator<FloatRegister> i = floatRegs.begin();  *i != fnoreg; ++i) {
-    f2(*i);
-  }
-}
-
 // NeoverseTM N1Software Optimization Guide:
 // Adjacent AESE/AESMC instruction pairs and adjacent AESD/AESIMC
 // instruction pairs will exhibit the performance characteristics
@@ -212,49 +150,122 @@ void MacroAssembler::aes_round(FloatRegister input, FloatRegister subkey) {
   aese(input, subkey); aesmc(input, input);
 }
 
+class KernelGenerator: public MacroAssembler {
+protected:
+  const int _unrolls;
+public:
+  KernelGenerator(Assembler *as, int unrolls)
+    : MacroAssembler(as->code()), _unrolls(unrolls) { }
+  virtual void generate(int index) = 0;
+  virtual int length() = 0;
+  virtual KernelGenerator *next() = 0;
+  int unrolls() { return _unrolls; }
+  void unroll();
+};
+
+void KernelGenerator::unroll() {
+  KernelGenerator *generators[unrolls()];
+  generators[0] = this;
+  for (int i = 1; i < unrolls(); i++) {
+    generators[i] = generators[i-1]->next();
+  }
+
+  for (int j = 0; j < length(); j++) {
+    for (int i = 0; i < unrolls(); i++) {
+      generators[i]->generate(j);
+    }
+  }
+}
+
+class AESKernelGenerator: public KernelGenerator {
+  Register _from, _to;
+  const Register _keylen;
+  FloatRegister _data;
+  const FloatRegister _subkeys;
+  bool _is_base;
+  Label _rounds_44, _rounds_52;
+
+public:
+  AESKernelGenerator(Assembler *as, int unrolls,
+                     Register from, Register to, Register keylen, FloatRegister data,
+                     FloatRegister subkeys, bool is_base = true)
+    : KernelGenerator(as, unrolls),
+      _from(from), _to(to), _keylen(keylen), _data(data),
+      _subkeys(subkeys), _is_base(is_base) {
+  }
+
+  virtual void generate(int index) {
+    switch (index) {
+    case  0:
+      if (_from != noreg) {
+        ld1(_data, T16B, _from); // get 16 bytes of input
+      }
+      break;
+    case  1:
+      if (_is_base) {
+        cmpw(_keylen, 52);
+        br(Assembler::LO, _rounds_44);
+        br(Assembler::EQ, _rounds_52);
+      }
+      break;
+    case  2:  aes_round(_data, _subkeys +  0);  break;
+    case  3:  aes_round(_data, _subkeys +  1);  break;
+    case  4:
+      if (_is_base)  bind(_rounds_52);
+      break;
+    case  5:  aes_round(_data, _subkeys +  2);  break;
+    case  6:  aes_round(_data, _subkeys +  3);  break;
+    case  7:
+      if (_is_base)  bind(_rounds_44);
+      break;
+    case  8:  aes_round(_data, _subkeys +  4);  break;
+    case  9:  aes_round(_data, _subkeys +  5);  break;
+    case 10:  aes_round(_data, _subkeys +  6);  break;
+    case 11:  aes_round(_data, _subkeys +  7);  break;
+    case 12:  aes_round(_data, _subkeys +  8);  break;
+    case 13:  aes_round(_data, _subkeys +  9);  break;
+    case 14:  aes_round(_data, _subkeys + 10);  break;
+    case 15:  aes_round(_data, _subkeys + 11);  break;
+    case 16:  aes_round(_data, _subkeys + 12);  break;
+    case 17:  aese(_data, _subkeys + 13);  break;
+    case 18:  eor(_data, T16B, _data, _subkeys + 14);  break;
+    case 19:
+      if (_to != noreg) {
+        st1(_data, T16B, _to);
+      }
+      break;
+    default: ShouldNotReachHere();
+    }
+  }
+
+  virtual KernelGenerator *next() {
+    return new AESKernelGenerator(this, _unrolls,
+                                  _from, _to, _keylen,
+                                  _data + 1, _subkeys, /*is_base*/false);
+  }
+
+  virtual int length() { return 20; }
+};
+
 // Uses expanded key in v17..v31
 // Returns encrypted values in inputs.
 // If to != noreg, store value at to; likewise from
 // Preserves key, keylen
 // Increments from, to
+// Input data in v0, v1, ...
+// unrolls controls the number of times to unroll the generated function
 void MacroAssembler::aesecb_encrypt(Register from, Register to, Register keylen,
-                                    FloatRegSet inputs) {
-  Label L_rounds_44, L_rounds_52;
-  if (from != noreg) {
-    forAll(inputs,
-           [&](FloatRegister reg) { ld1(reg, T16B, post(from, 16)); });// get 16 bytes of input
-  }
-
-  cmpw(keylen, 52);
-  br(Assembler::LO, L_rounds_44);
-  br(Assembler::EQ, L_rounds_52);
-
-  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v17, v18);
-       *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-  }
-  bind(L_rounds_52);
-  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v19, v20);
-       *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-  }
-  bind(L_rounds_44);
-  for (RegSetIterator<FloatRegister> subkeys = FloatRegSet::range(v21, v29);
-       *subkeys != fnoreg; ++subkeys) {
-    forAll(inputs, [&](FloatRegister reg) { aes_round( reg, *subkeys); });
-  }
-  forAll(inputs, [&](FloatRegister reg) { aese(reg, v30); });
-  forAll(inputs, [&](FloatRegister reg) { eor(reg, T16B, reg, v31); });
-
-  if (to != noreg) {
-    forAll(inputs,
-           [&](FloatRegister reg) { st1(v0, T16B, post(to, 16)); });
-  }
+                                    FloatRegister data, int unrolls) {
+  AESKernelGenerator g(this, unrolls,
+                       from, to, keylen, data, v17);
+  g.unroll();
 }
 
+// ghash_multiply and ghash_reduce are the non-unrolled versions of
+// the GHASH function generators.
 void MacroAssembler::ghash_multiply(FloatRegister result_lo, FloatRegister result_hi,
-                                    FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
-                                    FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3) {
+                                     FloatRegister a, FloatRegister b, FloatRegister a1_xor_a0,
+                                     FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3) {
   // Karatsuba multiplication performs a 128*128 -> 256-bit
   // multiplication in three 128-bit multiplications and a few
   // additions.
@@ -313,33 +324,6 @@ void MacroAssembler::ghash_reduce(FloatRegister result, FloatRegister lo, FloatR
   eor(lo, T16B, lo, t1);
   pmull(t0, T1Q, hi, p, T1D);
   eor(result, T16B, lo, t0);
-}
-
-class KernelGenerator: public MacroAssembler {
-private:
-  int _unrolls;
-public:
-  KernelGenerator(Assembler *as, int unrolls)
-    : MacroAssembler(as->code()), _unrolls(unrolls) { }
-  virtual void generate(int index) = 0;
-  virtual int length() = 0;
-  virtual KernelGenerator *next() = 0;
-  int unrolls() { return _unrolls; }
-  void unroll();
-};
-
-void KernelGenerator::unroll() {
-  KernelGenerator *generators[unrolls()];
-  generators[0] = this;
-  for (int i = 1; i < unrolls(); i++) {
-    generators[i] = generators[i-1]->next();
-  }
-
-  for (int j = 0; j < length(); j++) {
-    for (int i = 0; i < unrolls(); i++) {
-      generators[i]->generate(j);
-    }
-  }
 }
 
 class GHASHMultiplyGenerator: public KernelGenerator {
@@ -490,6 +474,7 @@ public:
  int length() { return 7; }
 };
 
+// Perform a GHASH multiply/reduce on a single FloatRegister.
 void MacroAssembler::ghash_modmul(FloatRegister result,
                                   FloatRegister result_lo, FloatRegister result_hi, FloatRegister b,
                                   FloatRegister a, FloatRegister vzr, FloatRegister a1_xor_a0, FloatRegister p,
@@ -510,6 +495,17 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                                               Register subkeyH,
                                               Register data, Register blocks, int unrolls) {
   int register_stride = 7;
+
+  // Bafflingly, GCM uses little-endian for the byte order, but
+  // big-endian for the bit order.  For example, the polynomial 1 is
+  // represented as the 16-byte string 80 00 00 00 | 12 bytes of 00.
+  //
+  // So, we must either reverse the bytes in each word and do
+  // everything big-endian or reverse the bits in each byte and do
+  // it little-endian.  On AArch64 it's more idiomatic to reverse
+  // the bits in each byte (we have an instruction, RBIT, to do
+  // that) and keep the data in little-endian bit order throught the
+  // calculation, bit-reversing the inputs and outputs.
 
   assert(unrolls * register_stride < 32, "out of registers");
 
@@ -535,7 +531,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   {
     // The first time around we'll have to calculate H**2, H**3, etc.
     // Look at the largest power of H in the subkeyH array to see if
-    // it's already been calculated
+    // it's already been calculated.
     ldp(rscratch1, rscratch2, Address(subkeyH, 16 * (unrolls - 1)));
     orr(rscratch1, rscratch1, rscratch2);
     cbnz(rscratch1, already_calculated);
@@ -566,7 +562,7 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
   orr(Hprime, T16B, v6, v6);     // Move H ** unrolls into Hprime
 
-  // Hprime contains (H ** unrolls)
+  // Hprime contains (H ** 1, H ** 2, ... H ** unrolls)
   // v0 contains the initial state. Clear the others.
   for (int i = 1; i < unrolls; i++) {
     int ofs = register_stride * i;

@@ -3042,21 +3042,18 @@ class StubGenerator: public StubCodeGenerator {
       __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
 
       // Encrypt the counters
-      if (bulk_width == 8) {
-        __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v7));
-      } else {
-        __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v3));
-      }
+      __ aesecb_encrypt(noreg, noreg, keylen, v0, bulk_width);
+
       if (bulk_width == 8) {
         __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
       }
+
       // XOR the encrypted counters with the inputs
-      forAll(FloatRegSet::range(v0, v3),
-             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
-      if (bulk_width == 8) {
-        forAll(FloatRegSet::range(v4, v7),
-               [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      for (int i = 0; i < bulk_width; i++) {
+        __ eor(v0 + i, __ T16B, v0 + i, v8 + i);
       }
+
+      // Write the encrypted data
       __ st1(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
       if (bulk_width == 8) {
         __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
@@ -3161,15 +3158,14 @@ class StubGenerator: public StubCodeGenerator {
       __ ld1(v8, v9, v10, v11, __ T16B, __ post(in, 4 * 16));
 
       // Encrypt the counters
-      __ aesecb_encrypt(noreg, noreg, keylen, FloatRegSet::range(v0, v7));
+      __ aesecb_encrypt(noreg, noreg, keylen, v0, 8);
 
       __ ld1(v12, v13, v14, v15, __ T16B, __ post(in, 4 * 16));
 
       // XOR the encrypted counters with the inputs
-      forAll(FloatRegSet::range(v0, v3),
-             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
-      forAll(FloatRegSet::range(v4, v7),
-             [&](FloatRegister reg) { __ eor(reg, __ T16B, reg, reg + v8->encoding()); });
+      for (int i = 0; i < 8; i++) {
+        __ eor(v0 + i, __ T16B, v0 + i, v8 + i);
+      }
       __ st1(v0, v1, v2, v3, __ T16B, __ post(out, 4 * 16));
       __ st1(v4, v5, v6, v7, __ T16B, __ post(out, 4 * 16));
 
@@ -5611,17 +5607,6 @@ class StubGenerator: public StubCodeGenerator {
   }
 
   address generate_ghash_processBlocks_wide() {
-    // Bafflingly, GCM uses little-endian for the byte order, but
-    // big-endian for the bit order.  For example, the polynomial 1 is
-    // represented as the 16-byte string 80 00 00 00 | 12 bytes of 00.
-    //
-    // So, we must either reverse the bytes in each word and do
-    // everything big-endian or reverse the bits in each byte and do
-    // it little-endian.  On AArch64 it's more idiomatic to reverse
-    // the bits in each byte (we have an instruction, RBIT, to do
-    // that) and keep the data in little-endian bit order throught the
-    // calculation, bit-reversing the inputs and outputs.
-
     address small = generate_ghash_processBlocks();
 
     StubCodeMark mark(this, "StubRoutines", "ghash_processBlocks");
@@ -7371,8 +7356,8 @@ class StubGenerator: public StubCodeGenerator {
 
     // generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
-      // StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
+      // StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+      StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks_wide();
     }
 
     if (UseBASE64Intrinsics) {
