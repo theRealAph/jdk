@@ -650,9 +650,15 @@ class Assembler : public AbstractAssembler {
 public:
 
 #ifndef PRODUCT
-  void emit_long(jint x);
+  static const uintptr_t asm_bp;
+
+  void emit_int32(jint x) {
+    if ((uintptr_t)pc() == asm_bp)
+      NOP();
+    AbstractAssembler::emit_int32(x);
+  }
 #else
-  void emit_long(jint x) {
+  void emit_int32(jint x) {
     AbstractAssembler::emit_int32(x);
   }
 #endif
@@ -3292,7 +3298,7 @@ inline Assembler::Membar_mask_bits operator|(Assembler::Membar_mask_bits a,
 }
 
 Instruction_aarch64::~Instruction_aarch64() {
-  assem->emit_long(insn);
+  assem->emit_int32(insn);
   assert_cond(get_bits() == 0xffffffff);
 }
 
