@@ -648,17 +648,16 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                            /*Hprime*/v6, p, vzr,
                            /*temps*/v1, v3, /* reuse b*/v2) .unroll();
 
-    // NB: GHASHReduceGenerator also loads the next #unrolls blocks of
-    // data into v2, v2+ofs, ...
-    GHASHReduceGenerator (this, unrolls,
-                          /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr,
-                          /*data*/v2, /*temp*/v3) .unroll();
-
+    ld1(/*data*/v2, T16B, post(r2, 0x10));
     for (int i = 1; i < unrolls; i++) {
       const int ofs = register_stride * i;
-      eor(v0, T16B, v0, v0+ofs);
+      eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
+      eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
       eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+      ld1(/*data*/v2 + ofs, T16B, post(r2, 0x10));
     }
+
+    ghash_reduce(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, p, vzr, /*tmp*/v1);
 
     sub(blocks, blocks, unrolls);
     cmp(blocks, (unsigned char)(unrolls * 2));
