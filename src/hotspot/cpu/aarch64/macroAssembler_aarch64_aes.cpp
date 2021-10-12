@@ -358,15 +358,15 @@ public:
                          FloatRegister result_lo, FloatRegister result_hi,
                          FloatRegister b,
                          /* non-offsetted (shared) registers */
-                         FloatRegister a, FloatRegister a1_xor_a0, FloatRegister p, FloatRegister vzr,
+                         FloatRegister a, FloatRegister p, FloatRegister vzr,
                          /* offseted (temp) registers */
                          FloatRegister tmp1, FloatRegister tmp2, FloatRegister tmp3)
     : KernelGenerator(as, unrolls),
       _result_lo(result_lo), _result_hi(result_hi), _b(b),
-      _a(a), _vzr(vzr), _a1_xor_a0(a1_xor_a0), _p(p),
+      _a(a), _vzr(vzr), _p(p),
       _tmp1(tmp1), _tmp2(tmp2), _tmp3(tmp3) { }
 
-  int register_stride = 7;
+  static const int register_stride = 7;
 
   virtual void generate(int index) {
     // Karatsuba multiplication performs a 128*128 -> 256-bit
@@ -393,7 +393,11 @@ public:
         break;
       case  3:  pmull(_result_lo,  T1Q, _b, _a, T1D);  // A0*B0
         break;
-      case  4:  pmull(_tmp2, T1Q, _tmp1, _a1_xor_a0, T1D); // (A1+A0)(B1+B0)
+        // case  4:  pmull(_tmp2, T1Q, _tmp1, _a1_xor_a0, T1D); // (A1+A0)(B1+B0)
+      case  4:
+        ext(_tmp2, T16B, _a, _a, 0x08); // long-swap subkeyH into a1_xor_a0
+        eor(_tmp2, T16B, _tmp2, _a);    // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+        pmull(_tmp2, T1Q, _tmp1, _tmp2, T1D); // (A1+A0)(B1+B0)
         break;
 
       case  5:  ext(_tmp1, T16B, _result_lo, _result_hi, 0x08);  break;
@@ -410,14 +414,17 @@ public:
   }
 
   virtual KernelGenerator *next() {
-    GHASHMultiplyGenerator *result = new GHASHMultiplyGenerator(*this);
-    result->_result_lo += register_stride;
-    result->_result_hi += register_stride;
-    result->_b += register_stride;
-    result->_tmp1 += register_stride;
-    result->_tmp2 += register_stride;
-    result->_tmp3 += register_stride;
-    return result;
+    return new GHASHMultiplyGenerator
+      (this, _unrolls,
+       _result_lo + register_stride,
+       _result_hi + register_stride,
+       _b + register_stride,
+       _a + register_stride,
+       _vzr,
+       _p,
+       _tmp1 + register_stride,
+       _tmp2 + register_stride,
+       _tmp3 + register_stride);
   }
 
   virtual int length() { return 11; }
@@ -442,7 +449,7 @@ public:
       _result(result), _lo(lo), _hi(hi),
       _p(p), _vzr(vzr), _data(data), _t1(t1), _once(true) { }
 
-  int register_stride = 7;
+  static const int register_stride = 7;
 
   virtual void generate(int index) {
     const FloatRegister t0 = _result;
@@ -511,7 +518,7 @@ void MacroAssembler::ghash_modmul(FloatRegister result,
 void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register state,
                                               Register subkeyH,
                                               Register data, Register blocks, int unrolls) {
-  int register_stride = 7;
+  const int register_stride = GHASHMultiplyGenerator::register_stride;
 
   // Bafflingly, GCM uses little-endian for the byte order, but
   // big-endian for the bit order.  For example, the polynomial 1 is
@@ -526,74 +533,82 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
   assert(unrolls * register_stride < 32, "out of registers");
 
-  FloatRegister a1_xor_a0 = v28;
-  FloatRegister Hprime = v29;
   FloatRegister vzr = v30;
   FloatRegister p = v31;
   eor(vzr, T16B, vzr, vzr); // zero register
 
   ldrq(p, field_polynomial);    // The field polynomial
 
-  ldrq(v0, Address(state));
-  ldrq(Hprime, Address(subkeyH));
 
-  rev64(v0, T16B, v0);          // Bit-reverse words in state and subkeyH
-  rbit(v0, T16B, v0);
-  rev64(Hprime, T16B, Hprime);
-  rbit(Hprime, T16B, Hprime);
-
-  // Powers of H -> Hprime
-
-  Label already_calculated, done;
   {
-    // The first time around we'll have to calculate H**2, H**3, etc.
-    // Look at the largest power of H in the subkeyH array to see if
-    // it's already been calculated.
-    ldp(rscratch1, rscratch2, Address(subkeyH, 16 * (unrolls - 1)));
-    orr(rscratch1, rscratch1, rscratch2);
-    cbnz(rscratch1, already_calculated);
+    FloatRegister a1_xor_a0 = v28;
+    FloatRegister Hprime = v29;
 
-    orr(v6, T16B, Hprime, Hprime);  // Start with H in v6 and Hprime
-    for (int i = 1; i < unrolls; i++) {
-      ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
-      eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);    // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-      ghash_modmul(/*result*/v6, /*result_lo*/v5, /*result_hi*/v4, /*b*/v6,
-                   Hprime, vzr, a1_xor_a0, p,
-                   /*temps*/v1, v3, v2);
-      rev64(v1, T16B, v6);
-      rbit(v1, T16B, v1);
-      strq(v1, Address(subkeyH, 16 * i));
+    ldrq(v0, Address(state));
+    ldrq(Hprime, Address(subkeyH));
+
+    rev64(v0, T16B, v0);          // Bit-reverse words in state and subkeyH
+    rbit(v0, T16B, v0);
+    rev64(Hprime, T16B, Hprime);
+    rbit(Hprime, T16B, Hprime);
+
+    // Powers of H -> Hprime
+
+    Label already_calculated, done;
+    {
+      // The first time around we'll have to calculate H**2, H**3, etc.
+      // Look at the largest power of H in the subkeyH array to see if
+      // it's already been calculated.
+      ldp(rscratch1, rscratch2, Address(subkeyH, 16 * (unrolls - 1)));
+      orr(rscratch1, rscratch1, rscratch2);
+      cbnz(rscratch1, already_calculated);
+
+      orr(v6, T16B, Hprime, Hprime);  // Start with H in v6 and Hprime
+      for (int i = 1; i < unrolls; i++) {
+        const int ofs = register_stride * i;
+
+        ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
+        eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);    // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
+        ghash_modmul(/*result*/v6, /*result_lo*/v5, /*result_hi*/v4, /*b*/v6,
+                     Hprime, vzr, a1_xor_a0, p,
+                     /*temps*/v1, v3, v2);
+        rev64(v1, T16B, v6);
+        rbit(v1, T16B, v1);
+        strq(v1, Address(subkeyH, 16 * i));
+        // FIXME
+        // orr(v6 + ofs, T16B, Hprime, Hprime);
+      }
+      // FIXME
+      // b(done);
     }
-    b(done);
+    {
+      bind(already_calculated);
+
+      for (int i = 0; i < unrolls; i++) {
+        const int ofs = register_stride * i;
+        // Load the powers of H we need into v6...
+        // ldrq(v6 + ofs, Address(subkeyH, 16 * i));
+        ldrq(v6 + ofs, Address(subkeyH, 16 * (unrolls - 1)));
+        rev64(v6 + ofs, T16B, v6 + ofs);
+        rbit(v6 + ofs, T16B, v6 + ofs);
+      }
+    }
+    bind(done);
   }
-  {
-    bind(already_calculated);
-
-    // Load the largest power of H we need into v6.
-    ldrq(v6, Address(subkeyH, 16 * (unrolls - 1)));
-    rev64(v6, T16B, v6);
-    rbit(v6, T16B, v6);
-  }
-  bind(done);
-
-  orr(Hprime, T16B, v6, v6);     // Move H ** unrolls into Hprime
-
-  // Hprime contains (H ** 1, H ** 2, ... H ** unrolls)
+  // v6 + offset contains (H ** 1, H ** 2, ... H ** unrolls)
   // v0 contains the initial state. Clear the others.
   for (int i = 1; i < unrolls; i++) {
-    int ofs = register_stride * i;
-    eor(ofs+v0, T16B, ofs+v0, ofs+v0); // zero each state register
+    const int ofs = register_stride * i;
+    eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
   }
 
-  ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
-  eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);    // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-
   // Load #unrolls blocks of data
-  for (int ofs = 0; ofs < unrolls * register_stride; ofs += register_stride) {
+  for (int i = 0; i < unrolls; i++) {
+    const int ofs = register_stride * i;
     ld1(v2+ofs, T16B, post(data, 0x10));
   }
 
-  // Register assignments, replicated across 4 clones, v0 ... v23
+  // Register assignments, replicated across 4 clones, v0 ... v27
   //
   // v0: input / output: current state, result of multiply/reduce
   // v1: temp
@@ -602,12 +617,10 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   // v3: temp
   // v4: output: high part of product
   // v5: output: low part ...
-  // v6: unused
+  // v6: H' (hash subkey)
   //
   // Not replicated:
   //
-  // v28: High part of H xor low part of H'
-  // v29: H' (hash subkey)
   // v30: zero
   // v31: Reduction polynomial of the Galois field
 
@@ -631,11 +644,11 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
 
     GHASHMultiplyGenerator(this, unrolls,
                            /*result_lo*/v5, /*result_hi*/v4, /*data*/v2,
-                           Hprime, a1_xor_a0, p, vzr,
+                           /*Hprime*/v6, p, vzr,
                            /*temps*/v1, v3, /* reuse b*/v2) .unroll();
 
     // NB: GHASHReduceGenerator also loads the next #unrolls blocks of
-    // data into v0, v0+ofs, the current state.
+    // data into v2, v2+ofs, ...
     GHASHReduceGenerator (this, unrolls,
                           /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr,
                           /*data*/v2, /*temp*/v3) .unroll();
@@ -646,11 +659,13 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   }
 
   // Merge the #unrolls states.  Note that the data for the next
-  // iteration has already been loaded into v4, v4+ofs, etc...
+  // iteration has already been loaded into v2, v2+ofs, etc...
 
   // First, we multiply/reduce each clone by the appropriate power of H.
   for (int i = 0; i < unrolls; i++) {
     int ofs = register_stride * i;
+    FloatRegister a1_xor_a0 = v28;
+    FloatRegister Hprime = v29;
     ldrq(Hprime, Address(subkeyH, 16 * (unrolls - i - 1)));
 
     rbit(v2+ofs, T16B, v2+ofs);
