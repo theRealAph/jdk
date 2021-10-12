@@ -664,32 +664,28 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     br(GE, L_ghash_loop);
   }
 
-  // Merge the #unrolls states.  Note that the data for the next
-  // iteration has already been loaded into v2, v2+ofs, etc...
+  {
+    // Xor data into current state
+    for (int ofs = 0; ofs < unrolls * register_stride; ofs += register_stride) {
+      rbit((v2+ofs), T16B, (v2+ofs));
+      eor((v2+ofs), T16B, v0+ofs, (v2+ofs));   // bit-swapped data ^ bit-swapped state
+    }
 
-  // First, we multiply/reduce each clone by the appropriate power of H.
-  for (int i = 0; i < unrolls; i++) {
-    int ofs = register_stride * i;
-    FloatRegister a1_xor_a0 = v28;
-    FloatRegister Hprime = v29;
-    ldrq(Hprime, Address(subkeyH, 16 * (unrolls - i - 1)));
+    // Generate fully-unrolled multiply-reduce in two stages.
 
-    rbit(v2+ofs, T16B, v2+ofs);
-    eor(v2+ofs, T16B, ofs+v0, v2+ofs);   // bit-swapped data ^ bit-swapped state
+    GHASHMultiplyGenerator(this, unrolls,
+                           /*result_lo*/v5, /*result_hi*/v4, /*data*/v2,
+                           /*Hprime*/v6, p, vzr,
+                           /*temps*/v1, v3, /* reuse b*/v2) .unroll();
 
-    rev64(Hprime, T16B, Hprime);
-    rbit(Hprime, T16B, Hprime);
-    ext(a1_xor_a0, T16B, Hprime, Hprime, 0x08); // long-swap subkeyH into a1_xor_a0
-    eor(a1_xor_a0, T16B, a1_xor_a0, Hprime);    // xor subkeyH into subkeyL (Karatsuba: (A1+A0))
-    ghash_modmul(/*result*/v0+ofs, /*result_lo*/v5+ofs, /*result_hi*/v4+ofs, /*b*/v2+ofs,
-                 Hprime, vzr, a1_xor_a0, p,
-                 /*temps*/v1+ofs, v3+ofs, /* reuse b*/v2+ofs);
-  }
+    for (int i = 1; i < unrolls; i++) {
+      const int ofs = register_stride * i;
+      eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
+      eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
+      eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+    }
 
-  // Then we sum the results.
-  for (int i = 0; i < unrolls - 1; i++) {
-    int ofs = register_stride * i;
-    eor(v0, T16B, v0, v0 + register_stride + ofs);
+    ghash_reduce(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, p, vzr, /*tmp*/v1);
   }
 
   sub(blocks, blocks, (unsigned char)unrolls);
