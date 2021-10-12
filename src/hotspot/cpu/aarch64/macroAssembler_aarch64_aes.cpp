@@ -678,12 +678,21 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                            /*Hprime*/v6, p, vzr,
                            /*temps*/v1, v3, /* reuse b*/v2) .unroll();
 
-    for (int i = 1; i < unrolls; i++) {
-      const int ofs = register_stride * i;
-      eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
-      eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
-      eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+    // Sum columns
+    for (int stride = 1; stride < unrolls; stride *= 2) {
+      for (int i = 0; i < unrolls; i +=stride * 2) {
+        int ofs = i * register_stride;
+        int next = ofs + register_stride * stride;
+        eor(/*result_hi*/v4+ofs, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4+next);
+        eor(/*result_lo*/v5+ofs, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5+next);
+      }
     }
+    // for (int i = 1; i < unrolls; i++) {
+    //   const int ofs = register_stride * i;
+    //   eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
+    //   eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
+    //   eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+    // }
 
     ghash_reduce(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, p, vzr, /*tmp*/v1);
   }
@@ -695,3 +704,4 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
   rbit(v0, T16B, v0);
   st1(v0, T16B, state);
 }
+
