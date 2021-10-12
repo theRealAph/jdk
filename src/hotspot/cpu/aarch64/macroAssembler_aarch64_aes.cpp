@@ -647,15 +647,28 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
                            /*result_lo*/v5, /*result_hi*/v4, /*data*/v2,
                            /*Hprime*/v6, p, vzr,
                            /*temps*/v1, v3, /* reuse b*/v2) .unroll();
-
-    ld1(/*data*/v2, T16B, post(r2, 0x10));
-    for (int i = 1; i < unrolls; i++) {
-      const int ofs = register_stride * i;
-      eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
-      eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
-      eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
-      ld1(/*data*/v2 + ofs, T16B, post(r2, 0x10));
+    {
+      FloatRegister data = v2;
+      // Sum columns
+      ld1(data, T16B, post(r2, 0x10)); data += register_stride;
+      for (int stride = 1; stride < unrolls; stride *= 2) {
+        for (int i = 0; i < unrolls; i +=stride * 2) {
+          int ofs = i * register_stride;
+          int next = ofs + register_stride * stride;
+          eor(/*result_hi*/v4+ofs, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4+next);
+          eor(/*result_lo*/v5+ofs, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5+next);
+          ld1(data, T16B, post(r2, 0x10)); data += register_stride;
+        }
+      }
     }
+    // ld1(/*data*/v2, T16B, post(r2, 0x10));
+    // for (int i = 1; i < unrolls; i++) {
+    //   const int ofs = register_stride * i;
+    //   eor(/*result_hi*/v4, T16B, /*result_hi*/v4+ofs, /*result_hi*/v4);
+    //   eor(/*result_lo*/v5, T16B, /*result_lo*/v5+ofs, /*result_lo*/v5);
+    //   eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+    //   ld1(/*data*/v2 + ofs, T16B, post(r2, 0x10));
+    // }
 
     ghash_reduce(/*result*/v0, /*result_lo*/v5, /*result_hi*/v4, p, vzr, /*tmp*/v1);
 
