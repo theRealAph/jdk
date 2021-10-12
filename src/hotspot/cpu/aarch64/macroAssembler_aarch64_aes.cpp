@@ -587,15 +587,16 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
       for (int i = 0; i < unrolls; i++) {
         const int ofs = register_stride * i;
         // Load the powers of H we need into v6...
-        // ldrq(v6 + ofs, Address(subkeyH, 16 * i));
-        ldrq(v6 + ofs, Address(subkeyH, 16 * (unrolls - 1)));
+        ldrq(v6 + ofs, Address(subkeyH, 16 * (unrolls - i - 1)));
+        // ldrq(v6 + ofs, Address(subkeyH, 16 * (unrolls - 1)));
         rev64(v6 + ofs, T16B, v6 + ofs);
         rbit(v6 + ofs, T16B, v6 + ofs);
       }
     }
     bind(done);
   }
-  // v6 + offset contains (H ** 1, H ** 2, ... H ** unrolls)
+
+  // v6 + offset contains (H ** (unrolls-1) ... , H ** 2, H ** 1)
   // v0 contains the initial state. Clear the others.
   for (int i = 1; i < unrolls; i++) {
     const int ofs = register_stride * i;
@@ -652,6 +653,12 @@ void MacroAssembler::ghash_processBlocks_wide(address field_polynomial, Register
     GHASHReduceGenerator (this, unrolls,
                           /*result*/v0, /*lo*/v5, /*hi*/v4, p, vzr,
                           /*data*/v2, /*temp*/v3) .unroll();
+
+    for (int i = 1; i < unrolls; i++) {
+      const int ofs = register_stride * i;
+      eor(v0, T16B, v0, v0+ofs);
+      eor(v0+ofs, T16B, v0+ofs, v0+ofs); // zero each state register
+    }
 
     sub(blocks, blocks, unrolls);
     cmp(blocks, (unsigned char)(unrolls * 2));
