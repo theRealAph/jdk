@@ -29,6 +29,12 @@
 #include "asm/register.hpp"
 #include "utilities/powerOfTwo.hpp"
 
+#ifdef LINUX
+#define INTERNAL_VISIBILITY  __attribute__ ((visibility ("internal")))
+#else
+#define INTERNAL_VISIBILITY
+#endif
+
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
@@ -36,39 +42,49 @@ typedef VMRegImpl* VMReg;
 class RegisterImpl;
 typedef RegisterImpl* Register;
 
-inline const Register as_Register(int encoding) {
-  return (Register)(intptr_t) encoding;
-}
+const Register as_Register(int encoding);
 
 class RegisterImpl: public AbstractRegisterImpl {
  public:
   enum {
-    number_of_registers         =   32,
-    number_of_byte_registers      = 32,
-    number_of_registers_for_jvmci = 34,  // Including SP and ZR.
-    max_slots_per_register = 2
+    number_of_registers       = 32,
+    number_of_byte_registers  = 32,
+    number_of_named_registers = 34,  // Including SP and ZR.
+    max_slots_per_register    = 2
   };
 
   // derived registers, offsets, and addresses
-  Register successor() const                          { return as_Register(encoding() + 1); }
-
-  // construction
-  inline friend const Register as_Register(int encoding);
+  Register successor() const     { return as_Register(encoding() + 1); }
 
   VMReg as_VMReg();
 
   // accessors
-  int   encoding() const                         { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  bool  is_valid() const                         { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
-  bool  has_byte_register() const                { return 0 <= (intptr_t)this && (intptr_t)this < number_of_byte_registers; }
+  bool is_valid() const;
+  bool has_byte_register() const { return is_valid(); }
   const char* name() const;
-  int   encoding_nocheck() const                 { return (intptr_t)this; }
+  int encoding() const { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
+  int encoding_nocheck() const;
 };
 
+extern RegisterImpl all_Registers[RegisterImpl::number_of_named_registers] INTERNAL_VISIBILITY;
+constexpr Register first_Register = all_Registers;
+
+#undef CONSTANT_REGISTER_DECLARATION
+#define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
+constexpr type name = first_##type + value;
+
+// One past the last register
+CONSTANT_REGISTER_DECLARATION(Register, noreg, (RegisterImpl::number_of_named_registers));
+
+inline bool RegisterImpl::is_valid() const        { return this < noreg; }
+inline int RegisterImpl::encoding_nocheck() const { return this - first_Register; }
+
+inline const Register as_Register(int encoding) {
+  assert(encoding <= RegisterImpl::number_of_named_registers, "invalid register");
+  return first_Register + encoding;
+}
+
 // The integer registers of the aarch64 architecture
-
-CONSTANT_REGISTER_DECLARATION(Register, noreg, (-1));
-
 
 CONSTANT_REGISTER_DECLARATION(Register, r0,    (0));
 CONSTANT_REGISTER_DECLARATION(Register, r1,    (1));
@@ -113,7 +129,6 @@ CONSTANT_REGISTER_DECLARATION(Register, r28,  (28));
 CONSTANT_REGISTER_DECLARATION(Register, r29,  (29));
 CONSTANT_REGISTER_DECLARATION(Register, r30,  (30));
 
-
 // r31 is not a general purpose register, but represents either the
 // stack pointer or the zero/discard register depending on the
 // instruction.
@@ -128,9 +143,7 @@ const Register dummy_reg = r31_sp;
 class FloatRegisterImpl;
 typedef FloatRegisterImpl* FloatRegister;
 
-inline FloatRegister as_FloatRegister(int encoding) {
-  return (FloatRegister)(intptr_t) encoding;
-}
+const FloatRegister as_FloatRegister(int encoding);
 
 // The implementation of floating point registers for the architecture
 class FloatRegisterImpl: public AbstractRegisterImpl {
@@ -143,25 +156,32 @@ class FloatRegisterImpl: public AbstractRegisterImpl {
     extra_save_slots_per_neon_register = slots_per_neon_register - save_slots_per_register
   };
 
-  // construction
-  inline friend FloatRegister as_FloatRegister(int encoding);
-
   VMReg as_VMReg();
 
   // derived registers, offsets, and addresses
-  FloatRegister successor() const                          { return as_FloatRegister((encoding() + 1) % 32); }
+  FloatRegister successor() const     { return as_FloatRegister(encoding() + 1); }
 
   // accessors
-  int   encoding() const                          { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  int   encoding_nocheck() const                         { return (intptr_t)this; }
-  bool  is_valid() const                          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
+  bool is_valid() const;
   const char* name() const;
-
+  int  encoding() const { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
+  int  encoding_nocheck() const;
 };
 
-// The float registers of the AARCH64 architecture
+extern FloatRegisterImpl all_FloatRegisters[FloatRegisterImpl::number_of_registers] INTERNAL_VISIBILITY;
+constexpr FloatRegister first_FloatRegister = all_FloatRegisters;
 
-CONSTANT_REGISTER_DECLARATION(FloatRegister, fnoreg , (-1));
+CONSTANT_REGISTER_DECLARATION(FloatRegister, fnoreg , (FloatRegisterImpl::number_of_registers));
+
+inline bool FloatRegisterImpl::is_valid() const           { return this < fnoreg; }
+inline int FloatRegisterImpl::encoding_nocheck() const    { return this - first_FloatRegister; }
+
+inline const FloatRegister as_FloatRegister(int encoding) {
+  assert(encoding <= FloatRegisterImpl::number_of_registers, "invalid register");
+  return encoding == -1 ? fnoreg : first_FloatRegister + encoding;
+}
+
+// The float registers of the AARCH64 architecture
 
 CONSTANT_REGISTER_DECLARATION(FloatRegister, v0     , ( 0));
 CONSTANT_REGISTER_DECLARATION(FloatRegister, v1     , ( 1));
@@ -233,9 +253,7 @@ CONSTANT_REGISTER_DECLARATION(FloatRegister, z31    , (31));
 
 class PRegisterImpl;
 typedef PRegisterImpl* PRegister;
-inline PRegister as_PRegister(int encoding) {
-  return (PRegister)(intptr_t)encoding;
-}
+const PRegister as_PRegister(int encoding);
 
 // The implementation of predicate registers for the architecture
 class PRegisterImpl: public AbstractRegisterImpl {
@@ -246,21 +264,31 @@ class PRegisterImpl: public AbstractRegisterImpl {
     max_slots_per_register = 1
   };
 
-  // construction
-  inline friend PRegister as_PRegister(int encoding);
-
   VMReg as_VMReg();
 
   // derived registers, offsets, and addresses
-  PRegister successor() const     { return as_PRegister(encoding() + 1); }
+  PRegister successor() const { return as_PRegister(encoding() + 1); }
 
   // accessors
-  int   encoding() const          { assert(is_valid(), "invalid register"); return (intptr_t)this; }
-  int   encoding_nocheck() const  { return (intptr_t)this; }
-  bool  is_valid() const          { return 0 <= (intptr_t)this && (intptr_t)this < number_of_registers; }
-  bool  is_governing() const      { return 0 <= (intptr_t)this && (intptr_t)this < number_of_governing_registers; }
+  bool  is_valid() const;
   const char* name() const;
+  int   encoding() const      { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
+  int   encoding_nocheck() const;
+  bool  is_governing() const;
 };
+
+extern PRegisterImpl all_PRegisters[PRegisterImpl::number_of_registers] INTERNAL_VISIBILITY;;
+constexpr PRegister first_PRegister = all_PRegisters;
+
+inline bool PRegisterImpl::is_valid() const     { return this < first_PRegister + number_of_registers; }
+inline bool PRegisterImpl::is_governing() const { return this < first_PRegister + number_of_governing_registers; }
+inline int PRegisterImpl::encoding_nocheck() const
+                                                { return this - first_PRegister; }
+
+inline const PRegister as_PRegister(int encoding) {
+  assert(encoding <= PRegisterImpl::number_of_registers, "invalid register");
+  return first_PRegister + encoding;
+}
 
 // The predicate registers of SVE.
 CONSTANT_REGISTER_DECLARATION(PRegister, p0,  ( 0));
