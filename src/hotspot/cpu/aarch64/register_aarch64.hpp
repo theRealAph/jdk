@@ -29,12 +29,6 @@
 #include "asm/register.hpp"
 #include "utilities/powerOfTwo.hpp"
 
-#ifdef LINUX
-#define INTERNAL_VISIBILITY  __attribute__ ((visibility ("internal")))
-#else
-#define INTERNAL_VISIBILITY
-#endif
-
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
