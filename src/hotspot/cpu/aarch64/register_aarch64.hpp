@@ -41,7 +41,7 @@ inline const type as_ ## type(int encoding) {                           \
 }                                                                       \
 extern name all_ ## type ## s[name::number_of_declared_registers] INTERNAL_VISIBILITY; \
 constexpr type first_ ## type = all_ ## type ## s;                      \
-constexpr type name::first() { return all_ ## type ## s; }
+inline constexpr type name::first() { return all_ ## type ## s; }
 
 #define REGISTER_IMPL_DEFINITION(type, name)                    \
 name all_ ## type ## s[name::number_of_declared_registers];
@@ -143,6 +143,7 @@ CONSTANT_REGISTER_DECLARATION(Register, sp,  (33));
 
 // Used as a filler in instructions where a register field is unused.
 const Register dummy_reg = r31_sp;
+
 
 // Use FloatRegister as shortcut
 class FloatRegisterImpl;

@@ -243,7 +243,7 @@ public:
     *(unsigned *)a = target;
   }
 
-  __attribute__((always_inline)) void f(unsigned val, int msb, int lsb) {
+  void f(unsigned val, int msb, int lsb) {
     int nbits = msb - lsb + 1;
     guarantee(val < (1ULL << nbits), "Field too big for insn");
     assert_cond(msb >= lsb);
@@ -257,7 +257,7 @@ public:
 #endif
   }
 
-  __attribute__((always_inline)) void f(unsigned val, int bit) {
+  void f(unsigned val, int bit) {
     f(val, bit, bit);
   }
 
@@ -271,7 +271,7 @@ public:
     f(uval, lsb + nbits - 1, lsb);
   }
 
-  __attribute__((always_inline)) void rf(Register r, int lsb) {
+  void rf(Register r, int lsb) {
     f(r->encoding_nocheck(), lsb + 4, lsb);
   }
 
