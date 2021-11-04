@@ -26,9 +26,9 @@
 #include "precompiled.hpp"
 #include "register_aarch64.hpp"
 
-RegisterImpl all_Registers[RegisterImpl::number_of_named_registers];
-FloatRegisterImpl all_FloatRegisters[FloatRegisterImpl::number_of_registers];
-PRegisterImpl all_PRegisters[16];
+REGISTER_IMPL_DEFINITION(Register, RegisterImpl);
+REGISTER_IMPL_DEFINITION(FloatRegister, FloatRegisterImpl);
+REGISTER_IMPL_DEFINITION(PRegister, PRegisterImpl);
 
 const int ConcreteRegisterImpl::max_gpr = RegisterImpl::number_of_registers *
                                           RegisterImpl::max_slots_per_register;
