@@ -61,6 +61,11 @@ class Argument {
   };
 };
 
+#undef REGISTER_DECLARATION
+#define REGISTER_DECLARATION(type, name, value)         \
+const type name = type(value ## _encoding);             \
+constexpr int name ## _encoding = value ## _encoding;
+
 REGISTER_DECLARATION(Register, c_rarg0, r0);
 REGISTER_DECLARATION(Register, c_rarg1, r1);
 REGISTER_DECLARATION(Register, c_rarg2, r2);
@@ -332,7 +337,7 @@ class Post : public PrePost {
   Register _idx;
   bool _is_postreg;
 public:
-  Post(Register reg, int o) : PrePost(reg, o) { _idx = NULL; _is_postreg = false; }
+  Post(Register reg, int o) : PrePost(reg, o), _idx(noreg) { _is_postreg = false; }
   Post(Register reg, Register idx) : PrePost(reg, 0) { _idx = idx; _is_postreg = true; }
   Register idx_reg() { return _idx; }
   bool is_postreg() {return _is_postreg; }
@@ -401,29 +406,29 @@ class Address {
   Address()
     : _mode(no_mode) { }
   Address(Register r)
-    : _base(r), _index(noreg), _offset(0), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(0), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, int o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, long o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, long long o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, unsigned int o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, unsigned long o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, unsigned long long o)
-    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(Register r, ByteSize disp)
     : Address(r, in_bytes(disp)) { }
   Address(Register r, Register r1, extend ext = lsl())
     : _base(r), _index(r1), _offset(0), _mode(base_plus_offset_reg),
-      _ext(ext), _target(0) { }
+      _ext(ext), _is_lval(false), _target(0) { }
   Address(Pre p)
     : _base(p.reg()), _offset(p.offset()), _mode(pre) { }
   Address(Post p)
     : _base(p.reg()),  _index(p.idx_reg()), _offset(p.offset()),
-      _mode(p.is_postreg() ? post_reg : post), _target(0) { }
+      _mode(p.is_postreg() ? post_reg : post), _ext(lsl()), _is_lval(false), _target(0)  { }
   Address(address target, RelocationHolder const& rspec)
     : _mode(literal),
       _rspec(rspec),
@@ -432,7 +437,7 @@ class Address {
   Address(address target, relocInfo::relocType rtype = relocInfo::external_word_type);
   Address(Register base, RegisterOrConstant index, extend ext = lsl())
     : _base (base),
-      _offset(0), _ext(ext), _target(0) {
+      _offset(0), _ext(ext), _is_lval(false), _target(0) {
     if (index.is_register()) {
       _mode = base_plus_offset_reg;
       _index = index.as_register();

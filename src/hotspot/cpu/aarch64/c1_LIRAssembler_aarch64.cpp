@@ -190,7 +190,7 @@ Address LIR_Assembler::as_Address(LIR_Address* addr, Register tmp) {
   } else  {
     intptr_t addr_offset = intptr_t(addr->disp());
     if (Address::offset_ok_for_immed(addr_offset, addr->scale()))
-      return Address(base, addr_offset, Address::lsl(addr->scale()));
+      return Address(base, RegisterOrConstant(addr_offset), Address::lsl(addr->scale()));
     else {
       __ mov(tmp, addr_offset);
       return Address(base, tmp, Address::lsl(addr->scale()));

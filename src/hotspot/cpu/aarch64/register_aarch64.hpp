@@ -37,34 +37,32 @@ typedef VMRegImpl* VMReg;
 #define REGISTER_IMPL_DECLARATION(type, name)                           \
 inline const type as_ ## type(int encoding) {                           \
   assert(encoding <= name::number_of_declared_registers, "invalid register"); \
-  return encoding == -1 ? name::invalid() : name::first() + encoding;   \
-}                                                                       \
-extern name all_ ## type ## s[name::number_of_declared_registers] INTERNAL_VISIBILITY; \
-constexpr type first_ ## type = all_ ## type ## s;                      \
-inline constexpr type name::first() { return all_ ## type ## s; }
+  return encoding == -1 ? name::invalid() : name(encoding);             \
+}
 
-#define REGISTER_IMPL_DEFINITION(type, name)                    \
-name all_ ## type ## s[name::number_of_declared_registers];
 
 #undef CONSTANT_REGISTER_DECLARATION
 #define CONSTANT_REGISTER_DECLARATION(type, name, value)        \
-constexpr type name = first_##type + value;
+const type name(value);                                         \
+constexpr int name ## _encoding = value;
 
-
-// Use Register as shortcut
 class RegisterImpl;
-typedef RegisterImpl* Register;
-
+typedef RegisterImpl Register;
 const Register as_Register(int encoding);
 
 class RegisterImpl: public AbstractRegisterImpl {
-  const friend Register as_Register(int encoding);
+  unsigned char _encoding;
+
+  friend const Register as_Register(int encoding);
 
 private:
-  static constexpr Register first();
-  static constexpr Register invalid() { return first() + number_of_declared_registers; }
+  static Register invalid() { return Register(number_of_declared_registers); }
 
 public:
+  RegisterImpl(int encoding) : _encoding(encoding) {}
+  RegisterImpl(): _encoding(number_of_declared_registers) {}
+  RegisterImpl(const RegisterImpl& r): _encoding(r._encoding) {}
+
   enum {
     number_of_registers       = 32,
     number_of_byte_registers  = 32,
@@ -75,14 +73,23 @@ public:
   // derived registers, offsets, and addresses
   Register successor() const     { return as_Register(encoding() + 1); }
 
-  VMReg as_VMReg();
+  VMReg as_VMReg() const;
 
   // accessors
-  bool is_valid() const          { return this < invalid(); }
+  bool is_valid() const          { return _encoding < invalid()._encoding; }
   bool has_byte_register() const { return is_valid(); }
   const char* name() const;
-  int encoding() const           { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
-  int encoding_nocheck() const   { return this - first(); }
+  int encoding() const           { assert(is_valid(), "invalid register"); return _encoding; }
+  int encoding_nocheck() const   { return _encoding; }
+
+  bool operator==(const RegisterImpl &reg) const { return _encoding == reg._encoding; }
+  bool operator!=(const RegisterImpl &reg) const { return ! (*this == reg); }
+  bool operator< (const RegisterImpl &reg) const { return _encoding < reg._encoding; }
+  bool operator> (const RegisterImpl &reg) const { return reg < (*this); }
+  bool operator<=(const RegisterImpl &reg) const { return !((*this) > reg); }
+  bool operator>=(const RegisterImpl &reg) const { return !((*this) < reg); }
+
+  const RegisterImpl * operator->() const   { return this; }
 };
 
 
@@ -145,21 +152,22 @@ CONSTANT_REGISTER_DECLARATION(Register, sp,  (33));
 const Register dummy_reg = r31_sp;
 
 
-// Use FloatRegister as shortcut
 class FloatRegisterImpl;
-typedef FloatRegisterImpl* FloatRegister;
-
+typedef FloatRegisterImpl FloatRegister;
 const FloatRegister as_FloatRegister(int encoding);
 
-// The implementation of floating point registers for the architecture
 class FloatRegisterImpl: public AbstractRegisterImpl {
-  const friend FloatRegister as_FloatRegister(int encoding);
+  unsigned char _encoding;
+
+  friend const FloatRegister as_FloatRegister(int encoding);
 
 private:
-  static constexpr FloatRegister first();
-  static constexpr FloatRegister invalid() { return first() + number_of_declared_registers; }
+  static FloatRegister invalid() { return FloatRegister(number_of_declared_registers); }
 
 public:
+  FloatRegisterImpl(int encoding) : _encoding(encoding) {}
+  FloatRegisterImpl(): _encoding(number_of_declared_registers) {}
+
   enum {
     number_of_registers = 32,
     number_of_declared_registers = 32,
@@ -169,17 +177,29 @@ public:
     extra_save_slots_per_neon_register = slots_per_neon_register - save_slots_per_register
   };
 
-  VMReg as_VMReg();
-
   // derived registers, offsets, and addresses
-  FloatRegister successor() const { return as_FloatRegister(encoding() + 1); }
+  FloatRegister successor() const     { return *this + 1; }
+  FloatRegister operator+(int n) const { return as_FloatRegister(encoding() + n); }
+  FloatRegister operator+=(int n) { _encoding += n; return *this; }
+  FloatRegister operator++(int) { FloatRegister old = *this; *this += 1; return old; }
+
+  VMReg as_VMReg() const;
 
   // accessors
-  bool is_valid() const           { return this < invalid(); }
-  bool has_byte_register() const  { return is_valid(); }
+  bool is_valid() const          { return _encoding < invalid()._encoding; }
+  bool has_byte_register() const { return is_valid(); }
   const char* name() const;
-  int encoding() const            { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
-  int encoding_nocheck() const    { return this - first(); }
+  int encoding() const           { assert(is_valid(), "invalid register"); return _encoding; }
+  int encoding_nocheck() const   { return _encoding; }
+
+  bool operator==(const FloatRegister &reg) const { return _encoding == reg._encoding; }
+  bool operator!=(const FloatRegister &reg) const { return ! (*this == reg); }
+  bool operator< (const FloatRegister &reg) const { return _encoding < reg._encoding; }
+  bool operator> (const FloatRegister &reg) const { return reg < (*this); }
+  bool operator<=(const FloatRegister &reg) const { return !((*this) > reg); }
+  bool operator>=(const FloatRegister &reg) const { return !((*this) < reg); }
+
+  const FloatRegisterImpl *operator->() const    { return this; }
 };
 
 REGISTER_IMPL_DECLARATION(FloatRegister, FloatRegisterImpl);
@@ -256,17 +276,21 @@ CONSTANT_REGISTER_DECLARATION(FloatRegister, z30    , (30));
 CONSTANT_REGISTER_DECLARATION(FloatRegister, z31    , (31));
 
 
+// The implementation of predicate registers for the architecture
 class PRegisterImpl;
-typedef PRegisterImpl* PRegister;
+typedef PRegisterImpl PRegister;
 const PRegister as_PRegister(int encoding);
 
-// The implementation of predicate registers for the architecture
 class PRegisterImpl: public AbstractRegisterImpl {
-  const friend PRegister as_PRegister(int encoding);
+  const unsigned char _encoding;
+
+  friend const PRegister as_PRegister(int encoding);
 
 private:
-  static constexpr PRegister first();
-  static constexpr PRegister invalid() { return first() + number_of_declared_registers; }
+  static PRegister invalid() { return PRegister(number_of_declared_registers); }
+
+public:
+  PRegisterImpl(int encoding) : _encoding(encoding) {}
 
  public:
   enum {
@@ -276,20 +300,23 @@ private:
     max_slots_per_register = 1
   };
 
-  VMReg as_VMReg();
-
   // derived registers, offsets, and addresses
-  PRegister successor() const    { return as_PRegister(encoding() + 1); }
+  PRegister successor() const     { return as_PRegister(encoding() + 1); }
+
+  VMReg as_VMReg() const;
 
   // accessors
-  bool is_valid() const          { return this < invalid(); }
+  bool is_valid() const          { return _encoding < invalid()._encoding; }
   bool has_byte_register() const { return is_valid(); }
   const char* name() const;
-  int encoding() const           { assert(is_valid(), "invalid register"); return encoding_nocheck(); }
-  int encoding_nocheck() const   { return this - first(); }
+  int encoding() const           { assert(is_valid(), "invalid register"); return _encoding; }
+  int encoding_nocheck() const   { return _encoding; }
   bool is_governing() const {
-    return this < first() + number_of_governing_registers;
+    return encoding() < number_of_governing_registers;
   }
+
+  bool operator==(const PRegisterImpl reg) const { return _encoding == reg._encoding; }
+  const PRegisterImpl *operator->() const    { return this; }
 };
 
 REGISTER_IMPL_DECLARATION(PRegister, PRegisterImpl);
