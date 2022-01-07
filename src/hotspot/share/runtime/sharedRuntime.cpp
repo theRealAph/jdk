@@ -996,12 +996,16 @@ jlong SharedRuntime::get_java_tid(Thread* thread) {
   return 0;
 }
 
+extern "C" void pfl();
+
 /**
  * This function ought to be a void function, but cannot be because
  * it gets turned into a tail-call on sparc, which runs into dtrace bug
  * 6254741.  Once that is fixed we can remove the dummy return value.
  */
 int SharedRuntime::dtrace_object_alloc(oopDesc* o) {
+  pfl();
+  *(int*)0 = 1;
   return dtrace_object_alloc(Thread::current(), o, o->size());
 }
 
