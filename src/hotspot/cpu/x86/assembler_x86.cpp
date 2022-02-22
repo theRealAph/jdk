@@ -10216,6 +10216,20 @@ void Assembler::emit_operand32(Register reg, Address adr) {
                adr._rspec);
 }
 
+void Assembler::fxrstor(Address src) {
+  prefixq(src);
+  emit_int8(0x0F);
+  emit_int8((unsigned char)0xAE);
+  emit_operand(as_Register(1), src);
+}
+
+void Assembler::fxsave(Address dst) {
+  prefixq(dst);
+  emit_int8(0x0F);
+  emit_int8((unsigned char)0xAE);
+  emit_operand(as_Register(0), dst);
+}
+
 #ifndef _LP64
 // 32bit only pieces of the assembler
 
@@ -12241,19 +12255,9 @@ void Assembler::decq(Address dst) {
   emit_operand(rcx, dst);
 }
 
-void Assembler::fxrstor(Address src) {
-  emit_int24(get_prefixq(src), 0x0F, (unsigned char)0xAE);
-  emit_operand(as_Register(1), src);
-}
-
 void Assembler::xrstor(Address src) {
   emit_int24(get_prefixq(src), 0x0F, (unsigned char)0xAE);
   emit_operand(as_Register(5), src);
-}
-
-void Assembler::fxsave(Address dst) {
-  emit_int24(get_prefixq(dst), 0x0F, (unsigned char)0xAE);
-  emit_operand(as_Register(0), dst);
 }
 
 void Assembler::xsave(Address dst) {
