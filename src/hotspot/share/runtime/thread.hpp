@@ -550,8 +550,8 @@ protected:
   void    set_stack_size(size_t size)  { _stack_size = size; }
   address stack_end()  const           { return stack_base() - stack_size(); }
   void    record_stack_base_and_size();
-  void    register_thread_stack_with_NMT() NOT_NMT_RETURN;
-  void    unregister_thread_stack_with_NMT() NOT_NMT_RETURN;
+  void    register_thread_stack_with_NMT();
+  void    unregister_thread_stack_with_NMT();
 
   int     lgrp_id() const        { return _lgrp_id; }
   void    set_lgrp_id(int value) { _lgrp_id = value; }
@@ -1298,6 +1298,12 @@ class JavaThread: public Thread {
   }
   static ByteSize reserved_stack_activation_offset() {
     return byte_offset_of(JavaThread, _stack_overflow_state._reserved_stack_activation);
+  }
+  static ByteSize shadow_zone_safe_limit()  {
+    return byte_offset_of(JavaThread, _stack_overflow_state._shadow_zone_safe_limit);
+  }
+  static ByteSize shadow_zone_growth_watermark()  {
+    return byte_offset_of(JavaThread, _stack_overflow_state._shadow_zone_growth_watermark);
   }
 
   static ByteSize suspend_flags_offset()         { return byte_offset_of(JavaThread, _suspend_flags); }
