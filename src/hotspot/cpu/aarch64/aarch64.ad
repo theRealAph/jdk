@@ -2895,8 +2895,22 @@ typedef void (MacroAssembler::* mem_vector_insn)(FloatRegister Rt,
     }
   }
 
-%}
+  // Convert C2's idea of a rounding mode to AArch64 encoding.
+  Assembler::round_mode aarch64_round_mode(RoundDoubleModeNode::RoundingMode rmode) {
+    switch (rmode) {
+      case RoundDoubleModeNode::rmode_rint:
+        return Assembler::rmode_rint;
+      case RoundDoubleModeNode::rmode_floor:
+        return Assembler::rmode_floor;
+      case RoundDoubleModeNode::rmode_ceil:
+        return Assembler::rmode_ceil;
+      default:
+        ShouldNotReachHere();
+        return Assembler::rmode_zero;
+    }
+  }
 
+%}
 
 
 //----------ENCODING BLOCK-----------------------------------------------------
@@ -14535,6 +14549,16 @@ instruct roundD_reg(vRegD dst, vRegD src, immI rmode) %{
                    as_FloatRegister($src$$reg));
         break;
     }
+  %}
+  ins_pipe(fp_uop_d);
+%}
+
+instruct roundD2L_reg(iRegLNoSp dst, vRegD src, immI rmode) %{
+  match(Set dst (ConvD2L (RoundDoubleMode src rmode)));
+  format %{ "fcvtXs  $dst, $src, $rmode" %}
+  ins_encode %{
+    __ float_round_conv(as_Register($dst$$reg), as_FloatRegister($src$$reg),
+                        aarch64_round_mode((RoundDoubleModeNode::RoundingMode)($rmode$$constant)));
   %}
   ins_pipe(fp_uop_d);
 %}

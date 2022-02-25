@@ -2103,6 +2103,16 @@ public:
   INSN(fcvtzdw, 0b000, 0b01, 0b11, 0b000);
   INSN(fcvtzd,  0b100, 0b01, 0b11, 0b000);
 
+  enum round_mode {rmode_rint = 0b00, rmode_ceil = 0b01, rmode_floor = 0b10, rmode_zero = 0b11};
+  // fcvt{n,p,m,z}s - double to jlong
+  void float_round_conv(Register Rd, FloatRegister Rn, round_mode mode) {
+    float_int_convert(/*int64*/0b100, /*double*/0b01, mode, 0b000, Rd, as_Register(Rn));
+  }
+  // fcvt{n,p,m,z}s - float to jint
+  void float_round_convw(Register Rd, FloatRegister Rn, round_mode mode) {
+    float_int_convert(/*int32*/0b000, /*single*/0b00, mode, 0b000, Rd, as_Register(Rn));
+  }
+
   INSN(fmovs, 0b000, 0b00, 0b00, 0b110);
   INSN(fmovd, 0b100, 0b01, 0b00, 0b110);
 
