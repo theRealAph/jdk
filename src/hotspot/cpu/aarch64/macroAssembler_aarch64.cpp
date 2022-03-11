@@ -5275,7 +5275,7 @@ void MacroAssembler::java_round_float
     fmovs(ftmp, 0.5f);
     fadds(ftmp, src, ftmp);
     // Convert double to long, use RoundTowardsNegative
-    float_int_convert(/*32-bit*/0, /*float*/0b00, rmode_floor, 0b000,
+    float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_floor, 0b000,
                       dst, as_Register(ftmp));
     b(DONE);
   }

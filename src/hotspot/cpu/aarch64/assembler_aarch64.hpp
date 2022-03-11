@@ -2450,7 +2450,8 @@ public:
 
 #undef INSN
 
-#define INSN(NAME, op0, cmode0) \
+// Advanced SIMD modified immediate
+#define INSN(NAME, op0, cmode0)                                        \
   void NAME(FloatRegister Vd, SIMD_Arrangement T, unsigned imm8, unsigned lsl = 0) {   \
     unsigned cmode = cmode0;                                                           \
     unsigned op = op0;                                                                 \
@@ -2477,7 +2478,22 @@ public:
 
 #undef INSN
 
-#define INSN(NAME, op1, op2, op3) \
+#define INSN(NAME, op, cmode)                                           \
+  void NAME(FloatRegister Vd, SIMD_Arrangement T, double imm) {         \
+    unsigned imm8 = pack(imm);                                          \
+    starti;                                                             \
+    f(0, 31), f((int)T & 1, 30), f(op, 29), f(0b0111100000, 28, 19);    \
+    f(imm8 >> 5, 18, 16), f(cmode, 15, 12), f(0x01, 11, 10), f(imm8 & 0b11111, 9, 5); \
+    rf(Vd, 0);                                                          \
+  }
+
+  INSN(fmovs, 0, 0b1111);
+  INSN(fmovd, 1, 0b1111);
+
+#undef INSN
+
+// Advanced SIMD three same
+#define INSN(NAME, op1, op2, op3)                                                       \
   void NAME(FloatRegister Vd, SIMD_Arrangement T, FloatRegister Vn, FloatRegister Vm) { \
     starti;                                                                             \
     assert(T == T2S || T == T4S || T == T2D, "invalid arrangement");                    \
@@ -2925,6 +2941,7 @@ public:
   INSN(frintm, 0, 0b00, 0b01, 0b11001);
   INSN(frintp, 0, 0b10, 0b01, 0b11000);
   INSN(fcvtzs, 0, 0b10, 0b01, 0b11011);
+  INSN(fcvtms, 0, 0b00, 0b01, 0b11011);
 #undef ASSERTION
 
 #define ASSERTION (T == T8B || T == T16B || T == T4H || T == T8H || T == T2S || T == T4S)

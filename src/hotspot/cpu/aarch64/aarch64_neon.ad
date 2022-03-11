@@ -466,6 +466,26 @@ instruct vcvt2Fto2I(vecD dst, vecD src)
   ins_pipe(pipe_class_default);
 %}
 
+instruct vround4Fto4I(vecX dst, vecX src, vecX tmp1, vecX tmp2)
+%{
+  predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
+  match(Set dst (RoundVF src));
+  effect(TEMP tmp1, TEMP tmp2);
+  format %{ "fcvtms  $dst, T4S, $src\t# round 4F to 4I vector" %}
+  ins_encode %{
+    __ lea(rscratch1, ExternalAddress((address)(intptr_t)&xxyyzz));
+    __ blr(rscratch1);
+    __ get_fpcr(rscratch1);
+    __ orr(rscratch2, rscratch1, __ rmode_floor << 22);  // Assume FPCR.Rmode = 00.
+    // __ set_fpcr(rscratch2);
+    __ fmovs(as_FloatRegister($tmp1$$reg), __ T4S, 0.5);
+    __ fadd(as_FloatRegister($tmp1$$reg), __ T4S, as_FloatRegister($tmp1$$reg), as_FloatRegister($src$$reg));
+    __ fcvtms(as_FloatRegister($dst$$reg), __ T4S, as_FloatRegister($tmp1$$reg));
+    // __ set_fpcr(rscratch1);
+    %}
+  ins_pipe(pipe_class_default);
+%}
+
 instruct vcvt4Fto4I(vecX dst, vecX src)
 %{
   predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
