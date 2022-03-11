@@ -5263,27 +5263,28 @@ void MacroAssembler::java_round_float
   // lea(rscratch1, ExternalAddress((address)(intptr_t)&xxyyzz));
   // blr(rscratch1);
 
-  Label SPECIAL, DONE;
+  Label NOT_SPECIAL, DONE;
   BLOCK_COMMENT("java_round_float: { ");
   fmovs(rscratch1, src);
   eor(rscratch1, rscratch1, 0x80000000); // flip sign bit
   mov(rscratch2, jint_cast(0x1.0p23f));
   cmp(rscratch1, rscratch2);
-  br(LO, SPECIAL); {
-    // src >= 0 || |src| >= 0x1.0p23
-    // |src| >= 0x1.0p23 implies src has no fractional part
-    // use RoundToNearestTiesAway and we're done
-    float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_rint, /*away*/0b100,
-                      dst, as_Register(src));
-    b(DONE);
-  }
-  bind(SPECIAL); {  // src < 0 && src < 0x1.0p23
+  br(HS, NOT_SPECIAL); {
+    // src < 0 && |src| < 0x1.0p23
     // src may have a fractional part, so add 0.5
     fmovs(ftmp, 0.5f);
     fadds(ftmp, src, ftmp);
     // Convert double to long, use RoundTowardsNegative
     float_int_convert(/*32-bit*/0, /*float*/0b00, rmode_floor, 0b000,
                       dst, as_Register(ftmp));
+    b(DONE);
+  }
+  bind(NOT_SPECIAL); {
+    // src >= 0 || |src| >= 0x1.0p23
+    // |src| >= 0x1.0p23 implies src has no fractional part
+    // use RoundToNearestTiesAway and we're done
+    float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_rint, /*away*/0b100,
+                      dst, as_Register(src));
   }
   bind(DONE);
   BLOCK_COMMENT("} java_round_float");
