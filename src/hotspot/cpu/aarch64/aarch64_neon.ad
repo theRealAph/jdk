@@ -477,11 +477,11 @@ instruct vround4Fto4I(vecX dst, vecX src, vecX tmp1, vecX tmp2)
     __ blr(rscratch1);
     __ get_fpcr(rscratch1);
     __ orr(rscratch2, rscratch1, __ rmode_floor << 22);  // Assume FPCR.Rmode = 00.
-    // __ set_fpcr(rscratch2);
+    __ set_fpcr(rscratch2);
     __ fmovs(as_FloatRegister($tmp1$$reg), __ T4S, 0.5);
     __ fadd(as_FloatRegister($tmp1$$reg), __ T4S, as_FloatRegister($tmp1$$reg), as_FloatRegister($src$$reg));
     __ fcvtms(as_FloatRegister($dst$$reg), __ T4S, as_FloatRegister($tmp1$$reg));
-    // __ set_fpcr(rscratch1);
+    __ set_fpcr(rscratch1);
     %}
   ins_pipe(pipe_class_default);
 %}
