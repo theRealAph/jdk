@@ -14948,6 +14948,30 @@ instruct convL2D_reg_reg(vRegD dst, iRegL src) %{
   ins_pipe(fp_l2d);
 %}
 
+instruct round_double_reg(iRegLNoSp dst, vRegD src, iRegLNoSp rtmp, vRegD ftmp, vRegD ftmp2, rFlagsReg cr)
+%{
+  match(Set dst (RoundD src));
+  effect(TEMP dst, TEMP rtmp, TEMP ftmp, TEMP ftmp2, KILL cr);
+  format %{ "java_round_double $dst,$src"%}
+  ins_encode %{
+    __ java_round_double($dst$$Register, as_FloatRegister($src$$reg), $rtmp$$Register, as_FloatRegister($ftmp$$reg), as_FloatRegister($ftmp2$$reg));
+  %}
+  ins_pipe(pipe_slow);
+%}
+
+instruct round_float_reg(iRegINoSp dst, vRegF src, iRegLNoSp rtmp, vRegF ftmp, vRegF ftmp2, vRegF fzr, rFlagsReg cr)
+%{
+  match(Set dst (RoundF src));
+  effect(TEMP dst, TEMP rtmp, TEMP ftmp, TEMP ftmp2, TEMP fzr, KILL cr);
+  format %{ "java_round_float $dst,$src"%}
+  ins_encode %{
+    __ java_round_float($dst$$Register, as_FloatRegister($src$$reg), $rtmp$$Register,
+                        as_FloatRegister($ftmp$$reg), as_FloatRegister($ftmp2$$reg),
+                        as_FloatRegister($fzr$$reg));
+  %}
+  ins_pipe(pipe_slow);
+%}
+
 // stack <-> reg and reg <-> reg shuffles with no conversion
 
 instruct MoveF2I_stack_reg(iRegINoSp dst, stackSlotF src) %{

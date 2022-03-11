@@ -564,6 +564,16 @@ public:
     msr(0b011, 0b0100, 0b0100, 0b001, zr);
   }
 
+  inline void get_fpcr(Register reg)
+  {
+    mrs(0b11, 0b0100, 0b0100, 0b000, reg);
+  }
+
+  inline void set_fpcr(Register reg)
+  {
+    msr(0b011, 0b0100, 0b0100, 0b000, reg);
+  }
+
   // DCZID_EL0: op1 == 011
   //            CRn == 0000
   //            CRm == 0000
@@ -876,6 +886,12 @@ public:
 
   // Round up to a power of two
   void round_to(Register reg, int modulus);
+
+
+  void java_round_double(Register dst, FloatRegister src, Register rtmp,
+                         FloatRegister ftmp, FloatRegister ftmp2);
+  void java_round_float(Register dst, FloatRegister src, Register rtmp,
+                        FloatRegister ftmp, FloatRegister ftmp2, FloatRegister fzr);
 
   // allocation
   void eden_allocate(

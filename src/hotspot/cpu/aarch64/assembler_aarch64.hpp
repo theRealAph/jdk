@@ -2012,46 +2012,56 @@ public:
 #undef INSN
 
    // Floating-point<->integer conversions
-  void float_int_convert(unsigned op31, unsigned type,
+  void float_int_convert(unsigned sflag, unsigned ftype,
                          unsigned rmode, unsigned opcode,
                          Register Rd, Register Rn) {
     starti;
-    f(op31, 31, 29);
+    f(sflag, 31);
+    f(0b00, 30, 29);
     f(0b11110, 28, 24);
-    f(type, 23, 22), f(1, 21), f(rmode, 20, 19);
+    f(ftype, 23, 22), f(1, 21), f(rmode, 20, 19);
     f(opcode, 18, 16), f(0b000000, 15, 10);
     zrf(Rn, 5), zrf(Rd, 0);
   }
 
-#define INSN(NAME, op31, type, rmode, opcode)                           \
+#define INSN(NAME, sflag, ftype, rmode, opcode)                            \
   void NAME(Register Rd, FloatRegister Vn) {                            \
-    float_int_convert(op31, type, rmode, opcode, Rd, as_Register(Vn));  \
+    float_int_convert(sflag, ftype, rmode, opcode, Rd, as_Register(Vn));   \
   }
 
-  INSN(fcvtzsw, 0b000, 0b00, 0b11, 0b000);
-  INSN(fcvtzs,  0b100, 0b00, 0b11, 0b000);
-  INSN(fcvtzdw, 0b000, 0b01, 0b11, 0b000);
-  INSN(fcvtzd,  0b100, 0b01, 0b11, 0b000);
+  INSN(fcvtzsw, 0b0, 0b00, 0b11, 0b000);
+  INSN(fcvtzs,  0b1, 0b00, 0b11, 0b000);
+  INSN(fcvtzdw, 0b0, 0b01, 0b11, 0b000);
+  INSN(fcvtzd,  0b1, 0b01, 0b11, 0b000);
 
-  INSN(fmovs, 0b000, 0b00, 0b00, 0b110);
-  INSN(fmovd, 0b100, 0b01, 0b00, 0b110);
+  enum round_mode {rmode_rint = 0b00, rmode_ceil = 0b01, rmode_floor = 0b10, rmode_zero = 0b11};
+  enum round_ftype {round_half = 0b11, round_single = 0b00, round_double = 0b01};
+  // fcvt{n,p,m,z}s - double to jlong
+  void float_round_conv(Register Rd, FloatRegister Rn, round_mode mode,
+                        round_ftype ftype, enum operand_size size) {
+    guarantee(size == word || size == xword, "must be");
+    float_int_convert(size == xword, ftype, mode, 0b000, Rd, as_Register(Rn));
+  }
 
-  INSN(fmovhid, 0b100, 0b10, 0b01, 0b110);
+  INSN(fmovs, 0b0, 0b00, 0b00, 0b110);
+  INSN(fmovd, 0b1, 0b01, 0b00, 0b110);
+
+  INSN(fmovhid, 0b1, 0b10, 0b01, 0b110);
 
 #undef INSN
 
-#define INSN(NAME, op31, type, rmode, opcode)                           \
+#define INSN(NAME, sflag, type, rmode, opcode)                           \
   void NAME(FloatRegister Vd, Register Rn) {                            \
-    float_int_convert(op31, type, rmode, opcode, as_Register(Vd), Rn);  \
+    float_int_convert(sflag, type, rmode, opcode, as_Register(Vd), Rn);  \
   }
 
-  INSN(fmovs, 0b000, 0b00, 0b00, 0b111);
-  INSN(fmovd, 0b100, 0b01, 0b00, 0b111);
+  INSN(fmovs, 0b0, 0b00, 0b00, 0b111);
+  INSN(fmovd, 0b1, 0b01, 0b00, 0b111);
 
-  INSN(scvtfws, 0b000, 0b00, 0b00, 0b010);
-  INSN(scvtfs,  0b100, 0b00, 0b00, 0b010);
-  INSN(scvtfwd, 0b000, 0b01, 0b00, 0b010);
-  INSN(scvtfd,  0b100, 0b01, 0b00, 0b010);
+  INSN(scvtfws, 0b0, 0b00, 0b00, 0b010);
+  INSN(scvtfs,  0b1, 0b00, 0b00, 0b010);
+  INSN(scvtfwd, 0b0, 0b01, 0b00, 0b010);
+  INSN(scvtfd,  0b1, 0b01, 0b00, 0b010);
 
   // INSN(fmovhid, 0b100, 0b10, 0b01, 0b111);
 
