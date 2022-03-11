@@ -36,8 +36,10 @@ public class FpRoundingBenchmark {
 
   public double[] DargV1;
   public double[] ResD;
+  public long[] ResL;
   public float[] FargV1;
   public float[] ResF;
+  public int[] ResI;
 
   public final double[] DspecialVals = {
       0.0, -0.0, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
@@ -51,31 +53,45 @@ public class FpRoundingBenchmark {
       Float.MIN_NORMAL
   };
 
-  @Setup(Level.Trial)
+    long x;
+
+    long xorshift64() {
+        x ^= x << 13;
+        x ^= x >>> 7;
+        x ^= x << 17;
+        return x;
+    }
+
+  @Setup(Level.Iteration)
   public void BmSetup() {
       int i = 0;
+      x = 1;
       Random r = new Random(1024);
 
       DargV1 = new double[TESTSIZE];
       ResD = new double[TESTSIZE];
+      ResL = new long[TESTSIZE];
 
-      for (; i < DspecialVals.length; i++) {
+      for (i = 0; i < DspecialVals.length; i++) {
           DargV1[i] = DspecialVals[i];
       }
 
       for (; i < TESTSIZE; i++) {
-          DargV1[i] = r.nextDouble()*TESTSIZE;
+          DargV1[i] = Double.longBitsToDouble(xorshift64());
       }
 
       FargV1 = new float[TESTSIZE];
       ResF = new float[TESTSIZE];
+      ResI = new int[TESTSIZE];
 
-      for (; i < FspecialVals.length; i++) {
+      for (i = 0; i < FspecialVals.length; i++) {
           FargV1[i] = FspecialVals[i];
       }
 
       for (; i < TESTSIZE; i++) {
-          FargV1[i] = r.nextFloat()*TESTSIZE;
+          FargV1[i] = Float.intBitsToFloat((int)xorshift64());
+          if (i > 20 && FargV1[i] == 0.0)
+              throw new RuntimeException();
       }
   }
 
@@ -103,14 +119,14 @@ public class FpRoundingBenchmark {
   @Benchmark
   public void test_round_double() {
       for (int i = 0; i < TESTSIZE; i++) {
-          ResD[i] = Math.round(DargV1[i]);
+          ResL[i] = Math.round(DargV1[i]);
       }
   }
 
   @Benchmark
   public void test_round_float() {
       for (int i = 0; i < TESTSIZE; i++) {
-          ResF[i] = Math.round(FargV1[i]);
+          ResI[i] = Math.round(FargV1[i]);
       }
   }
 }
