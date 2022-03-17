@@ -895,7 +895,7 @@ public:
   void java_round_float(Register dst, FloatRegister src, Register rtmp,
                         FloatRegister ftmp, FloatRegister ftmp2, FloatRegister fzr);
   void vector_round_neon(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
-                         FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4,
+                         FloatRegister tmp2, FloatRegister tmp3,
                          SIMD_Arrangement T);
 
   // allocation

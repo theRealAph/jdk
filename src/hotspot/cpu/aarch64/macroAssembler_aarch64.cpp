@@ -5221,9 +5221,8 @@ void MacroAssembler::java_round_float
 }
 
 void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
-                                       FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4,
-                                       SIMD_Arrangement T) {
-  assert_different_registers(tmp1, tmp2, tmp3, tmp4, src, dst);
+                                       FloatRegister tmp2, FloatRegister tmp3, SIMD_Arrangement T) {
+  assert_different_registers(tmp1, tmp2, tmp3, src, dst);
 #ifndef PRODUCT
   mov(rscratch1, src->encoding());
   lea(lr, ExternalAddress((address)(intptr_t)&xxyyzz));
@@ -5238,8 +5237,8 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   fcvtms(tmp1, T, tmp1);
   // tmp1 = floor(src + 0.5, ties to even)
 
-  fcvtas(tmp4, T, src);
-  // tmp4 = round(src), ties to away
+  fcvtas(dst, T, src);
+  // dst = round(src), ties to away
 
   fneg(tmp3, T, src);
   mov(rscratch1, T == T2D ? julong_cast(0x1.0p52) : jint_cast(0x1.0p23f));
@@ -5248,7 +5247,6 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   // tmp3 is now a set of flags
 
   bif(dst, T16B, tmp1, tmp3);
-  bit(dst, T16B, tmp4, tmp3);
   // result in dst
 }
 
