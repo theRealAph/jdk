@@ -889,11 +889,14 @@ public:
   // Round up to a power of two
   void round_to(Register reg, int modulus);
 
-
+  // java.lang.Math::round intrinsics
   void java_round_double(Register dst, FloatRegister src, Register rtmp,
                          FloatRegister ftmp, FloatRegister ftmp2);
   void java_round_float(Register dst, FloatRegister src, Register rtmp,
                         FloatRegister ftmp, FloatRegister ftmp2, FloatRegister fzr);
+  void vector_round_neon(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
+                         FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4,
+                         SIMD_Arrangement T);
 
   // allocation
   void eden_allocate(

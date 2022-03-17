@@ -5156,34 +5156,6 @@ void MacroAssembler::char_array_compress(Register src, Register dst, Register le
   csel(res, res, zr, EQ);
 }
 
-// void MacroAssembler::java_round_double
-//   (Register dst, FloatRegister src, Register rtmp, FloatRegister ftmp, FloatRegister ftmp2) {
-//   Label NEGATIVE, LARGE, DONE;
-//   fcmpd(src, 0.0);
-//   br(Assembler::LT, NEGATIVE); {
-//     // src >= 0, use RoundToNearestTiesAway and we're done
-//     float_int_convert(/*64-bit*/1, /*double*/0b01, rmode_rint, /*away*/0b100,
-//                       dst, as_Register(src));
-//     b(DONE);
-//   }
-//   bind(NEGATIVE); {  // src < 0
-//     fmovd(ftmp2, src);
-//     mov(rscratch1, julong_cast(-0x1.0p52));
-//     fmovd(ftmp, rscratch1);
-//     fcmpd(src, ftmp);
-//     // If src is so large it must be an integer, we can simply take floor(src)
-//     br(Assembler::LE, LARGE); {
-//       // src may have a fractional part, so add 0.5
-//       fmovd(ftmp, 0.5);
-//       faddd(ftmp2, ftmp2, ftmp);
-//     }
-//     bind(LARGE);
-//     // Convert double to long, use RoundTowardsNegative
-//     float_int_convert(/*64-bit*/1, /*double*/0b01, rmode_floor, 0b000,
-//                       dst, as_Register(ftmp2));
-//   }
-//   bind(DONE);
-// }
 void MacroAssembler::java_round_double
   (Register dst, FloatRegister src, Register rtmp, FloatRegister ftmp, FloatRegister ftmp2) {
   Label SPECIAL, DONE;
@@ -5215,61 +5187,27 @@ void MacroAssembler::java_round_double
 void xxyyzz() {
 }
 
-#if 0
-// void MacroAssembler::java_round_float
-// (Register dst, FloatRegister src, Register rtmp, FloatRegister ftmp, FloatRegister ftmp2,
-//  FloatRegister fzr) {
-//   // lea(rscratch1, ExternalAddress((address)(intptr_t)&xxyyzz));
-//   // blr(rscratch1);
-
-//   BLOCK_COMMENT("java_round_float: { ");
-//   Label NEGATIVE, LARGE, DONE;
-//   fcmps(src, 0.0);
-//   br(Assembler::LT, NEGATIVE); {
-//     // src >= 0, use RoundToNearestTiesAway and we're done
-//     float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_rint, /*away*/0b100,
-//                       dst, as_Register(src));
-//     b(DONE);
-//   }
-//   bind(NEGATIVE); {  // src < 0
-//     fmovs(ftmp2, src);
-//     movw(rscratch1, jint_cast(-0x1.0p23f));
-//     fmovs(ftmp, rscratch1);
-//     fcmps(src, ftmp);
-//     // If src is so large it must be an integer, we can simply take floor(src)
-//     // br(Assembler::LE, LARGE); {
-//     //   // src may have a fractional part, so add 0.5
-//     //   fmovs(ftmp, 0.5f);
-//     //   fadds(ftmp2, ftmp2, ftmp);
-//     // }
-
-//       // src may have a fractional part, so add 0.5
-//       fmovs(fzr, 0.0f);
-//       fmovs(ftmp, 0.5f);
-//       fcsels(ftmp, fzr, ftmp, Assembler::LE);
-//       fadds(ftmp2, ftmp2, ftmp);
-
-//     // Convert double to long, use RoundTowardsNegative
-//     float_int_convert(/*32-bit*/0, /*float*/0b00, rmode_floor, 0b000,
-//                       dst, as_Register(ftmp2));
-//   }
-//   bind(DONE);
-//   BLOCK_COMMENT("} java_round_float");
-// }
-#else
 void MacroAssembler::java_round_float
 (Register dst, FloatRegister src, Register rtmp, FloatRegister ftmp, FloatRegister ftmp2,
  FloatRegister fzr) {
   // lea(rscratch1, ExternalAddress((address)(intptr_t)&xxyyzz));
   // blr(rscratch1);
 
-  Label NOT_SPECIAL, DONE;
+  Label SPECIAL, DONE;
   BLOCK_COMMENT("java_round_float: { ");
   fmovs(rscratch1, src);
   eor(rscratch1, rscratch1, 0x80000000); // flip sign bit
   mov(rscratch2, jint_cast(0x1.0p23f));
   cmp(rscratch1, rscratch2);
-  br(HS, NOT_SPECIAL); {
+  br(LO, SPECIAL); {
+    // src >= 0 || |src| >= 0x1.0p23
+    // |src| >= 0x1.0p23 implies src has no fractional part
+    // use RoundToNearestTiesAway and we're done
+    float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_rint, /*away*/0b100,
+                      dst, as_Register(src));
+    b(DONE);
+  }
+  bind(SPECIAL); {
     // src < 0 && |src| < 0x1.0p23
     // src may have a fractional part, so add 0.5
     fmovs(ftmp, 0.5f);
@@ -5277,19 +5215,43 @@ void MacroAssembler::java_round_float
     // Convert double to long, use RoundTowardsNegative
     float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_floor, 0b000,
                       dst, as_Register(ftmp));
-    b(DONE);
-  }
-  bind(NOT_SPECIAL); {
-    // src >= 0 || |src| >= 0x1.0p23
-    // |src| >= 0x1.0p23 implies src has no fractional part
-    // use RoundToNearestTiesAway and we're done
-    float_int_convert(/*32-bit*/0, /*single*/0b00, rmode_rint, /*away*/0b100,
-                      dst, as_Register(src));
   }
   bind(DONE);
   BLOCK_COMMENT("} java_round_float");
 }
+
+void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
+                                       FloatRegister tmp2, FloatRegister tmp3, FloatRegister tmp4,
+                                       SIMD_Arrangement T) {
+  assert_different_registers(tmp1, tmp2, tmp3, tmp4, src, dst);
+#ifndef PRODUCT
+  mov(rscratch1, src->encoding());
+  lea(lr, ExternalAddress((address)(intptr_t)&xxyyzz));
+  blr(lr);
 #endif
+  switch (T) {
+    case T4S:  fmovs(tmp1, T, 0.5f);   break;
+    case T2D:  fmovd(tmp1, T, 0.5);    break;
+    default:   ShouldNotReachHere();   break;
+  }
+  fadd(tmp1, T, tmp1, src);
+  fcvtms(tmp1, T, tmp1);
+  // tmp1 = floor(src + 0.5, ties to even)
+
+  fcvtas(tmp4, T, src);
+  // tmp4 = round(src), ties to away
+
+  fneg(tmp3, T, src);
+  mov(rscratch1, T == T2D ? julong_cast(0x1.0p52) : jint_cast(0x1.0p23f));
+  dup(tmp2, T, rscratch1);
+  cmhs(tmp3, T, tmp3, tmp2);
+  // tmp3 is now a set of flags
+
+  bif(dst, T16B, tmp1, tmp3);
+  bit(dst, T16B, tmp4, tmp3);
+  // result in dst
+}
+
 // get_thread() can be called anywhere inside generated code so we
 // need to save whatever non-callee save context might get clobbered
 // by the call to JavaThread::aarch64_get_thread_helper() or, indeed,

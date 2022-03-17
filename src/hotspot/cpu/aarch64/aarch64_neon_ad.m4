@@ -342,6 +342,24 @@ VECTOR_CAST_F2F(F, D, X, D, fcvtl, 2S, 2D)
 VECTOR_CAST_F2F(D, F, D, X, fcvtn, 2D, 2S)
 dnl
 
+define(`VECTOR_JAVA_FROUND', `
+instruct vround$2to$3(vecX dst, vecX src, vecX tmp1, vecX tmp2, vecX tmp3, vecX tmp4)
+%{
+  predicate(n->as_Vector()->length() == $5 && n->bottom_type()->is_vect()->element_basic_type() == T_$6);
+  match(Set dst (RoundV$1 src));
+  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP tmp4);
+  format %{ "vround  $dst, $4, $src\t# round $2 to $3 vector" %}
+  ins_encode %{
+    __ vector_round_neon(as_FloatRegister($dst$$reg), as_FloatRegister($src$$reg),
+                         as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp2$$reg),
+                         as_FloatRegister($tmp3$$reg), as_FloatRegister($tmp4$$reg),
+                         __ $4);
+  %}
+  ins_pipe(pipe_class_default);
+%}')dnl           $1  $2  $3   $4 $5   $6
+VECTOR_JAVA_FROUND(F, 4F, 4I, T4S, 4, INT)
+VECTOR_JAVA_FROUND(D, 2D, 2L, T2D, 2, LONG)
+
 // ------------------------------ Reduction -------------------------------
 dnl
 define(`REDUCE_ADD_BORS', `
