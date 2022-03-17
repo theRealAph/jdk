@@ -26,7 +26,7 @@
  * @bug 8279508
  * @summary Auto-vectorize Math.round API
  * @requires vm.compiler2.enabled
- * @requires os.simpleArch == "x64"
+ * @requires os.simpleArch == "x64" | os.simpleArch == "aarch64"
  * @library /test/lib /
  * @run driver compiler.vectorization.TestRoundVect
  */
@@ -45,12 +45,18 @@ public class TestRoundVect {
   private static int    [] iout;
 
   public static void main(String args[]) {
-      TestFramework.runWithFlags("-XX:-TieredCompilation",
-                                  "-XX:UseAVX=3",
-                                  "-XX:CompileThresholdScaling=0.3");
-      TestFramework.runWithFlags("-XX:-TieredCompilation",
-                                  "-XX:UseAVX=1",
-                                  "-XX:CompileThresholdScaling=0.3");
+      if (System.getProperty("os.arch").equals("amd64")) {
+          TestFramework.runWithFlags("-XX:-TieredCompilation",
+                                     "-XX:UseAVX=3",
+                                     "-XX:CompileThresholdScaling=0.3");
+          TestFramework.runWithFlags("-XX:-TieredCompilation",
+                                     "-XX:UseAVX=1",
+                                     "-XX:CompileThresholdScaling=0.3");
+      }
+      if (System.getProperty("os.arch").equals("aarch64")) {
+          TestFramework.runWithFlags("-XX:-TieredCompilation",
+                                     "-XX:CompileThresholdScaling=0.3");
+      }
       System.out.println("PASSED");
   }
 
