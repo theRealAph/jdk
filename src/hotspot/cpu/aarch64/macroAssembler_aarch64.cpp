@@ -5178,7 +5178,7 @@ void MacroAssembler::java_round_double
     faddd(ftmp, src, ftmp);
     // Convert double to long, use RoundTowardsNegative
     float_int_convert(/*64-bit*/1, /*double*/0b01, rmode_floor, 0b000,
-                      dst, as_Register(ftmp2));
+                      dst, as_Register(ftmp));
   }
   bind(DONE);
   BLOCK_COMMENT("} java_round_float");
@@ -5229,9 +5229,16 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   blr(lr);
 #endif
   switch (T) {
-    case T4S:  fmovs(tmp1, T, 0.5f);   break;
-    case T2D:  fmovd(tmp1, T, 0.5);    break;
-    default:   ShouldNotReachHere();   break;
+    case T4S:
+      fmovs(tmp1, T, 0.5f);
+      mov(rscratch1, jint_cast(0x1.0p23f));
+      break;
+    case T2D:
+      fmovd(tmp1, T, 0.5);
+      mov(rscratch1, julong_cast(0x1.0p52));
+      break;
+    default:
+      assert(T == T4S || T == T2D, "invalid arrangement");
   }
   fadd(tmp1, T, tmp1, src);
   fcvtms(tmp1, T, tmp1);
@@ -5241,7 +5248,6 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   // dst = round(src), ties to away
 
   fneg(tmp3, T, src);
-  mov(rscratch1, T == T2D ? julong_cast(0x1.0p52) : jint_cast(0x1.0p23f));
   dup(tmp2, T, rscratch1);
   cmhs(tmp3, T, tmp3, tmp2);
   // tmp3 is now a set of flags
