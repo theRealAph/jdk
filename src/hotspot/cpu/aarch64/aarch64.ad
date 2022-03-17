@@ -3833,6 +3833,10 @@ encode %{
         return;
       }
     } else {
+      int op = ideal_Opcode();
+      if (op == Op_CallLeaf || op == Op_CallLeafNoFP || op == Op_CallNative) {
+        asm("nop");
+      }
       Label retaddr;
       __ adr(rscratch2, retaddr);
       __ lea(rscratch1, RuntimeAddress(entry));

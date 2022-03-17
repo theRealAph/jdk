@@ -2940,6 +2940,7 @@ public:
   INSN(frintn, 0, 0b00, 0b01, 0b11000);
   INSN(frintm, 0, 0b00, 0b01, 0b11001);
   INSN(frintp, 0, 0b10, 0b01, 0b11000);
+  INSN(fcvtas, 0, 0b00, 0b01, 0b11100);
   INSN(fcvtzs, 0, 0b10, 0b01, 0b11011);
   INSN(fcvtms, 0, 0b00, 0b01, 0b11011);
 #undef ASSERTION
