@@ -466,22 +466,15 @@ instruct vcvt2Fto2I(vecD dst, vecD src)
   ins_pipe(pipe_class_default);
 %}
 
-instruct vround4Fto4I(vecX dst, vecX src, vecX tmp0, vecX tmp1, vecX tmp2, vecX tmp3, vecX tmp4)
+instruct vround4Fto4I(vecX dst, vecX src, vecX tmp1, vecX tmp2, vecX tmp3, vecX tmp4)
 %{
   predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
   match(Set dst (RoundVF src));
-  effect(TEMP_DEF dst, TEMP tmp0, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP tmp4);
-  format %{ "fcvtms  $dst, T4S, $src\t# round 4F to 4I vector" %}
+  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP tmp4);
+  format %{ "vround  $dst, T4S, $src\t# round 4F to 4I vector" %}
   ins_encode %{
-    // __ lea(rscratch1, ExternalAddress((address)(intptr_t)&xxyyzz));
-    // __ blr(rscratch1);
-    // __ get_fpcr(rscratch1);
-    // __ orr(rscratch2, rscratch1, __ rmode_floor << 22);  // Assume FPCR.Rmode = 00.
-    // __ set_fpcr(rscratch2);
-    // __ fmovs(as_FloatRegister($tmp1$$reg), __ T4S, 0.5);
-    // __ fadd(as_FloatRegister($tmp1$$reg), __ T4S, as_FloatRegister($tmp1$$reg), as_FloatRegister($src$$reg));
-    // __ fcvtms(as_FloatRegister($dst$$reg), __ T4S, as_FloatRegister($tmp1$$reg));
-    // __ set_fpcr(rscratch1);
+    assert_different_registers($tmp1$$Register, $tmp2$$Register, $tmp3$$Register, $tmp4$$Register,
+                               $src$$Register, $dst$$Register);
 #ifndef PRODUCT
     __ mov(rscratch1, as_FloatRegister($src$$reg)->encoding());
     __ lea(lr, ExternalAddress((address)(intptr_t)&xxyyzz));
@@ -490,16 +483,12 @@ instruct vround4Fto4I(vecX dst, vecX src, vecX tmp0, vecX tmp1, vecX tmp2, vecX 
     __ fmovs(as_FloatRegister($tmp1$$reg), __ T4S, 0.5);
     __ fadd(as_FloatRegister($tmp1$$reg), __ T4S, as_FloatRegister($tmp1$$reg), as_FloatRegister($src$$reg));
     __ fcvtms(as_FloatRegister($tmp1$$reg), __ T4S, as_FloatRegister($tmp1$$reg));
-    // tmp1 now has floor(src + 0.5)
+    // tmp1 = floor(src + 0.5)
 
     __ fcvtas(as_FloatRegister($tmp4$$reg), __ T4S, as_FloatRegister($src$$reg));
-    // tmp4 now has round(src), ties to away
+    // tmp4 = round(src), ties to away
 
-    // __ movi(as_FloatRegister($tmp0$$reg), __ T4S, 1);
-    // __ shl(as_FloatRegister($tmp0$$reg), __ T4S, as_FloatRegister($tmp0$$reg), 31);
-    // __ eor(as_FloatRegister($tmp3$$reg), __ T16B, as_FloatRegister($src$$reg), as_FloatRegister($tmp0$$reg));
     __ fneg(as_FloatRegister($tmp3$$reg), __ T4S, as_FloatRegister($src$$reg));
-
     __ movw(rscratch1, jint_cast(0x1.0p23f));
     __ dup(as_FloatRegister($tmp2$$reg), __ T4S, rscratch1);
     __ cmhs(as_FloatRegister($tmp3$$reg), __ T4S, as_FloatRegister($tmp3$$reg), as_FloatRegister($tmp2$$reg));
@@ -508,9 +497,41 @@ instruct vround4Fto4I(vecX dst, vecX src, vecX tmp0, vecX tmp1, vecX tmp2, vecX 
     __ bif(as_FloatRegister($dst$$reg), __ T16B, as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp3$$reg));
     __ bit(as_FloatRegister($dst$$reg), __ T16B, as_FloatRegister($tmp4$$reg), as_FloatRegister($tmp3$$reg));
 
-    assert_different_registers($tmp0$$Register, $tmp1$$Register);
-    assert_different_registers($tmp0$$Register, $tmp1$$Register, $tmp2$$Register, $tmp3$$Register, $tmp4$$Register,
+    %}
+  ins_pipe(pipe_class_default);
+%}
+
+instruct vround2Dto2L(vecX dst, vecX src, vecX tmp1, vecX tmp2, vecX tmp3, vecX tmp4)
+%{
+  predicate(n->as_Vector()->length() == 2 && n->bottom_type()->is_vect()->element_basic_type() == T_LONG);
+  match(Set dst (RoundVD src));
+  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP tmp4);
+  format %{ "fcvtms  $dst, T2D, $src\t# round 2D to 2L vector" %}
+  ins_encode %{
+    assert_different_registers($tmp1$$Register, $tmp2$$Register, $tmp3$$Register, $tmp4$$Register,
                                $src$$Register, $dst$$Register);
+#ifndef PRODUCT
+    __ mov(rscratch1, as_FloatRegister($src$$reg)->encoding());
+    __ lea(lr, ExternalAddress((address)(intptr_t)&xxyyzz));
+    __ blr(lr);
+#endif
+    __ fmovd(as_FloatRegister($tmp1$$reg), __ T2D, 0.5);
+    __ fadd(as_FloatRegister($tmp1$$reg), __ T2D, as_FloatRegister($tmp1$$reg), as_FloatRegister($src$$reg));
+    __ fcvtms(as_FloatRegister($tmp1$$reg), __ T2D, as_FloatRegister($tmp1$$reg));
+    // tmp1 = floor(src + 0.5, ties to even)
+
+    __ fcvtas(as_FloatRegister($tmp4$$reg), __ T2D, as_FloatRegister($src$$reg));
+    // tmp4 = round(src), ties to away
+
+    __ fneg(as_FloatRegister($tmp3$$reg), __ T2D, as_FloatRegister($src$$reg));
+    __ mov(rscratch1, julong_cast(0x1.0p52));
+    __ dup(as_FloatRegister($tmp2$$reg), __ T2D, rscratch1);
+    __ cmhs(as_FloatRegister($tmp3$$reg), __ T2D, as_FloatRegister($tmp3$$reg), as_FloatRegister($tmp2$$reg));
+    // tmp3 is now a set of flags
+
+    __ bif(as_FloatRegister($dst$$reg), __ T16B, as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp3$$reg));
+    __ bit(as_FloatRegister($dst$$reg), __ T16B, as_FloatRegister($tmp4$$reg), as_FloatRegister($tmp3$$reg));
+
     %}
   ins_pipe(pipe_class_default);
 %}
