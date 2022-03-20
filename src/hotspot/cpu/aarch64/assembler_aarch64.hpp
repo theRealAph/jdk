@@ -1083,7 +1083,7 @@ public:
 
   // A more convenient access to dmb for our purposes
   enum Membar_mask_bits {
-    // We can use ISH for a barrier because the ARM ARM says "This
+    // We can use ISH for a barrier because the Arm ARM says "This
     // architecture assumes that all Processing Elements that use the
     // same operating system or hypervisor are in the same Inner
     // Shareable shareability domain."
@@ -2024,9 +2024,9 @@ public:
     zrf(Rn, 5), zrf(Rd, 0);
   }
 
-#define INSN(NAME, sflag, ftype, rmode, opcode)                            \
-  void NAME(Register Rd, FloatRegister Vn) {                            \
-    float_int_convert(sflag, ftype, rmode, opcode, Rd, as_Register(Vn));   \
+#define INSN(NAME, sflag, ftype, rmode, opcode)                          \
+  void NAME(Register Rd, FloatRegister Vn) {                             \
+    float_int_convert(sflag, ftype, rmode, opcode, Rd, as_Register(Vn)); \
   }
 
   INSN(fcvtzsw, 0b0, 0b00, 0b11, 0b000);
@@ -2034,14 +2034,13 @@ public:
   INSN(fcvtzdw, 0b0, 0b01, 0b11, 0b000);
   INSN(fcvtzd,  0b1, 0b01, 0b11, 0b000);
 
-  enum round_mode {rmode_rint = 0b00, rmode_ceil = 0b01, rmode_floor = 0b10, rmode_zero = 0b11};
-  enum round_ftype {round_half = 0b11, round_single = 0b00, round_double = 0b01};
-  // fcvt{n,p,m,z}s - double to jlong
-  void float_round_conv(Register Rd, FloatRegister Rn, round_mode mode,
-                        round_ftype ftype, enum operand_size size) {
-    guarantee(size == word || size == xword, "must be");
-    float_int_convert(size == xword, ftype, mode, 0b000, Rd, as_Register(Rn));
-  }
+  // RoundToNearestTiesAway
+  INSN(fcvtassw, 0b0, 0b00, 0b00, 0b100);  // float -> signed word
+  INSN(fcvtasd,  0b1, 0b01, 0b00, 0b100);  // double -> signed xword
+
+  // RoundTowardsNegative
+  INSN(fcvtmssw, 0b0, 0b00, 0b10, 0b000);  // float -> signed word
+  INSN(fcvtmsd,  0b1, 0b01, 0b10, 0b000);  // double -> signed xword
 
   INSN(fmovs, 0b0, 0b00, 0b00, 0b110);
   INSN(fmovd, 0b1, 0b01, 0b00, 0b110);

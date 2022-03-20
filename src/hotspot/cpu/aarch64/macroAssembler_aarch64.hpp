@@ -1,5 +1,3 @@
-extern void xxyyzz();
-
 /*
  * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2021, Red Hat Inc. All rights reserved.
@@ -566,13 +564,11 @@ public:
     msr(0b011, 0b0100, 0b0100, 0b001, zr);
   }
 
-  inline void get_fpcr(Register reg)
-  {
+  inline void get_fpcr(Register reg) {
     mrs(0b11, 0b0100, 0b0100, 0b000, reg);
   }
 
-  inline void set_fpcr(Register reg)
-  {
+  inline void set_fpcr(Register reg) {
     msr(0b011, 0b0100, 0b0100, 0b000, reg);
   }
 
@@ -890,10 +886,8 @@ public:
   void round_to(Register reg, int modulus);
 
   // java.lang.Math::round intrinsics
-  void java_round_double(Register dst, FloatRegister src, Register rtmp,
-                         FloatRegister ftmp, FloatRegister ftmp2);
-  void java_round_float(Register dst, FloatRegister src, Register rtmp,
-                        FloatRegister ftmp, FloatRegister ftmp2, FloatRegister fzr);
+  void java_round_double(Register dst, FloatRegister src, FloatRegister ftmp);
+  void java_round_float(Register dst, FloatRegister src, FloatRegister ftmp);
   void vector_round_neon(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
                          FloatRegister tmp2, FloatRegister tmp3,
                          SIMD_Arrangement T);
