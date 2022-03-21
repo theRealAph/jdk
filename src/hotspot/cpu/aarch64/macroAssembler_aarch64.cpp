@@ -5213,6 +5213,7 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
                                        FloatRegister tmp2, FloatRegister tmp3, SIMD_Arrangement T) {
   assert_different_registers(tmp1, tmp2, tmp3, src, dst);
   switch (T) {
+    case T2S:
     case T4S:
       fmovs(tmp1, T, 0.5f);
       mov(rscratch1, jint_cast(0x1.0p23f));
@@ -5222,7 +5223,7 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
       mov(rscratch1, julong_cast(0x1.0p52));
       break;
     default:
-      assert(T == T4S || T == T2D, "invalid arrangement");
+      assert(T == T2S || T == T4S || T == T2D, "invalid arrangement");
   }
   fadd(tmp1, T, tmp1, src);
   fcvtms(tmp1, T, tmp1);
