@@ -5156,6 +5156,10 @@ void MacroAssembler::char_array_compress(Register src, Register dst, Register le
   csel(res, res, zr, EQ);
 }
 
+// java.math.round(double a)
+// Returns the closest long to the argument, with ties rounding to
+// positive infinity.  This requires some fiddling for corner
+// cases. We care to avoid double rounding in e.g. (jlong)(a + 0.5).
 void MacroAssembler::java_round_double(Register dst, FloatRegister src,
                                        FloatRegister ftmp) {
   Label SPECIAL, DONE;
@@ -5165,7 +5169,7 @@ void MacroAssembler::java_round_double(Register dst, FloatRegister src,
   mov(rscratch2, julong_cast(0x1.0p52));
   cmp(rscratch1, rscratch2);
   br(LO, SPECIAL); {
-    // src >= 0 || |src| >= 0x1.0p23
+    // src >= 0 || |src| >= 0x1.0p52
     // |src| >= 0x1.0p52 implies src has no fractional part
     // use RoundToNearestTiesAway and we're done
     fcvtasd(dst, src);

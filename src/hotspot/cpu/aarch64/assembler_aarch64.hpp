@@ -2450,7 +2450,7 @@ public:
 #undef INSN
 
 // Advanced SIMD modified immediate
-#define INSN(NAME, op0, cmode0)                                        \
+#define INSN(NAME, op0, cmode0) \
   void NAME(FloatRegister Vd, SIMD_Arrangement T, unsigned imm8, unsigned lsl = 0) {   \
     unsigned cmode = cmode0;                                                           \
     unsigned op = op0;                                                                 \
