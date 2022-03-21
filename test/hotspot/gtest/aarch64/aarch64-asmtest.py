@@ -1414,6 +1414,8 @@ generate(FloatConvertOp, [["fcvtzsw", "fcvtzs", "ws"], ["fcvtzs", "fcvtzs", "xs"
                           ["fcvtzdw", "fcvtzs", "wd"], ["fcvtzd", "fcvtzs", "xd"],
                           ["scvtfws", "scvtf", "sw"], ["scvtfs", "scvtf", "sx"],
                           ["scvtfwd", "scvtf", "dw"], ["scvtfd", "scvtf", "dx"],
+                          ["fcvtassw", "fcvtas", "ws"], ["fcvtassw", "fcvtas", "ws"],
+                          ["fcvtasd", "fcvtas", "xd"], ["fcvtasd", "fcvtas", "xd"],
                           ["fmovs", "fmov", "ws"], ["fmovd", "fmov", "xd"],
                           ["fmovs", "fmov", "sw"], ["fmovd", "fmov", "dx"]])
 
@@ -1584,7 +1586,9 @@ generate(SpecialCases, [["ccmn",   "__ ccmn(zr, zr, 3u, Assembler::LE);",       
                         ["umov",   "__ umov(r0, v1, __ B, 3);",                          "umov\tw0, v1.b[3]"],
                         ["fmov",   "__ fmovhid(r0, v1);",                                "fmov\tx0, v1.d[1]"],
                         ["ld1",    "__ ld1(v31, v0, __ T2D, Address(__ post(r1, r0)));", "ld1\t{v31.2d, v0.2d}, [x1], x0"],
-                        ["fcvtzs", "__ fcvtzs(v0, __ T4S, v1);",                         "fcvtzs\tv0.4s, v1.4s"],
+                        ["fcvtzs", "__ fcvtzs(v0, __ T2S, v1);",                         "fcvtzs\tv0.2s, v1.2s"],
+                        ["fcvtas", "__ fcvtas(v2, __ T4S, v3);",                         "fcvtas\tv2.4s, v3.4s"],
+                        ["fcvtms", "__ fcvtms(v4, __ T2D, v5);",                         "fcvtms\tv4.2d, v5.2d"],
                         # SVE instructions
                         ["cpy",     "__ sve_cpy(z0, __ S, p0, v1);",                      "mov\tz0.s, p0/m, s1"],
                         ["cpy",     "__ sve_cpy(z0, __ B, p0, 127, true);",               "mov\tz0.b, p0/m, 127"],
