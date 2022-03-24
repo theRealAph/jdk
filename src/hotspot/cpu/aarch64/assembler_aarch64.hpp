@@ -3110,6 +3110,7 @@ public:
   INSN(sve_fneg,    0b00000100, 0b011101101);
   INSN(sve_frintm,  0b01100101, 0b000010101); // floating-point round to integral value, toward minus infinity
   INSN(sve_frintn,  0b01100101, 0b000000101); // floating-point round to integral value, nearest with ties to even
+  INSN(sve_frinta,  0b01100101, 0b000100101); // floating-point round to integral value, nearest with ties to away
   INSN(sve_frintp,  0b01100101, 0b000001101); // floating-point round to integral value, toward plus infinity
   INSN(sve_fsqrt,   0b01100101, 0b001101101);
   INSN(sve_fsub,    0b01100101, 0b000001100);

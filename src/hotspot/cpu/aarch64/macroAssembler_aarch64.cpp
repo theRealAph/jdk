@@ -5245,6 +5245,46 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   // result in dst
 }
 
+void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
+                                      FloatRegister tmp2, FloatRegister tmp3, PRegister ptmp,
+                                      SIMD_RegVariant T) {
+  assert_different_registers(tmp1, tmp2, tmp3, src, dst);
+  switch (T) {
+    case S:
+      // fmovs(tmp1, T, 0.5f);
+      // mov(rscratch1, jint_cast(0x1.0p23f));
+      // break;
+      mov(rscratch1, jint_cast(0.5f));      // (I)   (ASIMD: -)
+      sve_cpy(tmp1, T, ptrue, rscratch1);   // (M0, V01) (ASIMD: V)
+      mov(rscratch1, jint_cast(0x1.0p23f)); // (I)   (ASIMD: I)
+      break;
+    // case D:
+    //   fmovd(tmp1, T, 0.5);
+    //   mov(rscratch1, julong_cast(0x1.0p52));
+    //   break;
+    default:
+      assert(T == S, "invalid arrangement");
+  }
+  sve_fadd(tmp1, T, tmp1, src);            // (V01)  (ASIMD: V)
+  sve_frintm(tmp1, T, ptrue, tmp1);        // (V0)   (ASIMD: V02)
+//   // tmp1 = floor(src + 0.5, ties to even)
+
+  sve_frinta(dst, T, ptrue, src);          // (V0)   (ASIMD: V02)
+//   // dst = round(src), ties to away
+
+  sve_fneg(tmp3, T, ptrue, src);           // (V)    (ASIMD: V)
+//   fneg(tmp3, T, src);
+  sve_dup(tmp2, T, rscratch1);             // (M0)   (ASIMD: M0)
+//   dup(tmp2, T, rscratch1);
+  sve_cmp(HS, ptmp, T, ptrue, tmp3, tmp2); // (V0,M0) (ASIMD: V)
+//   cmhs(ptmp, T, tmp3, tmp2);
+
+  sve_sel(dst, T, ptmp, dst, tmp1);        // (V01)  (ASIMD: V)
+  sve_fcvtzs(dst, T, ptrue, dst, T);       // (V0)   (ASIMD: -)
+//   bif(dst, T16B, tmp1, tmp3);
+  // result in dst
+}
+
 // get_thread() can be called anywhere inside generated code so we
 // need to save whatever non-callee save context might get clobbered
 // by the call to JavaThread::aarch64_get_thread_helper() or, indeed,
