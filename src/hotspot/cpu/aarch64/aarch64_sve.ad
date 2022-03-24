@@ -4816,11 +4816,26 @@ instruct vroundFtoI(vReg dst, vReg src, vReg tmp1, vReg tmp2, vReg tmp3, pRegGov
   // predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
   match(Set dst (RoundVF src));
   effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP ptmp);
-  format %{ "vround  $dst, T4S, $src\t# round 4F to 4I vector" %}
+  format %{ "sve_vround  $dst, S, $src\t# round 4F to 4I vector" %}
   ins_encode %{
     __ vector_round_sve(as_FloatRegister($dst$$reg), as_FloatRegister($src$$reg),
                         as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp2$$reg),
                         as_FloatRegister($tmp3$$reg), as_PRegister($ptmp$$reg), __ S);
+  %}
+  ins_pipe(pipe_class_default);
+%}
+
+instruct vroundDtoI(vReg dst, vReg src, vReg tmp1, vReg tmp2, vReg tmp3, pRegGov ptmp)
+%{
+  predicate(UseSVE > 0);
+  // predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
+  match(Set dst (RoundVD src));
+  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP ptmp);
+  format %{ "sve_vround  $dst, S, $src\t# round 4F to 4I vector" %}
+  ins_encode %{
+    __ vector_round_sve(as_FloatRegister($dst$$reg), as_FloatRegister($src$$reg),
+                        as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp2$$reg),
+                        as_FloatRegister($tmp3$$reg), as_PRegister($ptmp$$reg), __ D);
   %}
   ins_pipe(pipe_class_default);
 %}

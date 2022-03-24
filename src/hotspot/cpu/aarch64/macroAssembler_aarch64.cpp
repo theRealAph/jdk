@@ -5257,7 +5257,7 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
       mov(rscratch1, julong_cast(0x1.0p52));
       break;
     default:
-      assert(T == S, "invalid arrangement");
+      assert(T == S | T == D, "invalid arrangement");
   }
 
   sve_cpy(tmp1, T, ptrue, 0.5);
