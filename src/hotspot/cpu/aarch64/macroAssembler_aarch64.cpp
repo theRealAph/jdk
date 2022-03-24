@@ -5251,20 +5251,16 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
   assert_different_registers(tmp1, tmp2, tmp3, src, dst);
   switch (T) {
     case S:
-      // fmovs(tmp1, T, 0.5f);
-      // mov(rscratch1, jint_cast(0x1.0p23f));
-      // break;
-      mov(rscratch1, jint_cast(0.5f));      // (I)   (ASIMD: -)
-      sve_cpy(tmp1, T, ptrue, rscratch1);   // (M0, V01) (ASIMD: V)
       mov(rscratch1, jint_cast(0x1.0p23f)); // (I)   (ASIMD: I)
       break;
-    // case D:
-    //   fmovd(tmp1, T, 0.5);
-    //   mov(rscratch1, julong_cast(0x1.0p52));
-    //   break;
+    case D:
+      mov(rscratch1, julong_cast(0x1.0p52));
+      break;
     default:
       assert(T == S, "invalid arrangement");
   }
+
+  sve_cpy(tmp1, T, ptrue, 0.5);
   sve_fadd(tmp1, T, tmp1, src);            // (V01)  (ASIMD: V)
   sve_frintm(tmp1, T, ptrue, tmp1);        // (V0)   (ASIMD: V02)
 //   // tmp1 = floor(src + 0.5, ties to even)
