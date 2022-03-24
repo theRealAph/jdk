@@ -5245,10 +5245,18 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   // result in dst
 }
 
+void xxx() {
+  asm("nop");
+}
+
 void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
                                       FloatRegister tmp2, FloatRegister tmp3, PRegister ptmp,
                                       SIMD_RegVariant T) {
   assert_different_registers(tmp1, tmp2, tmp3, src, dst);
+
+  // mov(lr, (uint64_t)xxx);
+  // blr(lr);
+
   switch (T) {
     case S:
       mov(rscratch1, jint_cast(0x1.0p23f)); // (I)   (ASIMD: I)
@@ -5260,24 +5268,24 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
       assert(T == S | T == D, "invalid arrangement");
   }
 
-  sve_cpy(tmp1, T, ptrue, 0.5);
-  sve_fadd(tmp1, T, tmp1, src);            // (V01)  (ASIMD: V)
-  sve_frintm(tmp1, T, ptrue, tmp1);        // (V0)   (ASIMD: V02)
-//   // tmp1 = floor(src + 0.5, ties to even)
-
   sve_frinta(dst, T, ptrue, src);          // (V0)   (ASIMD: V02)
-//   // dst = round(src), ties to away
+  // dst = round(src), ties to away
 
-  sve_fneg(tmp3, T, ptrue, src);           // (V)    (ASIMD: V)
-//   fneg(tmp3, T, src);
-  sve_dup(tmp2, T, rscratch1);             // (M0)   (ASIMD: M0)
-//   dup(tmp2, T, rscratch1);
-  sve_cmp(HS, ptmp, T, ptrue, tmp3, tmp2); // (V0,M0) (ASIMD: V)
-//   cmhs(ptmp, T, tmp3, tmp2);
+  Label none;
 
-  sve_sel(dst, T, ptmp, dst, tmp1);        // (V01)  (ASIMD: V)
+  sve_fneg(tmp3, T, ptrue, src);           // (V01)   (ASIMD: V)
+  sve_dup(tmp2, T, rscratch1);             // (M0)    (ASIMD: M0)
+  sve_cmp(HS, ptmp, T, ptrue, tmp2, tmp3); // (V0,M0) (ASIMD: V)
+  br(EQ, none);
+  {
+    sve_cpy(tmp1, T, ptrue, 0.5);          // (V01)   (ASIMD: V)
+    sve_fadd(tmp1, T, ptrue, src);         // (V01)   (ASIMD: V)
+    sve_frintm(dst, T, ptmp, tmp1);        // (V0)    (ASIMD: V02)
+    // dst = floor(src + 0.5, ties to even)
+  }
+  bind(none);
+
   sve_fcvtzs(dst, T, ptrue, dst, T);       // (V0)   (ASIMD: -)
-//   bif(dst, T16B, tmp1, tmp3);
   // result in dst
 }
 
