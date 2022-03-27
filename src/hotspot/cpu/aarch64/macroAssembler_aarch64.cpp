@@ -1371,12 +1371,16 @@ void MacroAssembler::mov(FloatRegister Vd, SIMD_Arrangement T, uint32_t imm32) {
   }
 }
 
-void MacroAssembler::mov_immediate64(Register dst, uint64_t imm64)
+void MacroAssembler::mov_immediate64(Register dst, uint64_t imm64, bool isFloat)
 {
 #ifndef PRODUCT
   {
     char buffer[64];
-    snprintf(buffer, sizeof(buffer), "0x%" PRIX64, imm64);
+    if (isFloat) {
+      snprintf(buffer, sizeof(buffer), "%a", jdouble_cast((jlong)imm64));
+    } else {
+      snprintf(buffer, sizeof(buffer), "0x%" PRIX64, imm64);
+    }
     block_comment(buffer);
   }
 #endif
@@ -1484,14 +1488,18 @@ void MacroAssembler::mov_immediate64(Register dst, uint64_t imm64)
   }
 }
 
-void MacroAssembler::mov_immediate32(Register dst, uint32_t imm32)
+void MacroAssembler::mov_immediate32(Register dst, uint32_t imm32, bool isFloat)
 {
 #ifndef PRODUCT
-    {
-      char buffer[64];
+  {
+    char buffer[64];
+    if (isFloat) {
+      snprintf(buffer, sizeof(buffer), "%a", jfloat_cast((jint)imm32));
+    } else {
       snprintf(buffer, sizeof(buffer), "0x%" PRIX32, imm32);
-      block_comment(buffer);
     }
+    block_comment(buffer);
+  }
 #endif
   if (operand_valid_for_logical_immediate(true, imm32)) {
     orrw(dst, zr, imm32);
@@ -5220,11 +5228,11 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
     case T2S:
     case T4S:
       fmovs(tmp1, T, 0.5f);
-      mov(rscratch1, jint_cast(0x1.0p23f));
+      mov_immediate64(rscratch1, jint_cast(0x1.0p23f), /*isFloat*/true);
       break;
     case T2D:
       fmovd(tmp1, T, 0.5);
-      mov(rscratch1, julong_cast(0x1.0p52));
+      mov_immediate64(rscratch1, julong_cast(0x1.0p52), /*isFloat*/true);
       break;
     default:
       assert(T == T2S || T == T4S || T == T2D, "invalid arrangement");
@@ -5259,10 +5267,10 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
 
   switch (T) {
     case S:
-      mov(rscratch1, jint_cast(0x1.0p23f)); // (I)   (ASIMD: I)
+      mov_immediate32(rscratch1, jint_cast(0x1.0p23f), /*isFloat*/true); // (I)   (ASIMD: I)
       break;
     case D:
-      mov(rscratch1, julong_cast(0x1.0p52));
+      mov_immediate64(rscratch1, julong_cast(0x1.0p52), /*isFloat*/true);
       break;
     default:
       assert(T == S | T == D, "invalid arrangement");
@@ -5278,8 +5286,8 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
   sve_cmp(HS, ptmp, T, ptrue, tmp2, tmp3); // (V0,M0) (ASIMD: V)
   br(EQ, none);
   {
-    sve_cpy(tmp1, T, ptrue, 0.5);          // (V01)   (ASIMD: V)
-    sve_fadd(tmp1, T, ptrue, src);         // (V01)   (ASIMD: V)
+    sve_cpy(tmp1, T, ptmp, 0.5);          // (V01)   (ASIMD: V)
+    sve_fadd(tmp1, T, ptmp, src);         // (V01)   (ASIMD: V)
     sve_frintm(dst, T, ptmp, tmp1);        // (V0)    (ASIMD: V02)
     // dst = floor(src + 0.5, ties to even)
   }
