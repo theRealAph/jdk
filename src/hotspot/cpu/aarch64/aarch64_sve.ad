@@ -149,6 +149,9 @@ source %{
       case Op_LoadVector:
       case Op_StoreVector:
         return Matcher::vector_size_supported(bt, vlen);
+      // case Op_RoundVD:
+      // case Op_RoundVF:
+      //   return length_in_bytes > 16
       default:
         break;
     }
@@ -4812,8 +4815,8 @@ instruct vcvtFtoL(vReg dst, vReg src)
 
 instruct vroundFtoI(vReg dst, vReg src, vReg tmp1, vReg tmp2, vReg tmp3, pRegGov ptmp)
 %{
-  predicate(UseSVE > 0);
-  // predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
+  predicate(UseSVE > 0 &&
+            n->as_Vector()->length() >= 8);
   match(Set dst (RoundVF src));
   effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP ptmp);
   format %{ "sve_vround  $dst, S, $src\t# round 4F to 4I vector" %}
@@ -4827,8 +4830,8 @@ instruct vroundFtoI(vReg dst, vReg src, vReg tmp1, vReg tmp2, vReg tmp3, pRegGov
 
 instruct vroundDtoI(vReg dst, vReg src, vReg tmp1, vReg tmp2, vReg tmp3, pRegGov ptmp)
 %{
-  predicate(UseSVE > 0);
-  // predicate(n->as_Vector()->length() == 4 && n->bottom_type()->is_vect()->element_basic_type() == T_INT);
+  predicate(UseSVE > 0 &&
+            n->as_Vector()->length() >= 4);
   match(Set dst (RoundVD src));
   effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP ptmp);
   format %{ "sve_vround  $dst, S, $src\t# round 4F to 4I vector" %}
