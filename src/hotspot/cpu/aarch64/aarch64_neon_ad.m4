@@ -358,9 +358,11 @@ instruct vround$7$2to$5$3($7 dst, $7 src, $7 tmp1, $7 tmp2, $7 tmp3)
 %}')dnl           $1  $2  $3   $4 $5    $6    $7
 VECTOR_JAVA_FROUND(F, 2F,  I, T2S, 2,  INT, vecD)
 VECTOR_JAVA_FROUND(F, 4F,  I, T4S, 4,  INT, vecX)
+VECTOR_JAVA_FROUND(D, 2D,  L, T2D, 2, LONG, vecX)
+
+// Versions of vector_round for UseSVE > 0
 VECTOR_JAVA_FROUND(F, 2F,  I, T2S, 2,  INT, vReg)
 VECTOR_JAVA_FROUND(F, 4F,  I, T4S, 4,  INT, vReg)
-VECTOR_JAVA_FROUND(D, 2D,  L, T2D, 2, LONG, vecX)
 VECTOR_JAVA_FROUND(D, 2D,  L, T2D, 2, LONG, vReg)
 
 // ------------------------------ Reduction -------------------------------
