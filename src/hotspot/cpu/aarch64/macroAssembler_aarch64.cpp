@@ -5286,14 +5286,25 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
   sve_cmp(HS, ptmp, T, ptrue, tmp2, tmp3); // (V0,M0) (ASIMD: V)
   br(EQ, none);
   {
-    sve_cpy(tmp1, T, ptmp, 0.5);          // (V01)   (ASIMD: V)
-    sve_fadd(tmp1, T, ptmp, src);         // (V01)   (ASIMD: V)
+    sve_cpy(tmp1, T, ptmp, 0.5);           // (V01)   (ASIMD: V)
+    sve_fadd(tmp1, T, ptmp, src);          // (V01)   (ASIMD: V)
     sve_frintm(dst, T, ptmp, tmp1);        // (V0)    (ASIMD: V02)
     // dst = floor(src + 0.5, ties to even)
   }
   bind(none);
 
-  sve_fcvtzs(dst, T, ptrue, dst, T);       // (V0)   (ASIMD: -)
+  // Alternative, using only FP operations, slightly slower:
+  // sve_fcm(LT, ptmp, T, ptrue, src, 0.0);
+  // sve_dup(tmp2, T, rscratch1);             // (M0)    (ASIMD: M0)
+  // sve_fcm(GT, ptmp, T, ptmp, src, tmp2);   // (V0)    (ASIMD: V)
+  // {
+  //   sve_cpy(tmp1, T, ptmp, 0.5);           // (V01)   (ASIMD: V)
+  //   sve_fadd(tmp1, T, ptmp, src);          // (V01)   (ASIMD: V)
+  //   sve_frintm(dst, T, ptmp, tmp1);        // (V0)    (ASIMD: V02)
+  //   // dst = floor(src + 0.5, ties to even)
+  // }
+
+  sve_fcvtzs(dst, T, ptrue, dst, T);          // (V0)   (ASIMD: -)
   // result in dst
 }
 

@@ -3427,6 +3427,7 @@ public:
   void sve_cpy(FloatRegister Zd, SIMD_RegVariant T, PRegister Pg, int imm8, bool isMerge) {
     sve_cpy(Zd, T, Pg, imm8, isMerge, /*isFloat*/false);
   }
+  // SVE copy floating-point immediate to vector elements (predicated)
   void sve_cpy(FloatRegister Zd, SIMD_RegVariant T, PRegister Pg, double d) {
     sve_cpy(Zd, T, Pg, checked_cast<int8_t>(pack(d)), /*isMerge*/true, /*isFloat*/true);
   }
@@ -3489,6 +3490,29 @@ void sve_cmp(Condition cond, PRegister Pd, SIMD_RegVariant T,
   }
   f(0b00100101, 31, 24), f(T, 23, 22), f(0b0, 21), sf(imm5, 20, 16),
   f((cond_op >> 1) & 0x7, 15, 13), pgrf(Pg, 10), rf(Zn, 5);
+  f(cond_op & 0x1, 4), prf(Pd, 0);
+}
+
+// SVE Floating-point compare vector with zero
+void sve_fcm(Condition cond, PRegister Pd, SIMD_RegVariant T,
+             PRegister Pg, FloatRegister Zn, double d) {
+  starti;
+  assert(T != Q, "invalid size");
+  guarantee(d == 0.0, "invalid immediate");
+  int cond_op;
+  switch(cond) {
+    case EQ: cond_op = 0b100; break;
+    case GT: cond_op = 0b001; break;
+    case GE: cond_op = 0b000; break;
+    case LT: cond_op = 0b010; break;
+    case LE: cond_op = 0b011; break;
+    case NE: cond_op = 0b110; break;
+    default:
+      ShouldNotReachHere();
+  }
+  f(0b01100101, 31, 24), f(T, 23, 22), f(0b0100, 21, 18),
+  f((cond_op >> 1) & 0x3, 17, 16), f(0b001, 15, 13),
+  pgrf(Pg, 10), rf(Zn, 5);
   f(cond_op & 0x1, 4), prf(Pd, 0);
 }
 
