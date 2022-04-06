@@ -5167,23 +5167,20 @@ void MacroAssembler::char_array_compress(Register src, Register dst, Register le
 // java.math.round(double a)
 // Returns the closest long to the argument, with ties rounding to
 // positive infinity.  This requires some fiddling for corner
-// cases. We care to avoid double rounding in e.g. (jlong)(a + 0.5).
+// cases. We take care to avoid double rounding in e.g. (jlong)(a + 0.5).
 void MacroAssembler::java_round_double(Register dst, FloatRegister src,
                                        FloatRegister ftmp) {
-  Label SPECIAL, DONE;
+  Label DONE;
   BLOCK_COMMENT("java_round_float: { ");
   fmovd(rscratch1, src);
+  // Use RoundToNearestTiesAway unless src small and -ve.
+  fcvtasd(dst, src);
+  // Test if src >= 0 || abs(src) >= 0x1.0p52
   eor(rscratch1, rscratch1, 1ul << 63); // flip sign bit
   mov(rscratch2, julong_cast(0x1.0p52));
   cmp(rscratch1, rscratch2);
-  br(LO, SPECIAL); {
-    // src >= 0 || |src| >= 0x1.0p52
-    // |src| >= 0x1.0p52 implies src has no fractional part
-    // use RoundToNearestTiesAway and we're done
-    fcvtasd(dst, src);
-    b(DONE);
-  }
-  bind(SPECIAL); {  // src < 0 && src < 0x1.0p52
+  br(HS, DONE); {
+    // src < 0 && abs(src) < 0x1.0p52
     // src may have a fractional part, so add 0.5
     fmovd(ftmp, 0.5);
     faddd(ftmp, src, ftmp);
@@ -5191,25 +5188,21 @@ void MacroAssembler::java_round_double(Register dst, FloatRegister src,
     fcvtmsd(dst, ftmp);
   }
   bind(DONE);
-  BLOCK_COMMENT("} java_round_float");
+  BLOCK_COMMENT("} java_round_double");
 }
 
 void MacroAssembler::java_round_float(Register dst, FloatRegister src,
                                       FloatRegister ftmp) {
-  Label SPECIAL, DONE;
+  Label DONE;
   BLOCK_COMMENT("java_round_float: { ");
   fmovs(rscratch1, src);
+  // Use RoundToNearestTiesAway unless src small and -ve.
+  fcvtassw(dst, src);
+  // Test if src >= 0 || abs(src) >= 0x1.0p23
   eor(rscratch1, rscratch1, 0x80000000); // flip sign bit
   mov(rscratch2, jint_cast(0x1.0p23f));
   cmp(rscratch1, rscratch2);
-  br(LO, SPECIAL); {
-    // src >= 0 || |src| >= 0x1.0p23
-    // |src| >= 0x1.0p23 implies src has no fractional part
-    // use RoundToNearestTiesAway and we're done
-    fcvtassw(dst, src);
-    b(DONE);
-  }
-  bind(SPECIAL); {
+  br(HS, DONE); {
     // src < 0 && |src| < 0x1.0p23
     // src may have a fractional part, so add 0.5
     fmovs(ftmp, 0.5f);
