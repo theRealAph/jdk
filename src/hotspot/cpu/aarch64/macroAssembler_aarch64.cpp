@@ -5242,6 +5242,14 @@ void MacroAssembler::vector_round_neon(FloatRegister dst, FloatRegister src, Flo
   cmhs(tmp3, T, tmp3, tmp2);
   // tmp3 is now a set of flags
 
+  // Why we don't we use MOVI to load the constant 0x1.0p23f into
+  // tmp2, instead of moving it first into rscratch1 then using DUP to
+  // copy it into all the vector lanes. The answer is that it's
+  // slower, at least on Apple M1.
+  //
+  // movi(tmp2, T16B, jint_cast(0x1.0p23f) >> 24);
+  // shl(tmp2, T4S, tmp2, 24);
+
   bif(dst, T16B, tmp1, tmp3);
   // result in dst
 }
@@ -5251,9 +5259,8 @@ void xxx() {
 }
 
 void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
-                                      FloatRegister tmp2, FloatRegister tmp3, PRegister ptmp,
-                                      SIMD_RegVariant T) {
-  assert_different_registers(tmp1, tmp2, tmp3, src, dst);
+                                      FloatRegister tmp2, PRegister ptmp, SIMD_RegVariant T) {
+  assert_different_registers(tmp1, tmp2, src, dst);
 
   // mov(lr, (uint64_t)xxx);
   // blr(lr);
@@ -5274,9 +5281,9 @@ void MacroAssembler::vector_round_sve(FloatRegister dst, FloatRegister src, Floa
 
   Label none;
 
-  sve_fneg(tmp3, T, ptrue, src);           // (V01)   (ASIMD: V)
+  sve_fneg(tmp1, T, ptrue, src);           // (V01)   (ASIMD: V)
   sve_dup(tmp2, T, rscratch1);             // (M0)    (ASIMD: M0)
-  sve_cmp(HS, ptmp, T, ptrue, tmp2, tmp3); // (V0,M0) (ASIMD: V)
+  sve_cmp(HS, ptmp, T, ptrue, tmp2, tmp1); // (V0,M0) (ASIMD: V)
   br(EQ, none);
   {
     sve_cpy(tmp1, T, ptmp, 0.5);           // (V01)   (ASIMD: V)

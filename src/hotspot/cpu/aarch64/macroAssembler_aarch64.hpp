@@ -884,7 +884,7 @@ public:
                          FloatRegister tmp2, FloatRegister tmp3,
                          SIMD_Arrangement T);
   void vector_round_sve(FloatRegister dst, FloatRegister src, FloatRegister tmp1,
-                        FloatRegister tmp2, FloatRegister tmp3, PRegister ptmp,
+                        FloatRegister tmp2, PRegister ptmp,
                         SIMD_RegVariant T);
 
   // allocation

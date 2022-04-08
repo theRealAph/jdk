@@ -1914,17 +1914,17 @@ instruct vroundD(vReg dst, vReg src, immI rmode) %{
   ins_pipe(pipe_slow);
 %}
 define(`VECTOR_JAVA_FROUND', `
-instruct vround$2to$5$3($7 dst, $7 src, $7 tmp1, $7 tmp2, $7 tmp3, pRegGov ptmp)
+instruct vround$2to$5$3($7 dst, $7 src, $7 tmp1, $7 tmp2, pRegGov ptmp)
 %{
   predicate(UseSVE > 0 &&
             n->as_Vector()->length() == $5);
   match(Set dst (RoundV$1 src));
-  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP tmp3, TEMP ptmp);
+  effect(TEMP_DEF dst, TEMP tmp1, TEMP tmp2, TEMP ptmp);
   format %{ "sve_vround  $dst, $4, $src\t# round $2 to $5$3 vector" %}
   ins_encode %{
     __ vector_round_sve(as_FloatRegister($dst$$reg), as_FloatRegister($src$$reg),
                         as_FloatRegister($tmp1$$reg), as_FloatRegister($tmp2$$reg),
-                        as_FloatRegister($tmp3$$reg), as_PRegister($ptmp$$reg), __ $4);
+                        as_PRegister($ptmp$$reg), __ $4);
   %}
   ins_pipe(pipe_class_default);
 %}')dnl           $1  $2  $3 $4 $5    $6    $7
