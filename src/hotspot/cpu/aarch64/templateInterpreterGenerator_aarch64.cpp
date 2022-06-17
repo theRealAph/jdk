@@ -146,7 +146,7 @@ address TemplateInterpreterGenerator::generate_slow_signature_handler() {
 
 address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::MethodKind kind) {
   // rmethod: Method*
-  // r13: sender sp
+  // r13_sender_sp: sender sp
   // esp: args
 
   if (!InlineIntrinsics) return NULL; // Generate a vanilla entry
@@ -174,13 +174,13 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
     entry_point = __ pc();
     __ ldrd(v0, Address(esp));
     __ fabsd(v0, v0);
-    __ mov(sp, r13); // Restore caller's SP
+    __ mov(sp, r13_sender_sp); // Restore caller's SP
     break;
   case Interpreter::java_lang_math_sqrt:
     entry_point = __ pc();
     __ ldrd(v0, Address(esp));
     __ fsqrtd(v0, v0);
-    __ mov(sp, r13);
+    __ mov(sp, r13_sender_sp);
     break;
   case Interpreter::java_lang_math_sin :
   case Interpreter::java_lang_math_cos :
@@ -190,7 +190,7 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
   case Interpreter::java_lang_math_exp :
     entry_point = __ pc();
     __ ldrd(v0, Address(esp));
-    __ mov(sp, r13);
+    __ mov(sp, r13_sender_sp);
     __ mov(r19, lr);
     continuation = r19;  // The first callee-saved register
     generate_transcendental_entry(kind, 1);
@@ -201,7 +201,7 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
     continuation = r19;
     __ ldrd(v0, Address(esp, 2 * Interpreter::stackElementSize));
     __ ldrd(v1, Address(esp));
-    __ mov(sp, r13);
+    __ mov(sp, r13_sender_sp);
     generate_transcendental_entry(kind, 2);
     break;
   case Interpreter::java_lang_math_fmaD :
@@ -211,7 +211,7 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
       __ ldrd(v1, Address(esp, 2 * Interpreter::stackElementSize));
       __ ldrd(v2, Address(esp));
       __ fmaddd(v0, v0, v1, v2);
-      __ mov(sp, r13); // Restore caller's SP
+      __ mov(sp, r13_sender_sp); // Restore caller's SP
     }
     break;
   case Interpreter::java_lang_math_fmaF :
@@ -221,7 +221,7 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
       __ ldrs(v1, Address(esp, Interpreter::stackElementSize));
       __ ldrs(v2, Address(esp));
       __ fmadds(v0, v0, v1, v2);
-      __ mov(sp, r13); // Restore caller's SP
+      __ mov(sp, r13_sender_sp); // Restore caller's SP
     }
     break;
   default:
@@ -307,7 +307,7 @@ void TemplateInterpreterGenerator::generate_transcendental_entry(AbstractInterpr
 // Attempt to execute abstract method. Throw exception
 address TemplateInterpreterGenerator::generate_abstract_entry(void) {
   // rmethod: Method*
-  // r13: sender SP
+  // r13_sender_sp: sender SP
 
   address entry_point = __ pc();
 
@@ -717,7 +717,7 @@ void TemplateInterpreterGenerator::generate_stack_overflow_check(void) {
   // correct call stack that we can always unwind.  The ANDR should be
   // unnecessary because the sender SP in r13 is always aligned, but
   // it doesn't hurt.
-  __ andr(sp, r13, -16);
+  __ andr(sp, r13_sender_sp, -16);
 
   // Note: the restored frame is not necessarily interpreted.
   // Use the shared runtime version of the StackOverflowError.
@@ -841,7 +841,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
 
   // set sender sp
   // leave last_sp as null
-  __ stp(zr, r13, Address(sp, 8 * wordSize));
+  __ stp(zr, r13_sender_sp, Address(sp, 8 * wordSize));
 
   // Move SP out of the way
   if (! native_call) {
@@ -900,7 +900,7 @@ address TemplateInterpreterGenerator::generate_Reference_get_entry(void) {
   // This code is based on generate_accessor_entry.
   //
   // rmethod: Method*
-  // r13: senderSP must preserve for slow path, set SP to it on fast path
+  // r13_sender_sp: senderSP must preserve for slow path, set SP to it on fast path
 
   // LR is live.  It must be saved around calls.
 
@@ -915,7 +915,7 @@ address TemplateInterpreterGenerator::generate_Reference_get_entry(void) {
   __ ldr(local_0, Address(esp, 0));
   __ cbz(local_0, slow_path);
 
-  __ mov(r19, r13);   // Move senderSP to a callee-saved register
+  __ mov(r19, r13_sender_sp);   // Move senderSP to a callee-saved register
 
   // Load the value of the referent field.
   const Address field_address(local_0, referent_offset);
@@ -942,7 +942,7 @@ address TemplateInterpreterGenerator::generate_CRC32_update_entry() {
     address entry = __ pc();
 
     // rmethod: Method*
-    // r13: senderSP must preserved for slow path
+    // r13_sender_sp: senderSP must preserved for slow path
     // esp: args
 
     Label slow_path;
@@ -971,7 +971,7 @@ address TemplateInterpreterGenerator::generate_CRC32_update_entry() {
 
     // result in c_rarg0
 
-    __ andr(sp, r13, -16);
+    __ andr(sp, r13_sender_sp, -16);
     __ ret(lr);
 
     // generate a vanilla native entry as the slow path
@@ -992,7 +992,7 @@ address TemplateInterpreterGenerator::generate_CRC32_updateBytes_entry(AbstractI
     address entry = __ pc();
 
     // rmethod,: Method*
-    // r13: senderSP must preserved for slow path
+    // r13_sender_sp: senderSP must preserved for slow path
 
     Label slow_path;
     // If we need a safepoint check, generate full interpreter entry.
@@ -1024,7 +1024,7 @@ address TemplateInterpreterGenerator::generate_CRC32_updateBytes_entry(AbstractI
     // Can now load 'len' since we're finished with 'off'
     __ ldrw(len, Address(esp, 0x0)); // Length
 
-    __ andr(sp, r13, -16); // Restore the caller's SP
+    __ andr(sp, r13_sender_sp, -16); // Restore the caller's SP
 
     // We are frameless so we can just jump to the stub.
     __ b(CAST_FROM_FN_PTR(address, StubRoutines::updateBytesCRC32()));
@@ -1068,7 +1068,7 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
       __ ldrw(crc, Address(esp, 3*wordSize)); // long crc
     }
 
-    __ andr(sp, r13, -16); // Restore the caller's SP
+    __ andr(sp, r13_sender_sp, -16); // Restore the caller's SP
 
     // Jump to the stub.
     __ b(CAST_FROM_FN_PTR(address, StubRoutines::updateBytesCRC32C()));
