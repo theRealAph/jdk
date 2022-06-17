@@ -47,13 +47,13 @@
 //    [constant pool cache   ]                   = cache()              cache_offset
 
 //    [klass of method       ]                   = mirror()             mirror_offset
-//    [padding               ]
+//    [padding               ]                                          padding offset
 
 //    [methodData            ]                   = mdp()                mdx_offset
 //    [Method                ]                   = method()             method_offset
 
 //    [last esp              ]                   = last_sp()            last_sp_offset
-//    [old stack pointer     ]                     (sender_sp)          sender_sp_offset
+//    [sender's SP           ]                     (sender_sp)          sender_sp_offset
 
 //    [old frame pointer     ]   <- fp           = link()
 //    [return pc             ]
