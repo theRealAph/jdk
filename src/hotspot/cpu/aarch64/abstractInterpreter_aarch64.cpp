@@ -135,7 +135,7 @@ void AbstractInterpreter::layout_activation(Method* method,
   // NOTE the difference in using sender_sp and
   // interpreter_frame_sender_sp interpreter_frame_sender_sp is
   // the original sp of the caller (the unextended_sp) and
-  // sender_sp is fp+8/16 (32bit/64bit) XXX
+  // sender_sp is fp+16
   //
   // The interpreted method entry on AArch64 aligns SP to 16 bytes
   // before generating the fixed part of the activation frame. So there
@@ -170,7 +170,6 @@ void AbstractInterpreter::layout_activation(Method* method,
   // for the biggest user:
   //   -reserved slot for exception handler
   //   -reserved slots for JSR292. Method::extra_stack_entries() is the size.
-  //   -3 reserved slots so get_method_counters() can save some registers before call_VM().
   int max_stack = method->constMethod()->max_stack() + MAX2(3, Method::extra_stack_entries());
   intptr_t* extended_sp = (intptr_t*) monbot  -
     (max_stack * Interpreter::stackElementWords) -

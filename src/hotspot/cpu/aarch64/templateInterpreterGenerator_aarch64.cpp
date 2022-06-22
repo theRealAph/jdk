@@ -458,6 +458,9 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
   __ add(esp, esp, r1, Assembler::LSL, 3);
 
   // Restore machine SP
+#ifndef OLD_SP
+  __ restore_sp_after_call();
+#else
   __ ldr(rscratch1, Address(rmethod, Method::const_offset()));
   __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
   __ add(rscratch1, rscratch1, frame::interpreter_frame_monitor_size() + 2);
@@ -465,6 +468,7 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
          Address(rfp, frame::interpreter_frame_initial_sp_offset * wordSize));
   __ sub(rscratch1, rscratch2, rscratch1, ext::uxtw, 3);
   __ andr(sp, rscratch1, -16);
+#endif
 
   __ check_and_handle_popframe(rthread);
   __ check_and_handle_earlyret(rthread);
@@ -485,6 +489,9 @@ address TemplateInterpreterGenerator::generate_deopt_entry_for(TosState state,
   __ get_method(rmethod);
   __ get_dispatch();
 
+#ifndef OLD_SP
+  __ restore_sp_after_call();  // Restore SP to extended SP
+#else
   // Calculate stack limit
   __ ldr(rscratch1, Address(rmethod, Method::const_offset()));
   __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
@@ -493,6 +500,7 @@ address TemplateInterpreterGenerator::generate_deopt_entry_for(TosState state,
          Address(rfp, frame::interpreter_frame_initial_sp_offset * wordSize));
   __ sub(rscratch1, rscratch2, rscratch1, ext::uxtx, 3);
   __ andr(sp, rscratch1, -16);
+#endif
 
   // Restore expression stack pointer
   __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
@@ -849,7 +857,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   if (! native_call) {
     __ ldr(rscratch1, Address(rmethod, Method::const_offset()));
     __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
-    __ add(rscratch1, rscratch1, frame::interpreter_frame_monitor_size() + 2);
+    __ add(rscratch1, rscratch1, MAX2(3, Method::extra_stack_entries()));
     __ sub(rscratch1, sp, rscratch1, ext::uxtw, 3);
     __ andr(rscratch1, rscratch1, -16);
     __ str(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
@@ -1752,6 +1760,9 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
              c_rarg1);
 
   // Calculate stack limit
+#ifndef OLD_SP
+  __ restore_sp_after_call();
+#else
   __ ldr(rscratch1, Address(rmethod, Method::const_offset()));
   __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
   __ add(rscratch1, rscratch1, frame::interpreter_frame_monitor_size() + 4);
@@ -1759,6 +1770,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
          Address(rfp, frame::interpreter_frame_initial_sp_offset * wordSize));
   __ sub(rscratch1, rscratch2, rscratch1, ext::uxtx, 3);
   __ andr(sp, rscratch1, -16);
+#endif
 
   // r0: exception handler entry point
   // r3: preserved exception oop
@@ -1887,6 +1899,9 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
 #endif // INCLUDE_JVMTI
 
   // Restore machine SP
+#ifndef OLD_SP
+  __ restore_sp_after_call();
+#else
   __ ldr(rscratch1, Address(rmethod, Method::const_offset()));
   __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
   __ add(rscratch1, rscratch1, frame::interpreter_frame_monitor_size() + 4);
@@ -1894,6 +1909,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
          Address(rfp, frame::interpreter_frame_initial_sp_offset * wordSize));
   __ sub(rscratch1, rscratch2, rscratch1, ext::uxtw, 3);
   __ andr(sp, rscratch1, -16);
+#endif
 
   __ dispatch_next(vtos);
   // end of PopFrame support

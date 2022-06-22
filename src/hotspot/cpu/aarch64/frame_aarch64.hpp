@@ -184,7 +184,7 @@
 
   void interpreter_frame_set_extended_sp(intptr_t* sp);
 
-template <typename RegisterMapT>
+  template <typename RegisterMapT>
   static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
 
   // deoptimization support

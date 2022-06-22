@@ -65,15 +65,6 @@ class InterpreterMacroAssembler: public MacroAssembler {
   virtual void check_and_handle_popframe(Register java_thread);
   virtual void check_and_handle_earlyret(Register java_thread);
 
-  void check_extended_sp(const char* msg = "nothing") {
-      Label L;
-      ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
-      cmp(sp, rscratch1);
-      br(EQ, L);
-      stop(msg);
-      bind(L);
-  }
-
   // Interpreter-specific registers
   void save_bcp() {
     str(rbcp, Address(rfp, frame::interpreter_frame_bcp_offset * wordSize));
@@ -94,11 +85,27 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void restore_sp_after_call() {
     Label L;
     ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+#ifdef ASSERT
     cbnz(rscratch1, L);
     stop("SP is null");
+#endif
     bind(L);
     mov(sp, rscratch1);
   }
+
+  void check_extended_sp(const char* msg = "check extended SP") {
+#ifdef ASSERT
+      Label L;
+      ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+      cmp(sp, rscratch1);
+      br(EQ, L);
+      stop(msg);
+      bind(L);
+#endif
+  }
+
+#define check_extended_sp()                                             \
+  check_extended_sp("SP does not match extended SP in frame at " __FILE__ ":" XSTR(__LINE__))
 
   void get_dispatch();
 
