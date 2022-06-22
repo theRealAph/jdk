@@ -47,7 +47,7 @@
 //    [constant pool cache   ]                   = cache()              cache_offset
 
 //    [klass of method       ]                   = mirror()             mirror_offset
-//    [padding               ]                                          padding offset
+//    [extended SP           ]                                          extended_sp offset
 
 //    [methodData            ]                   = mdp()                mdx_offset
 //    [Method                ]                   = method()             method_offset
@@ -82,8 +82,8 @@
     interpreter_frame_last_sp_offset                 = interpreter_frame_sender_sp_offset - 1,
     interpreter_frame_method_offset                  = interpreter_frame_last_sp_offset - 1,
     interpreter_frame_mdp_offset                     = interpreter_frame_method_offset - 1,
-    interpreter_frame_padding_offset                 = interpreter_frame_mdp_offset - 1,
-    interpreter_frame_mirror_offset                  = interpreter_frame_padding_offset - 1,
+    interpreter_frame_extended_sp_offset             = interpreter_frame_mdp_offset - 1,
+    interpreter_frame_mirror_offset                  = interpreter_frame_extended_sp_offset - 1,
     interpreter_frame_cache_offset                   = interpreter_frame_mirror_offset - 1,
     interpreter_frame_locals_offset                  = interpreter_frame_cache_offset - 1,
     interpreter_frame_bcp_offset                     = interpreter_frame_locals_offset - 1,
@@ -182,7 +182,9 @@
   // expression stack tos if we are nested in a java call
   intptr_t* interpreter_frame_last_sp() const;
 
-  template <typename RegisterMapT>
+  void interpreter_frame_set_extended_sp(intptr_t* sp);
+
+template <typename RegisterMapT>
   static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
 
   // deoptimization support

@@ -780,10 +780,12 @@ void TemplateInterpreterGenerator::lock_method() {
   }
 
   // add space for monitor & lock
+  __ check_extended_sp();
   __ sub(sp, sp, entry_size); // add space for a monitor entry
   __ sub(esp, esp, entry_size);
-  __ mov(rscratch1, esp);
-  __ str(rscratch1, monitor_block_top);  // set new monitor block top
+  __ mov(rscratch1, sp);
+  __ str(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+  __ str(esp, monitor_block_top);  // set new monitor block top
   // store object
   __ str(r0, Address(esp, BasicObjectLock::obj_offset_in_bytes()));
   __ mov(c_rarg1, esp); // object address
@@ -849,7 +851,12 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
     __ ldrh(rscratch1, Address(rscratch1, ConstMethod::max_stack_offset()));
     __ add(rscratch1, rscratch1, frame::interpreter_frame_monitor_size() + 2);
     __ sub(rscratch1, sp, rscratch1, ext::uxtw, 3);
-    __ andr(sp, rscratch1, -16);
+    __ andr(rscratch1, rscratch1, -16);
+    __ str(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+    __ mov(sp, rscratch1);
+  } else {
+    __ mov(rscratch1, sp);
+    __ str(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
   }
 }
 
@@ -1232,7 +1239,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ ldr(rscratch1, monitor_block_top);
     __ cmp(esp, rscratch1);
     __ br(Assembler::EQ, L);
-    __ stop("broken stack frame setup in interpreter");
+    __ stop("broken stack frame setup in interpreter 1");
     __ bind(L);
   }
 #endif
@@ -1432,6 +1439,9 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ push(ltos);
     __ bind(no_oop);
   }
+
+  // Restore SP (drop native parameters area), to keep SP in sync with extended_sp in frame
+  // __ restore_sp_after_call();
 
   {
     Label no_reguard;
@@ -1683,7 +1693,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
     __ ldr(rscratch1, monitor_block_top);
     __ cmp(esp, rscratch1);
     __ br(Assembler::EQ, L);
-    __ stop("broken stack frame setup in interpreter");
+    __ stop("broken stack frame setup in interpreter 2");
     __ bind(L);
   }
 #endif

@@ -65,6 +65,15 @@ class InterpreterMacroAssembler: public MacroAssembler {
   virtual void check_and_handle_popframe(Register java_thread);
   virtual void check_and_handle_earlyret(Register java_thread);
 
+  void check_extended_sp(const char* msg = "nothing") {
+      Label L;
+      ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+      cmp(sp, rscratch1);
+      br(EQ, L);
+      stop(msg);
+      bind(L);
+  }
+
   // Interpreter-specific registers
   void save_bcp() {
     str(rbcp, Address(rfp, frame::interpreter_frame_bcp_offset * wordSize));
@@ -80,6 +89,15 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
   void restore_constant_pool_cache() {
     ldr(rcpool, Address(rfp, frame::interpreter_frame_cache_offset * wordSize));
+  }
+
+  void restore_sp_after_call() {
+    Label L;
+    ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+    cbnz(rscratch1, L);
+    stop("SP is null");
+    bind(L);
+    mov(sp, rscratch1);
   }
 
   void get_dispatch();

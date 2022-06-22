@@ -3827,6 +3827,11 @@ void TemplateTable::monitorenter()
   {
     Label entry, loop;
     // 1. compute new pointers            // rsp: old expression stack top
+
+    __ check_extended_sp();
+    __ mov(rscratch1, sp);
+    __ str(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+
     __ ldr(c_rarg1, monitor_block_bot);   // c_rarg1: old expression stack bottom
     __ sub(esp, esp, entry_size);         // move expression stack top
     __ sub(c_rarg1, c_rarg1, entry_size); // move expression stack bottom
