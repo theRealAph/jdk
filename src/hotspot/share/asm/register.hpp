@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -101,7 +101,8 @@ public:
 
   AbstractRegSet() : _bitset(0) { }
 
-  AbstractRegSet(RegImpl r1) : _bitset(1 << r1->encoding()) { }
+  AbstractRegSet(RegImpl r)
+  : _bitset(r->is_valid() ? 1 << r->encoding() : 0) { }
 
   AbstractRegSet operator+(const AbstractRegSet aSet) const {
     AbstractRegSet result(_bitset | aSet._bitset);
@@ -110,6 +111,11 @@ public:
 
   AbstractRegSet operator-(const AbstractRegSet aSet) const {
     AbstractRegSet result(_bitset & ~aSet._bitset);
+    return result;
+  }
+
+  AbstractRegSet operator&(const AbstractRegSet aSet) const {
+    AbstractRegSet result(_bitset & aSet._bitset);
     return result;
   }
 
@@ -123,7 +129,7 @@ public:
     return *this;
   }
 
-  static AbstractRegSet of(RegImpl r1) {
+  static constexpr AbstractRegSet of(RegImpl r1) {
     return AbstractRegSet(r1);
   }
 
@@ -135,8 +141,9 @@ public:
     return of(r1, r2) + r3;
   }
 
-  static AbstractRegSet of(RegImpl r1, RegImpl r2, RegImpl r3, RegImpl r4) {
-    return of(r1, r2, r3) + r4;
+  template<typename... Rx>
+  static constexpr AbstractRegSet of(RegImpl r1, RegImpl r2, RegImpl r3, Rx... rest) {
+    return of(r1, r2, r3) + of(rest...);
   }
 
   static AbstractRegSet range(RegImpl start, RegImpl end) {
@@ -149,6 +156,10 @@ public:
     bits >>= 31 - end_enc;
 
     return AbstractRegSet(bits);
+  }
+
+  bool contains(RegImpl reg) {
+    return of(reg).bits() & bits();
   }
 
   uint size() const { return population_count(_bitset); }
@@ -237,14 +248,26 @@ inline ReverseRegSetIterator<RegImpl> AbstractRegSet<RegImpl>::rbegin() {
 
 // Debugging support
 
+#ifdef ASSERT
+template<typename R, typename... Rx>
+inline constexpr bool different_registers(R first_register, Rx... more_registers) {
+  AbstractRegSet<R> regs = AbstractRegSet<R>::of(first_register, more_registers...);
+  return sizeof...(more_registers) + 1 == regs.size();
+}
+#endif
+
 template<typename R, typename... Rx>
 inline void assert_different_registers(R first_register, Rx... more_registers) {
 #ifdef ASSERT
-  const R regs[] = { first_register, more_registers... };
   // Verify there are no equal entries.
-  for (size_t i = 0; i < ARRAY_SIZE(regs) - 1; ++i) {
-    for (size_t j = i + 1; j < ARRAY_SIZE(regs); ++j) {
-      assert(regs[i] != regs[j], "Multiple uses of register: %s", regs[i]->name());
+  if (! different_registers(first_register, more_registers...)) {
+    AbstractRegSet<R> already_used = AbstractRegSet<R>::of(first_register);
+    const R regs[] = { more_registers... };
+    for (size_t i = 0; i < ARRAY_SIZE(regs); ++i) {
+      R r = regs[i];
+      assert(! already_used.contains(r),
+             "Multiple uses of register: %s", r->name());
+      already_used += r;
     }
   }
 #endif
