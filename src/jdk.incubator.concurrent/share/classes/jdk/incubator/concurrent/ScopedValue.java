@@ -576,6 +576,7 @@ public final class ScopedValue<T> {
     private T slowGet() {
         var value = findBinding();
         if (value == Snapshot.NIL) {
+            if (Cache.CACHE_LOOKUP_QUERIES)  Cache.put(this, value);
             throw new NoSuchElementException();
         }
         Cache.put(this, value);
@@ -586,15 +587,25 @@ public final class ScopedValue<T> {
      * {@return {@code true} if this scoped value is bound in the current thread}
      */
     public boolean isBound() {
-        // ??? Do we want to search cache for this? In most cases we don't expect
-        // this {@link ScopedValue} to be bound, so it's not worth it. But I may
-        // be wrong about that.
-/*
-        if (Cache.find(this) != Snapshot.NIL) {
-            return true;
+        if (Cache.CACHE_LOOKUP_QUERIES) {
+            Object[] objects = scopedValueCache();
+            if (objects != null) {
+                // This code should perhaps be in class Cache. We do it
+                // here because the generated code is small and fast and
+                // we really want it to be inlined in the caller.
+                int n = (hash & Cache.SLOT_MASK) * 2;
+                if (objects[n] == this) {
+                    return objects[n + 1] != Snapshot.NIL;
+                }
+                n = ((hash >>> Cache.INDEX_BITS) & Cache.SLOT_MASK) * 2;
+                if (objects[n] == this) {
+                    return objects[n + 1] != Snapshot.NIL;
+                }
+            }
         }
- */
-        return findBinding() != Snapshot.NIL;
+        var value = findBinding();
+        if (Cache.CACHE_LOOKUP_QUERIES)  Cache.put(this, value);
+        return value != Snapshot.NIL;
     }
 
     /**
@@ -723,6 +734,8 @@ public final class ScopedValue<T> {
         static final int TABLE_MASK = TABLE_SIZE - 1;
         static final int PRIMARY_MASK = (1 << TABLE_SIZE) - 1;
 
+        private static final boolean CACHE_LOOKUP_QUERIES;
+
         // The number of elements in the cache array, and a bit mask used to
         // select elements from it.
         private static final int CACHE_TABLE_SIZE, SLOT_MASK;
@@ -745,6 +758,12 @@ public final class ScopedValue<T> {
             CACHE_TABLE_SIZE = cacheSize;
             SLOT_MASK = cacheSize - 1;
         }
+
+        static {
+            final String propertyName = "jdk.incubator.concurrent.ScopedValue.cacheLookupQueries";
+            var cacheLookupQueries = GetPropertyAction.privilegedGetProperty(propertyName, "false");
+            CACHE_LOOKUP_QUERIES = ("true".equals(cacheLookupQueries));
+         }
 
         static final int primaryIndex(ScopedValue<?> key) {
             return key.hash & TABLE_MASK;
