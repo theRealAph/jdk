@@ -713,15 +713,16 @@ class StubGenerator: public StubCodeGenerator {
                            copy_direction direction) {
     int unit = wordSize * direction;
     int bias = (UseSIMDForMemoryOps ? 4:2) * wordSize;
-
-    const Register t0 = r3, t1 = r4, t2 = r5, t3 = r6,
-      t4 = r7, t5 = r11, t6 = r12, t7 = r13;
+    auto scr = (RegSet::range(r3, r7) + RegSet::range(r11, r13)).begin();
+    const Register t0 = *scr, t1 = *++scr, t2 = *++scr, t3 = *++scr,
+      t4 = *++scr, t5 = *++scr, t6 = *++scr, t7 = *++scr;
     const Register stride = r14;
     const Register gct1 = r8, gct2 = r9, gct3 = r10;
+    const Register gct[] = {gct1, gct2, gct3};
     const FloatRegister gcvt1 = v6, gcvt2 = v7, gcvt3 = v8;
     BarrierSetAssembler* bs_asm = BarrierSet::barrier_set()->barrier_set_assembler();
 
-    assert_different_registers(rscratch1, rscratch2, t0, t1, t2, t3, t4, t5, t6, t7);
+    // assert_different_registers(rscratch1, rscratch2, t0, t1, t2, t3, t4, t5, t6, t7);
     assert_different_registers(s, d, count, rscratch1, rscratch2);
 
     Label again, drain;
@@ -797,44 +798,27 @@ class StubGenerator: public StubCodeGenerator {
     if (PrefetchCopyIntervalInBytes > 0)
       __ prfm(use_stride ? Address(s, stride) : Address(s, prefetch), PLDL1KEEP);
 
+    static const FloatRegister vt[] = {v0, v1, v2, v3};
+    static const Register t[] = {t0, t1, t2, t3, t4, t5, t6, t7};
+
     if (UseSIMDForMemoryOps) {
-      bs_asm->copy_store_at(_masm, decorators, type, 32,
-                            Address(d, 4 * unit), v0, v1,
-                            gct1, gct2, gct3, gcvt1, gcvt2, gcvt3);
-      bs_asm->copy_load_at(_masm, decorators, type, 32,
-                           v0, v1, Address(s, 4 * unit),
-                           gct1, gct2, gcvt1);
-      bs_asm->copy_store_at(_masm, decorators, type, 32,
-                            Address(__ pre(d, 8 * unit)), v2, v3,
-                            gct1, gct2, gct3, gcvt1, gcvt2, gcvt3);
-      bs_asm->copy_load_at(_masm, decorators, type, 32,
-                           v2, v3, Address(__ pre(s, 8 * unit)),
-                           gct1, gct2, gcvt1);
+      for (int i = 0; i < 4; i+= 2) {
+        bs_asm->copy_store_at(_masm, decorators, type, 32,
+                              Address(d, i * 4 * unit), vt[i], vt[i+1],
+                              gct1, gct2, gct3, gcvt1, gcvt2, gcvt3);
+        bs_asm->copy_load_at(_masm, decorators, type, 32,
+                             vt[i], vt[i+1], Address(s, i * 4 * unit),
+                             gct1, gct2, gcvt1);
+      }
     } else {
-      bs_asm->copy_store_at(_masm, decorators, type, 16,
-                            Address(d, 2 * unit), t0, t1,
-                            gct1, gct2, gct3);
-      bs_asm->copy_load_at(_masm, decorators, type, 16,
-                           t0, t1, Address(s, 2 * unit),
-                           gct1);
-      bs_asm->copy_store_at(_masm, decorators, type, 16,
-                            Address(d, 4 * unit), t2, t3,
-                            gct1, gct2, gct3);
-      bs_asm->copy_load_at(_masm, decorators, type, 16,
-                           t2, t3, Address(s, 4 * unit),
-                           gct1);
-      bs_asm->copy_store_at(_masm, decorators, type, 16,
-                            Address(d, 6 * unit), t4, t5,
-                            gct1, gct2, gct3);
-      bs_asm->copy_load_at(_masm, decorators, type, 16,
-                           t4, t5, Address(s, 6 * unit),
-                           gct1);
-      bs_asm->copy_store_at(_masm, decorators, type, 16,
-                            Address(__ pre(d, 8 * unit)), t6, t7,
-                            gct1, gct2, gct3);
-      bs_asm->copy_load_at(_masm, decorators, type, 16,
-                           t6, t7, Address(__ pre(s, 8 * unit)),
-                           gct1);
+      for (int i = 0; i < 8; i+= 2) {
+        bs_asm->copy_store_at(_masm, decorators, type, 16,
+                              Address(d, i * 2 * unit), t[i], t[i+1],
+                              gct1, gct2, gct3);
+        bs_asm->copy_load_at(_masm, decorators, type, 16,
+                             t[i], t[i+1], Address(s, i * 2 * unit),
+                             gct1);
+      }
     }
 
     __ subs(count, count, 8);
