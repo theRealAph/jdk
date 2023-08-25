@@ -533,17 +533,17 @@ public class Arguments {
             }
         }
 
-        if (options.isSet(Option.PREVIEW)) {
-            if (sourceString == null) {
-                //enable-preview must be used with explicit -source or --release
-                report(Errors.PreviewWithoutSourceOrRelease);
-                return false;
-            } else if (source != Source.DEFAULT) {
-                //enable-preview must be used with latest source version
-                report(Errors.PreviewNotLatest(sourceString, Source.DEFAULT));
-                return false;
-            }
-        }
+        // if (options.isSet(Option.PREVIEW)) {
+        //     if (sourceString == null) {
+        //         //enable-preview must be used with explicit -source or --release
+        //         report(Errors.PreviewWithoutSourceOrRelease);
+        //         return false;
+        //     } else if (source != Source.DEFAULT) {
+        //         //enable-preview must be used with latest source version
+        //         report(Errors.PreviewNotLatest(sourceString, Source.DEFAULT));
+        //         return false;
+        //     }
+        // }
 
         String profileString = options.get(Option.PROFILE);
         if (profileString != null) {
@@ -641,45 +641,45 @@ public class Arguments {
     }
 
     private void validateAddExports(SourceVersion sv) {
-        String addExports = options.get(Option.ADD_EXPORTS);
-        if (addExports != null) {
-            // Each entry must be of the form sourceModule/sourcePackage=target-list where
-            // target-list is a comma separated list of module or ALL-UNNAMED.
-            // Empty items in the target-list are ignored.
-            // There must be at least one item in the list; this is handled in Option.ADD_EXPORTS.
-            Pattern p = Option.ADD_EXPORTS.getPattern();
-            for (String e : addExports.split("\0")) {
-                Matcher m = p.matcher(e);
-                if (m.matches()) {
-                    String sourceModuleName = m.group(1);
-                    if (!SourceVersion.isName(sourceModuleName, sv)) {
-                        // syntactically invalid source name:  e.g. --add-exports m!/p1=m2
-                        log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, sourceModuleName));
-                    }
-                    String sourcePackageName = m.group(2);
-                    if (!SourceVersion.isName(sourcePackageName, sv)) {
-                        // syntactically invalid source name:  e.g. --add-exports m1/p!=m2
-                        log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, sourcePackageName));
-                    }
+        // String addExports = options.get(Option.ADD_EXPORTS);
+        // if (addExports != null) {
+        //     // Each entry must be of the form sourceModule/sourcePackage=target-list where
+        //     // target-list is a comma separated list of module or ALL-UNNAMED.
+        //     // Empty items in the target-list are ignored.
+        //     // There must be at least one item in the list; this is handled in Option.ADD_EXPORTS.
+        //     Pattern p = Option.ADD_EXPORTS.getPattern();
+        //     for (String e : addExports.split("\0")) {
+        //         Matcher m = p.matcher(e);
+        //         if (m.matches()) {
+        //             String sourceModuleName = m.group(1);
+        //             if (!SourceVersion.isName(sourceModuleName, sv)) {
+        //                 // syntactically invalid source name:  e.g. --add-exports m!/p1=m2
+        //                 log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, sourceModuleName));
+        //             }
+        //             String sourcePackageName = m.group(2);
+        //             if (!SourceVersion.isName(sourcePackageName, sv)) {
+        //                 // syntactically invalid source name:  e.g. --add-exports m1/p!=m2
+        //                 log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, sourcePackageName));
+        //             }
 
-                    String targetNames = m.group(3);
-                    for (String targetName : targetNames.split(",")) {
-                        switch (targetName) {
-                            case "":
-                            case "ALL-UNNAMED":
-                                break;
+        //             String targetNames = m.group(3);
+        //             for (String targetName : targetNames.split(",")) {
+        //                 switch (targetName) {
+        //                     case "":
+        //                     case "ALL-UNNAMED":
+        //                         break;
 
-                            default:
-                                if (!SourceVersion.isName(targetName, sv)) {
-                                    // syntactically invalid target name:  e.g. --add-exports m1/p1=m!
-                                    log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, targetName));
-                                }
-                                break;
-                        }
-                    }
-                }
-            }
-        }
+        //                     default:
+        //                         if (!SourceVersion.isName(targetName, sv)) {
+        //                             // syntactically invalid target name:  e.g. --add-exports m1/p1=m!
+        //                             log.warning(Warnings.BadNameForOption(Option.ADD_EXPORTS, targetName));
+        //                         }
+        //                         break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     private void validateAddReads(SourceVersion sv) {

@@ -70,7 +70,7 @@ public class VFrame {
           // Compiled method (native stub or Java code)
           ScopeDesc scope = null;
           // FIXME: should revisit the check of isDebugging(); should not be necessary
-          if (mayBeImprecise || VM.getVM().isDebugging()) {
+          if (mayBeImprecise) {
             scope = nm.getScopeDescNearDbg(f.getPC());
           } else {
             scope = nm.getScopeDescAt(f.getPC());

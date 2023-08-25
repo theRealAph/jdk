@@ -199,7 +199,8 @@ public class Modules extends JCTree.Visitor {
         allowModules = Feature.MODULES.allowedInSource(source);
         Options options = Options.instance(context);
 
-        allowAccessIntoSystem = options.isUnset(Option.RELEASE);
+        allowAccessIntoSystem = // options.isUnset(Option.RELEASE)
+            true;
         lintOptions = options.isUnset(Option.XLINT_CUSTOM, "-" + LintCategory.OPTIONS.option);
 
         multiModuleMode = fileManager.hasLocation(StandardLocation.MODULE_SOURCE_PATH);

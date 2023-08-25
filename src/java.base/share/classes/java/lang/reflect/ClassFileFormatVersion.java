@@ -281,20 +281,7 @@ public enum ClassFileFormatVersion {
      * href="https://docs.oracle.com/javase/specs/jvms/se21/html/index.html">
      * <cite>The Java Virtual Machine Specification, Java SE 21 Edition</cite></a>
      */
-    RELEASE_21(65),
-
-    /**
-     * The version introduced by the Java Platform, Standard Edition
-     * 22.
-     *
-     * @since 22
-     *
-     * @see <a
-     * href="https://docs.oracle.com/javase/specs/jvms/se22/html/index.html">
-     * <cite>The Java Virtual Machine Specification, Java SE 22 Edition</cite></a>
-     */
-    RELEASE_22(66),
-    ; // Reduce code churn when appending new constants
+    RELEASE_21(65);
 
     // Note to maintainers: when adding constants for newer releases,
     // the implementation of latest() must be updated too.
@@ -309,7 +296,7 @@ public enum ClassFileFormatVersion {
      * {@return the latest class file format version}
      */
     public static ClassFileFormatVersion latest() {
-        return RELEASE_22;
+        return RELEASE_21;
     }
 
     /**

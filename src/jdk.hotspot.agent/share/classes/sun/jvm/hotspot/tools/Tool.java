@@ -24,6 +24,7 @@
 
 package sun.jvm.hotspot.tools;
 
+import java.awt.desktop.SystemEventListener;
 import java.io.PrintStream;
 
 import sun.jvm.hotspot.HotSpotAgent;
@@ -139,11 +140,13 @@ public abstract class Tool implements Runnable {
        }
 
        // Exit with 0 or 1
-       System.exit(returnStatus);
+       
+       // System.exit(returnStatus);
    }
 
    public void stop() {
       if (agent != null) {
+          System.out.println("##### Detaching");
          agent.detach();
       }
    }

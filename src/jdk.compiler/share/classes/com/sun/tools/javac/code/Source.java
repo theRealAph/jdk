@@ -132,13 +132,7 @@ public enum Source {
     /**
       * 21, tbd
       */
-    JDK21("21"),
-
-    /**
-      * 22, tbd
-      */
-    JDK22("22"),
-    ; // Reduce code churn when appending new constants
+    JDK21("21");
 
     private static final Context.Key<Source> sourceKey = new Context.Key<>();
 
@@ -190,7 +184,6 @@ public enum Source {
 
     public Target requiredTarget() {
         return switch(this) {
-        case JDK22  -> Target.JDK1_22;
         case JDK21  -> Target.JDK1_21;
         case JDK20  -> Target.JDK1_20;
         case JDK19  -> Target.JDK1_19;
@@ -331,7 +324,6 @@ public enum Source {
         case JDK19  -> RELEASE_19;
         case JDK20  -> RELEASE_20;
         case JDK21  -> RELEASE_21;
-        case JDK22  -> RELEASE_22;
         default     -> null;
         };
     }
