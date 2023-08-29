@@ -295,6 +295,10 @@ public class AARCH64Frame extends Frame {
       return senderForCompiledFrame(map, cb);
     }
 
+    if (raw_fp == null) {
+        return null;
+    }
+
     // Must be native-compiled frame, i.e. the marshaling code for native
     // methods that exists in the core system.
     return new AARCH64Frame(getSenderSP(), getLink(), getSenderPC());

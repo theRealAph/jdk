@@ -8271,7 +8271,8 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_call_stub_entry =
       generate_call_stub(StubRoutines::_call_stub_return_address);
 
-    // is referenced by megamorphic call
+    fprintf(stderr, "_call_stub_return_address = %p\n", StubRoutines::_call_stub_return_address);
+        // is referenced by megamorphic call
     StubRoutines::_catch_exception_entry = generate_catch_exception();
 
     // Build this early so it's available for the interpreter.

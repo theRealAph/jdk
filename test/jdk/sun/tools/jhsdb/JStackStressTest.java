@@ -31,7 +31,7 @@
  */
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.ArrayList;
 import sun.jvm.hotspot.debugger.JVMDebugger;
 import sun.jvm.hotspot.tools.*;
@@ -46,69 +46,91 @@ import jdk.test.lib.Utils;
 
 public class JStackStressTest {
 
-    Process jShellProcess;
+    Process jshellProc;
+
+    static void echo(InputStream in, OutputStream out) {
+        try {
+            int ch;
+            while ((ch = in.read()) != -1) {
+                out.write(ch);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public void testjstack() throws IOException {
         launchJshell();
-        long jShellPID = jShellProcess.pid();
+        long jShellPID = jshellProc.pid();
+
+        var jshellStdin = jshellProc.getOutputStream();
+        var jshellStdout = jshellProc.getInputStream();
+        var jshellStderr = jshellProc.getErrorStream();
 
         try {
             // Do 4 jstacks on the jshell process as it starts up
-        //     for (int i = 1; i <= 4; i++) {
-        //         JDKToolLauncher launcher = JDKToolLauncher.createUsingTestJDK("jhsdb");
-        //         launcher.addVMArgs(Utils.getTestJavaOpts());
-        //         launcher.addToolArg("jstack");
-        //         launcher.addToolArg("--pid=" + Long.toString(jShellPID));
+            //     for (int i = 1; i <= 4; i++) {
+            //         JDKToolLauncher launcher = JDKToolLauncher.createUsingTestJDK("jhsdb");
+            //         launcher.addVMArgs(Utils.getTestJavaOpts());
+            //         launcher.addToolArg("jstack");
+            //         launcher.addToolArg("--pid=" + Long.toString(jShellPID));
 
-        //         System.out.println("###### Starting jstack iteration " + i + " against " + jShellPID);
-        //         long startTime = System.currentTimeMillis();
-        //         ProcessBuilder processBuilder = SATestUtils.createProcessBuilder(launcher);
-        //         OutputAnalyzer output = ProcessTools.executeProcess(processBuilder);
-        //         System.out.println("jhsdb jstack stdout:");
-        //         System.out.println(output.getStdout());
-        //         System.out.println("jhsdb jstack stderr:");
-        //         System.out.println(output.getStderr());
-        //         long elapsedTime = System.currentTimeMillis() - startTime;
-        //         System.out.println("###### End of all output for iteration " + i +
-        //                            " which took " + elapsedTime + "ms");
-        //         output.shouldHaveExitValue(0);
-        //         // This will detect most SA failures, including during the attach.
-        //         output.shouldNotMatch("^sun.jvm.hotspot.debugger.DebuggerException:.*$");
-        //         // This will detect unexpected exceptions, like NPEs and asserts, that are caught
-        //         // by sun.jvm.hotspot.tools.Tool.execute().
-        //         output.shouldNotMatch("^Error: .*$");
-        //     }
-        // } catch (Exception ex) {
-        //     throw new RuntimeException("Test ERROR " + ex, ex);
-        // } finally {
-        //     try (OutputStream out = jShellProcess.getOutputStream()) {
-        //         out.write("/exit\n".getBytes());
-        //         out.flush();
-        //     }
-        //     try {
-        //         jShellProcess.waitFor(); // jshell should exit quickly
-        //     } catch (InterruptedException e) {
-        //     }
-        //     System.out.println("jshell Output: " + jshellOutput.getOutput());
-        // }
+            //         System.out.println("###### Starting jstack iteration " + i + " against " + jShellPID);
+            //         long startTime = System.currentTimeMillis();
+            //         ProcessBuilder processBuilder = SATestUtils.createProcessBuilder(launcher);
+            //         OutputAnalyzer output = ProcessTools.executeProcess(processBuilder);
+            //         System.out.println("jhsdb jstack stdout:");
+            //         System.out.println(output.getStdout());
+            //         System.out.println("jhsdb jstack stderr:");
+            //         System.out.println(output.getStderr());
+            //         long elapsedTime = System.currentTimeMillis() - startTime;
+            //         System.out.println("###### End of all output for iteration " + i +
+            //                            " which took " + elapsedTime + "ms");
+            //         output.shouldHaveExitValue(0);
+            //         // This will detect most SA failures, including during the attach.
+            //         output.shouldNotMatch("^sun.jvm.hotspot.debugger.DebuggerException:.*$");
+            //         // This will detect unexpected exceptions, like NPEs and asserts, that are caught
+            //         // by sun.jvm.hotspot.tools.Tool.execute().
+            //         output.shouldNotMatch("^Error: .*$");
+            //     }
+            // } catch (Exception ex) {
+            //     throw new RuntimeException("Test ERROR " + ex, ex);
+            // } finally {
+            //     try (OutputStream out = jshellProc.getOutputStream()) {
+            //         out.write("/exit\n".getBytes());
+            //         out.flush();
+            //     }
+            //     try {
+            //         jshellProc.waitFor(); // jshell should exit quickly
+            //     } catch (InterruptedException e) {
+            //     }
+            //     System.out.println("jshell Output: " + jshellOutput.getOutput());
+            // }
+
+            new Thread(() -> echo(jshellStdout, System.out)).start();
+            new Thread(() -> echo(jshellStderr, System.out)).start();
+
+
             for (int i = 1; i <= 40; i++) {
-                JStack jstack = new JStack();
+                JStack jstack = new JStack(true, false);
                 var args = new ArrayList<String>();
                 args.add(Long.toString(jShellPID));
                 System.out.println("###### Starting jstack iteration " + i + " against " + jShellPID);
                 jstack.runWithArgs(args.toArray(new String[args.size()]));
                 System.out.println("returned");
+
             }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             throw new RuntimeException("Test ERROR " + ex, ex);
         } finally {
-            try (OutputStream out = jShellProcess.getOutputStream()) {
-                out.write("/exit\n".getBytes());
-                out.flush();
-                // out.close();
+            try (OutputStream out = jshellProc.getOutputStream()) {
+                jshellStdin.write("2 + 2\n".getBytes()); jshellStdin.flush();
+                jshellStdin.write("Math.exp($1)\n".getBytes()); jshellStdin.flush();
+
+                jshellStdin.close();
             }
             try {
-                jShellProcess.waitFor(); // jshell should exit quickly
+                // jshellProc.waitFor(); // jshell should exit quickly
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -120,11 +142,11 @@ public class JStackStressTest {
         System.out.println("Starting Jshell");
         long startTime = System.currentTimeMillis();
         try {
-                jShellProcess = Runtime.getRuntime().exec("/local/theRealAph-jdk/build/linux-x86_64-server-release/jdk/bin/jshell");
+            jshellProc = Runtime.getRuntime().exec("/local/theRealAph-jdk/build/linux-aarch64-server-release/jdk/bin/jshell -J-Xcomp");
             // JDKToolLauncher launcher = JDKToolLauncher.createUsingTestJDK("jshell");
             // launcher.addVMArgs(Utils.getTestJavaOpts());
             // ProcessBuilder pb = new ProcessBuilder(launcher.getCommand());
-            // jShellProcess = ProcessTools.startProcess("JShell", pb);
+            // jshellProc = ProcessTools.startProcess("JShell", pb);
         } catch (Exception ex) {
             throw new RuntimeException("Test ERROR " + ex, ex);
         }

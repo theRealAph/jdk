@@ -2342,12 +2342,17 @@ void SystemDictionary::invoke_bootstrap_method(BootstrapInfo& bootstrap_specifie
     args.push_oop(appendix_box);
   }
   JavaValue result(T_OBJECT);
-  JavaCalls::call_static(&result,
-                         vmClasses::MethodHandleNatives_klass(),
-                         is_indy ? vmSymbols::linkCallSite_name() : vmSymbols::linkDynamicConstant_name(),
-                         is_indy ? vmSymbols::linkCallSite_signature() : vmSymbols::linkDynamicConstant_signature(),
-                         &args, CHECK);
 
+  {
+    Klass *C_klass = vmClasses::MethodHandleNatives_klass();
+    Symbol *C_name = is_indy ? vmSymbols::linkCallSite_name() : vmSymbols::linkDynamicConstant_name();
+    Symbol *C_signature = is_indy ? vmSymbols::linkCallSite_signature() : vmSymbols::linkDynamicConstant_signature();
+    JavaCalls::call_static(&result,
+                           C_klass,
+                           C_name,
+                           C_signature,
+                           &args, CHECK);
+  }
   Handle value(THREAD, result.get_oop());
   if (is_indy) {
     Handle appendix;
