@@ -147,7 +147,7 @@ public class VFrame {
       }
     }
     VFrame f = sender(imprecise);
-    if (f.getFrame().getPC() == null) {
+    if (f == null || f.getFrame().getPC() == null) {
       sender(imprecise);
     }
     while (f != null) {
