@@ -165,7 +165,7 @@ public class JStackStressTest {
                     }
                 });
         }
-        service.awaitTermination(20, TimeUnit.SECONDS);
+        service.awaitTermination(2000, TimeUnit.SECONDS);
         // The test throws RuntimeException on error.
         // IOException is thrown if Jshell can't start because of some bad
         // environment condition
