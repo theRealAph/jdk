@@ -117,7 +117,12 @@ public class VFrame {
     if (fr.isFirstFrame()) {
       return null;
     }
-    Frame s = fr.realSender(tempMap);
+    Frame s = null;
+    try {
+      s = fr.realSender(tempMap);
+    } catch (NullPointerException e) {
+      e.printStackTrace();
+    }
     if (s == null) {
       return null;
     }
