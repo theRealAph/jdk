@@ -152,14 +152,18 @@ public class VFrame {
         return (JavaVFrame) f;
       }
       Address oldSP = f.getFrame().getSP();
-      f = f.sender(imprecise);
-      if (f != null) {
-          // Make sure the sender frame is above the current frame, not below
-          Address newSP = f.getFrame().getSP();
-          if (oldSP.greaterThanOrEqual(newSP)) {
-              String errString = "newSP(" + newSP + ") is not above oldSP(" + oldSP + ")";
-              throw new RuntimeException(errString);
-          }
+      var f1 = f.sender(imprecise);
+      if (f1 != null) {
+        if (f1.getFrame().getPC() == null) {
+          f1 = f.sender(imprecise);
+        }
+        f = f1;
+        // Make sure the sender frame is above the current frame, not below
+        Address newSP = f.getFrame().getSP();
+        if (oldSP.greaterThanOrEqual(newSP)) {
+          String errString = "newSP(" + newSP + ") is not above oldSP(" + oldSP + ")";
+          throw new RuntimeException(errString);
+        }
       }
     }
     return null;
