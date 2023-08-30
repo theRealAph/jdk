@@ -122,6 +122,7 @@ public class VFrame {
       s = fr.realSender(tempMap);
     } catch (NullPointerException e) {
       e.printStackTrace();
+      s = fr.realSender(tempMap);
     }
     if (s == null) {
       return null;
