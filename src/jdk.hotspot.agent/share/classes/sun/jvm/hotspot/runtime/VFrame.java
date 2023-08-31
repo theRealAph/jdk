@@ -132,6 +132,7 @@ public class VFrame {
     }
     if (s.getPC() == null) {
       System.err.print("");
+      fr.realSender(tempMap);
     }
     return VFrame.newVFrame(s, tempMap, getThread(), VM.getVM().isDebugging(), mayBeImprecise);
   }
