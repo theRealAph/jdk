@@ -130,6 +130,9 @@ public class VFrame {
     if (s.isFirstFrame()) {
       return null;
     }
+    if (s.getPC() == null) {
+      System.err.print("");
+    }
     return VFrame.newVFrame(s, tempMap, getThread(), VM.getVM().isDebugging(), mayBeImprecise);
   }
 
