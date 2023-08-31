@@ -33,6 +33,9 @@ public class ExternalVFrame extends VFrame {
   ExternalVFrame(Frame fr, RegisterMap regMap, JavaThread thread, boolean mayBeImprecise) {
     super(fr, regMap, thread);
 
+    if (fr.getPC() == null) {
+      System.err.print("");
+    }
     this.mayBeImprecise = mayBeImprecise;
   }
 
