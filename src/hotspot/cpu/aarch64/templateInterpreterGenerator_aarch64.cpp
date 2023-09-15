@@ -1103,10 +1103,10 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
   return entry;
 }
 
-// public final native long compareAndExchangeLong(Object o, long offset,
-//                                                 long expected,
-//                                                 long x);
-address TemplateInterpreterGenerator::generate_compareAndExchangeLong_entry(AbstractInterpreter::MethodKind kind) {
+// public final native boolean compareAndSetLong(Object o, long offset,
+//                                               long expected,
+//                                               long x);
+address TemplateInterpreterGenerator::generate_compareAndSetLong_entry(AbstractInterpreter::MethodKind kind) {
   address entry = __ pc();
 
   const Register obj = c_rarg0;
@@ -1116,14 +1116,14 @@ address TemplateInterpreterGenerator::generate_compareAndExchangeLong_entry(Abst
 
   int sp_offset = 0;
 
-  __ ldr(x, Address(esp, sp_offset));        sp_offset += wordSize;
-  __ ldr(expected, Address(esp, sp_offset)); sp_offset += wordSize;
-  __ ldr(offset, Address(esp, sp_offset));   sp_offset += wordSize;
-  __ ldr(obj, Address(esp, sp_offset));      sp_offset += wordSize;
+  __ ldr(x, Address(esp, sp_offset));        sp_offset += 2 * wordSize; // long
+  __ ldr(expected, Address(esp, sp_offset)); sp_offset += 2 * wordSize; // long
+  __ ldr(offset, Address(esp, sp_offset));   sp_offset += 2 * wordSize; // long
+  __ ldr(obj, Address(esp, sp_offset));
 
   __ lea(obj, Address(obj, offset));
   __ cmpxchg(obj, expected, x, __ xword, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
-  __ mov(r0, rscratch1);
+  __ cset(r0, __ EQ);
   __ andr(sp, r19_sender_sp, -16); // Restore the caller's SP
   __ ret(lr);
 
