@@ -1103,6 +1103,33 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
   return entry;
 }
 
+// public final native long compareAndExchangeLong(Object o, long offset,
+//                                                 long expected,
+//                                                 long x);
+address TemplateInterpreterGenerator::generate_compareAndExchangeLong_entry(AbstractInterpreter::MethodKind kind) {
+  address entry = __ pc();
+
+  const Register obj = c_rarg0;
+  const Register offset = c_rarg1;
+  const Register expected = c_rarg2;
+  const Register x = c_rarg3;
+
+  int sp_offset = 0;
+
+  __ ldr(x, Address(esp, sp_offset));        sp_offset += wordSize;
+  __ ldr(expected, Address(esp, sp_offset)); sp_offset += wordSize;
+  __ ldr(offset, Address(esp, sp_offset));   sp_offset += wordSize;
+  __ ldr(obj, Address(esp, sp_offset));      sp_offset += wordSize;
+
+  __ lea(obj, Address(obj, offset));
+  __ cmpxchg(obj, expected, x, __ xword, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
+  __ mov(r0, rscratch1);
+  __ andr(sp, r19_sender_sp, -16); // Restore the caller's SP
+  __ ret(lr);
+
+  return entry;
+}
+
 void TemplateInterpreterGenerator::bang_stack_shadow_pages(bool native_call) {
   // See more discussion in stackOverflow.hpp.
 
