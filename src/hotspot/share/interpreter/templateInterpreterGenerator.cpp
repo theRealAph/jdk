@@ -482,7 +482,7 @@ address TemplateInterpreterGenerator::generate_intrinsic_entry(AbstractInterpret
   case Interpreter::java_util_zip_CRC32C_updateDirectByteBuffer
                                            : entry_point = generate_CRC32C_updateBytes_entry(kind); break;
   case Interpreter::jdk_internal_misc_Unsafe_compareAndSetLong
-                                           : entry_point = generate_compareAndSetLong_entry(kind); break;
+                                           : entry_point = generate_compareAndSetX_entry(kind); break;
   case Interpreter::java_lang_Thread_currentThread
                                            : entry_point = generate_currentThread(); break;
   case Interpreter::java_lang_Float_float16ToFloat

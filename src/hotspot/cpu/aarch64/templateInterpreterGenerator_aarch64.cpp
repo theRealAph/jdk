@@ -1103,10 +1103,11 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
   return entry;
 }
 
-// public final native boolean compareAndSetLong(Object o, long offset,
-//                                               long expected,
-//                                               long x);
-address TemplateInterpreterGenerator::generate_compareAndSetLong_entry(AbstractInterpreter::MethodKind kind) {
+// public final native boolean compareAndSetX(Object o, long offset,
+//                                           long expected,
+//                                           long x);
+address TemplateInterpreterGenerator
+    ::generate_compareAndSetX_entry(AbstractInterpreter::MethodKind kind) {
   address entry = __ pc();
 
   const Register obj = c_rarg0;
@@ -1114,18 +1115,35 @@ address TemplateInterpreterGenerator::generate_compareAndSetLong_entry(AbstractI
   const Register expected = c_rarg2;
   const Register x = c_rarg3;
 
+  Assembler::operand_size size;
+  switch(kind) {
+    case AbstractInterpreter::jdk_internal_misc_Unsafe_compareAndSetLong:
+      size = Assembler::xword; break;
+    default: ShouldNotReachHere(); break;
+  }
+
+  Label fast_path, slow_path;
+
   int sp_offset = 0;
-
-  __ ldr(x, Address(esp, sp_offset));        sp_offset += 2 * wordSize; // long
-  __ ldr(expected, Address(esp, sp_offset)); sp_offset += 2 * wordSize; // long
-  __ ldr(offset, Address(esp, sp_offset));   sp_offset += 2 * wordSize; // long
+  constexpr int stackLongSize = 2 * Interpreter::stackElementSize;
+  __ ldr(x, Address(esp, sp_offset));        sp_offset += stackLongSize;
+  __ ldr(expected, Address(esp, sp_offset)); sp_offset += stackLongSize;
+  __ ldr(offset, Address(esp, sp_offset));   sp_offset += stackLongSize;
   __ ldr(obj, Address(esp, sp_offset));
+  // __ cbz(obj, slow_path);
+  __ cbnz(obj, fast_path);
+  __ b(slow_path);
 
+  __ bind(fast_path);
   __ lea(obj, Address(obj, offset));
-  __ cmpxchg(obj, expected, x, __ xword, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
+  __ cmpxchg(obj, expected, x, size, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
   __ cset(r0, __ EQ);
   __ andr(sp, r19_sender_sp, -16); // Restore the caller's SP
   __ ret(lr);
+
+  // generate a vanilla native entry as the slow path
+  __ bind(slow_path);
+  __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
 
   return entry;
 }

@@ -87,7 +87,7 @@ class AbstractInterpreter: AllStatic {
     java_util_zip_CRC32_updateByteBuffer,                       // implementation of java.util.zip.CRC32.updateByteBuffer()
     java_util_zip_CRC32C_updateBytes,                           // implementation of java.util.zip.CRC32C.updateBytes(crc, b[], off, end)
     java_util_zip_CRC32C_updateDirectByteBuffer,                // implementation of java.util.zip.CRC32C.updateDirectByteBuffer(crc, address, off, end)
-    jdk_internal_misc_Unsafe_compareAndSetLong,            // implementation of jdk.internal.misc.compareAndSetLong(obj, off, expected, x)
+    jdk_internal_misc_Unsafe_compareAndSetLong,                 // implementation of jdk.internal.misc.compareAndSetLong(obj, off, expected, x)
     java_lang_Float_intBitsToFloat,                             // implementation of java.lang.Float.intBitsToFloat()
     java_lang_Float_floatToRawIntBits,                          // implementation of java.lang.Float.floatToRawIntBits()
     java_lang_Float_float16ToFloat,                             // implementation of java.lang.Float.float16ToFloat()
