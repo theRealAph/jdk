@@ -129,6 +129,8 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
       case vmIntrinsics::_updateDirectByteBufferCRC32C: return java_util_zip_CRC32C_updateDirectByteBuffer;
       case vmIntrinsics::_compareAndSetLong:
                                              return jdk_internal_misc_Unsafe_compareAndSetLong;
+      case vmIntrinsics::_compareAndSetInt:
+                                             return jdk_internal_misc_Unsafe_compareAndSetInt;
       case vmIntrinsics::_intBitsToFloat:    return java_lang_Float_intBitsToFloat;
       case vmIntrinsics::_floatToRawIntBits: return java_lang_Float_floatToRawIntBits;
       case vmIntrinsics::_longBitsToDouble:  return java_lang_Double_longBitsToDouble;
@@ -221,6 +223,8 @@ vmIntrinsics::ID AbstractInterpreter::method_intrinsic(MethodKind kind) {
                                   : return vmIntrinsics::_updateDirectByteBufferCRC32C;
   case jdk_internal_misc_Unsafe_compareAndSetLong
                                   : return vmIntrinsics::_compareAndSetLong;
+  case jdk_internal_misc_Unsafe_compareAndSetInt
+                                  : return vmIntrinsics::_compareAndSetInt;
   case java_lang_Thread_currentThread
                                   : return vmIntrinsics::_currentThread;
   case java_lang_Float_intBitsToFloat
@@ -326,8 +330,8 @@ void AbstractInterpreter::print_method_kind(MethodKind kind) {
     case java_util_zip_CRC32_updateBytes      : tty->print("java_util_zip_CRC32_updateBytes"); break;
     case java_util_zip_CRC32_updateByteBuffer : tty->print("java_util_zip_CRC32_updateByteBuffer"); break;
     case java_util_zip_CRC32C_updateBytes     : tty->print("java_util_zip_CRC32C_updateBytes"); break;
-    case jdk_internal_misc_Unsafe_compareAndSetLong
-                                              : tty->print("jdk_internal_misc_Unsafe_compareAndSetLong"); break;
+    case jdk_internal_misc_Unsafe_compareAndSetInt
+                                              : tty->print("jdk_internal_misc_Unsafe_compareAndSetInt"); break;
     case java_util_zip_CRC32C_updateDirectByteBuffer: tty->print("java_util_zip_CRC32C_updateDirectByteByffer"); break;
     case java_lang_ref_reference_get          : tty->print("java_lang_ref_reference_get"); break;
     case java_lang_Thread_currentThread       : tty->print("java_lang_Thread_currentThread"); break;

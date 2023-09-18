@@ -255,6 +255,9 @@ void BytecodePrinter::print_field_or_method(int cp_index, outputStream* st) {
   Symbol* klass = constants->klass_name_at(constants->uncached_klass_ref_index_at(cp_index));
   const char* sep = (tag.is_field() ? ":" : "");
   st->print_cr(" %d <%s.%s%s%s> ", cp_index, klass->as_C_string(), name->as_C_string(), sep, signature->as_C_string());
+  if (strcmp("compareAndSetLong", name->as_C_string()) == 0) {
+    asm("nop");
+  }
 }
 
 // JVM_CONSTANT_Dynamic or JVM_CONSTANT_InvokeDynamic

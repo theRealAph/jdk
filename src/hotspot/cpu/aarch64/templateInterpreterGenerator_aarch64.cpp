@@ -1103,6 +1103,8 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
   return entry;
 }
 
+long intrinsic_counter;
+
 // public final native boolean compareAndSetX(Object o, long offset,
 //                                           long expected,
 //                                           long x);
@@ -1115,35 +1117,35 @@ address TemplateInterpreterGenerator
   const Register expected = c_rarg2;
   const Register x = c_rarg3;
 
+  __ set_last_Java_frame(sp, rfp, lr, rscratch1);
+
   Assembler::operand_size size;
   switch(kind) {
     case AbstractInterpreter::jdk_internal_misc_Unsafe_compareAndSetLong:
       size = Assembler::xword; break;
+    case AbstractInterpreter::jdk_internal_misc_Unsafe_compareAndSetInt:
+      size = Assembler::word; break;
     default: ShouldNotReachHere(); break;
   }
 
-  Label fast_path, slow_path;
+  __ mov(rscratch1, (intptr_t)&intrinsic_counter);
+  __ mov(rscratch2, (u8)1);
+  __ ldadd(__ xword, rscratch2, rscratch2, rscratch1);
 
   int sp_offset = 0;
-  constexpr int stackLongSize = 2 * Interpreter::stackElementSize;
-  __ ldr(x, Address(esp, sp_offset));        sp_offset += stackLongSize;
-  __ ldr(expected, Address(esp, sp_offset)); sp_offset += stackLongSize;
-  __ ldr(offset, Address(esp, sp_offset));   sp_offset += stackLongSize;
+  const int stackSize =
+    (size == Assembler::word ? 1 : 2) * Interpreter::stackElementSize;
+  __ ldr(x, Address(esp, sp_offset));        sp_offset += stackSize;
+  __ ldr(expected, Address(esp, sp_offset)); sp_offset += stackSize;
+  __ ldr(offset, Address(esp, sp_offset));   sp_offset += 2 * Interpreter::stackElementSize;
   __ ldr(obj, Address(esp, sp_offset));
-  // __ cbz(obj, slow_path);
-  __ cbnz(obj, fast_path);
-  __ b(slow_path);
 
-  __ bind(fast_path);
+
   __ lea(obj, Address(obj, offset));
   __ cmpxchg(obj, expected, x, size, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
   __ cset(r0, __ EQ);
   __ andr(sp, r19_sender_sp, -16); // Restore the caller's SP
   __ ret(lr);
-
-  // generate a vanilla native entry as the slow path
-  __ bind(slow_path);
-  __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
 
   return entry;
 }

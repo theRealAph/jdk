@@ -231,6 +231,7 @@ void TemplateInterpreterGenerator::generate_all() {
   native_method_entry(java_util_zip_CRC32_updateByteBuffer)
 
   native_method_entry(jdk_internal_misc_Unsafe_compareAndSetLong)
+  native_method_entry(jdk_internal_misc_Unsafe_compareAndSetInt)
 
   native_method_entry(java_lang_Float_intBitsToFloat)
   native_method_entry(java_lang_Float_floatToRawIntBits)
@@ -481,7 +482,8 @@ address TemplateInterpreterGenerator::generate_intrinsic_entry(AbstractInterpret
                                            : // fall thru
   case Interpreter::java_util_zip_CRC32C_updateDirectByteBuffer
                                            : entry_point = generate_CRC32C_updateBytes_entry(kind); break;
-  case Interpreter::jdk_internal_misc_Unsafe_compareAndSetLong
+  case Interpreter::jdk_internal_misc_Unsafe_compareAndSetLong : // fall thru
+  case Interpreter::jdk_internal_misc_Unsafe_compareAndSetInt
                                            : entry_point = generate_compareAndSetX_entry(kind); break;
   case Interpreter::java_lang_Thread_currentThread
                                            : entry_point = generate_currentThread(); break;
