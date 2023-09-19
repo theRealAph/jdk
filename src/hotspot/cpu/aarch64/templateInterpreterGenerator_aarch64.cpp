@@ -1103,11 +1103,13 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
   return entry;
 }
 
-long intrinsic_counter;
+#ifndef PRODUCT
+long compareAndSetX_intrinsic_counter;
+#endif
 
-// public final native boolean compareAndSetX(Object o, long offset,
-//                                           long expected,
-//                                           long x);
+// public final native boolean compareAndSet<X>(Object o, long offset,
+//                                           X expected,
+//                                           X x);
 address TemplateInterpreterGenerator
     ::generate_compareAndSetX_entry(AbstractInterpreter::MethodKind kind) {
   address entry = __ pc();
@@ -1117,32 +1119,34 @@ address TemplateInterpreterGenerator
   const Register expected = c_rarg2;
   const Register x = c_rarg3;
 
-  __ set_last_Java_frame(sp, rfp, lr, rscratch1);
-
-  Assembler::operand_size size;
+  int elements;
+  Assembler::operand_size opsize;
   switch(kind) {
     case AbstractInterpreter::jdk_internal_misc_Unsafe_compareAndSetLong:
-      size = Assembler::xword; break;
+      elements = 2;   opsize = Assembler::xword;
+      break;
     case AbstractInterpreter::jdk_internal_misc_Unsafe_compareAndSetInt:
-      size = Assembler::word; break;
-    default: ShouldNotReachHere(); break;
+      elements = 1;   opsize = Assembler::word;
+      break;
+    default:
+      ShouldNotReachHere(); break;
   }
 
-  __ mov(rscratch1, (intptr_t)&intrinsic_counter);
+#ifndef PRODUCT
+  __ mov(rscratch1, (intptr_t)&compareAndSetX_intrinsic_counter);
   __ mov(rscratch2, (u8)1);
   __ ldadd(__ xword, rscratch2, rscratch2, rscratch1);
+#endif
 
   int sp_offset = 0;
-  const int stackSize =
-    (size == Assembler::word ? 1 : 2) * Interpreter::stackElementSize;
-  __ ldr(x, Address(esp, sp_offset));        sp_offset += stackSize;
-  __ ldr(expected, Address(esp, sp_offset)); sp_offset += stackSize;
-  __ ldr(offset, Address(esp, sp_offset));   sp_offset += 2 * Interpreter::stackElementSize;
+  const size_t elementSize = Interpreter::stackElementSize;
+  __ ldr(x, Address(esp, sp_offset));        sp_offset += elements * elementSize;
+  __ ldr(expected, Address(esp, sp_offset)); sp_offset += elements * elementSize;
+  __ ldr(offset, Address(esp, sp_offset));   sp_offset += 2 * elementSize;
   __ ldr(obj, Address(esp, sp_offset));
 
-
   __ lea(obj, Address(obj, offset));
-  __ cmpxchg(obj, expected, x, size, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
+  __ cmpxchg(obj, expected, x, opsize, /*acquire*/true, /*release*/true, /*weak*/false, rscratch1);
   __ cset(r0, __ EQ);
   __ andr(sp, r19_sender_sp, -16); // Restore the caller's SP
   __ ret(lr);
