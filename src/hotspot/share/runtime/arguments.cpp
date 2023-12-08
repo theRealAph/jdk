@@ -558,8 +558,10 @@ typedef struct {
 } AliasedFlag;
 
 static AliasedFlag const aliased_jvm_flags[] = {
+  /* Alias name */              /* Canonical flag */
   { "DefaultMaxRAMFraction",    "MaxRAMFraction"    },
   { "CreateMinidumpOnCrash",    "CreateCoredumpOnCrash" },
+  { "RestoreMXCSROnJNICalls",   "RestoreFPEnvOnJNICalls" },
   { nullptr, nullptr}
 };
 

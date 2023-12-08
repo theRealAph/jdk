@@ -4429,7 +4429,7 @@ void MacroAssembler::load_klass(Register dst, Register src) {
 }
 
 void MacroAssembler::restore_cpu_control_state_after_jni(Register tmp1, Register tmp2) {
-  if (RestoreMXCSROnJNICalls) {
+  if (RestoreFPEnvOnJNICalls) {
     Label OK;
     get_fpcr(tmp1);
     mov(tmp2, tmp1);

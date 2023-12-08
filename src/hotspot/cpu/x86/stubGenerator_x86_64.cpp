@@ -581,7 +581,7 @@ address StubGenerator::generate_verify_mxcsr() {
     __ cmp32(rax, mxcsr_std, rscratch1);
     __ jcc(Assembler::equal, ok_ret);
 
-    __ warn("MXCSR changed by native JNI code, use -XX:+RestoreMXCSROnJNICall");
+    __ warn("MXCSR changed by native JNI code, use -XX:+RestoreFPEnvOnJNICalls");
 
     __ ldmxcsr(mxcsr_std, rscratch1);
 

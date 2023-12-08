@@ -776,8 +776,9 @@ const int ObjectAlignmentInBytes = 8;
           "Use signal-chaining to invoke signal handlers installed "        \
           "by the application (Unix only)")                                 \
                                                                             \
-  product(bool, RestoreMXCSROnJNICalls, false,                              \
-          "Restore MXCSR when returning from JNI calls")                    \
+  product(bool, RestoreFPEnvOnJNICalls, false,                              \
+          "Restore floating-point-control env when returning "              \
+          "from JNI calls")                                                 \
                                                                             \
   product(bool, CheckJNICalls, false,                                       \
           "Verify all arguments to JNI calls")                              \
