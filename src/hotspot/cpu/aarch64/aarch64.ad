@@ -16189,6 +16189,7 @@ instruct ShouldNotReachHere() %{
 instruct partialSubtypeCheck(iRegP_R4 sub, iRegP_R0 super, iRegP_R2 temp, iRegP_R5 result, rFlagsReg cr)
 %{
   match(Set result (PartialSubtypeCheck sub super));
+  predicate(! UseSecondarySupersTable);
   effect(KILL cr, KILL temp);
 
   ins_cost(1100);  // slightly larger than the next version
@@ -16201,29 +16202,103 @@ instruct partialSubtypeCheck(iRegP_R4 sub, iRegP_R0 super, iRegP_R2 temp, iRegP_
   ins_pipe(pipe_class_memory);
 %}
 
-instruct partialSubtypeCheckConstSuper(iRegP_R4 sub, iRegP_R0 super_reg, immP super_con, vRegD_V0 vtemp, iRegP_R5 result,
-                                       iRegP_R1 tempR1, iRegP_R2 tempR2, iRegP_R3 tempR3,
-                                       rFlagsReg cr)
+// instruct partialSubtypeCheckConstSuper(iRegP_R4 sub, iRegP_R0 super_reg, immP super_con, vRegD_V0 vtemp, iRegP_R5 result,
+//                                        iRegP_R1 tempR1, iRegP_R2 tempR2, iRegP_R3 tempR3,
+//                                        rFlagsReg cr)
+// %{
+//   match(Set result (PartialSubtypeCheck sub (Binary super_reg super_con)));
+//   predicate(UseSecondarySupersTable);
+//   effect(KILL cr, TEMP tempR1, TEMP tempR2, TEMP tempR3, TEMP vtemp);
+
+//   ins_cost(700);  // smaller than the next version
+//   format %{ "partialSubtypeCheck $result, $sub, super" %}
+
+//   ins_encode %{
+//     bool success = false;
+//     u1 super_klass_slot = ((Klass*)$super_con$$constant)->hash_slot();
+//     if (InlineSecondarySupersTest) {
+//       success = __ lookup_secondary_supers_table($sub$$Register, $super_reg$$Register,
+//                                                  $tempR1$$Register, $tempR2$$Register, $tempR3$$Register,
+//                                                  $vtemp$$FloatRegister,
+//                                                  $result$$Register,
+//                                                  super_klass_slot);
+//     } else {
+//       address call = __ trampoline_call(RuntimeAddress(StubRoutines::lookup_secondary_supers_table_stub(super_klass_slot)));
+//       success = (call != nullptr);
+//     }
+//     if (!success) {
+//       ciEnv::current()->record_failure("CodeCache is full");
+//       return;
+//     }
+//   %}
+
+//   ins_pipe(pipe_class_memory);
+// %}
+
+instruct partialSubtypeCheck1VarSuper(iRegP_R4 sub, iRegP_R0 super_reg, immP super_con,
+                                      vRegD_V0 vtemp1, vRegD_V1 vtemp2, vRegD vtemp3,
+                                      iRegP_R5 result,
+                                      iRegP_R1 tempR1, iRegP_R2 tempR2, iRegP_R3 tempR3,
+                                      rFlagsReg cr)
 %{
   match(Set result (PartialSubtypeCheck sub (Binary super_reg super_con)));
   predicate(UseSecondarySupersTable);
-  effect(KILL cr, TEMP tempR1, TEMP tempR2, TEMP tempR3, TEMP vtemp);
+  effect(KILL cr, TEMP tempR1, TEMP tempR2, TEMP tempR3,
+         TEMP vtemp1, TEMP vtemp2, TEMP vtemp3);
 
   ins_cost(700);  // smaller than the next version
   format %{ "partialSubtypeCheck $result, $sub, super" %}
 
   ins_encode %{
     bool success = false;
-    u1 super_klass_slot = ((Klass*)$super_con$$constant)->hash_slot();
     if (InlineSecondarySupersTest) {
       success = __ lookup_secondary_supers_table($sub$$Register, $super_reg$$Register,
                                                  $tempR1$$Register, $tempR2$$Register, $tempR3$$Register,
-                                                 $vtemp$$FloatRegister,
-                                                 $result$$Register,
-                                                 super_klass_slot);
+                                                 $vtemp1$$FloatRegister,
+                                                 $vtemp2$$FloatRegister,
+                                                 $vtemp3$$FloatRegister,
+                                                 $result$$Register);
     } else {
-      address call = __ trampoline_call(RuntimeAddress(StubRoutines::lookup_secondary_supers_table_stub(super_klass_slot)));
-      success = (call != nullptr);
+      // address call = __ trampoline_call(RuntimeAddress(StubRoutines::lookup_secondary_supers_table_stub(super_klass_slot)));
+      // success = (call != nullptr);
+      abort();
+    }
+    if (!success) {
+      ciEnv::current()->record_failure("CodeCache is full");
+      return;
+    }
+  %}
+
+  ins_pipe(pipe_class_memory);
+%}
+
+instruct partialSubtypeCheckVarSuper(iRegP_R4 sub, iRegP_R0 super_reg,
+                                     vRegD_V0 vtemp1, vRegD_V1 vtemp2, vRegD vtemp3,
+                                     iRegP_R5 result,
+                                     iRegP_R1 tempR1, iRegP_R2 tempR2, iRegP_R3 tempR3,
+                                     rFlagsReg cr)
+%{
+  match(Set result (PartialSubtypeCheck sub super_reg));
+  predicate(UseSecondarySupersTable);
+  effect(KILL cr, TEMP tempR1, TEMP tempR2, TEMP tempR3,
+         TEMP vtemp1, TEMP vtemp2, TEMP vtemp3);
+
+  ins_cost(700);  // smaller than the next version
+  format %{ "partialSubtypeCheck $result, $sub, super" %}
+
+  ins_encode %{
+    bool success = false;
+    if (InlineSecondarySupersTest) {
+      success = __ lookup_secondary_supers_table($sub$$Register, $super_reg$$Register,
+                                                 $tempR1$$Register, $tempR2$$Register, $tempR3$$Register,
+                                                 $vtemp1$$FloatRegister,
+                                                 $vtemp2$$FloatRegister,
+                                                 $vtemp3$$FloatRegister,
+                                                 $result$$Register);
+    } else {
+      // address call = __ trampoline_call(RuntimeAddress(StubRoutines::lookup_secondary_supers_table_stub(super_klass_slot)));
+      // success = (call != nullptr);
+      abort();
     }
     if (!success) {
       ciEnv::current()->record_failure("CodeCache is full");

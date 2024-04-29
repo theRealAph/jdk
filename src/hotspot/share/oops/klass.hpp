@@ -161,7 +161,7 @@ class Klass : public Metadata {
 
   // Bitmap and hash code used by hashed secondary supers.
   uintx    _bitmap;
-  uint8_t  _hash_slot;
+  uint16_t _hash_slot;
 
   static uint8_t compute_hash_slot(Symbol* s);
 
@@ -428,6 +428,7 @@ protected:
   static ByteSize next_sibling_offset()          { return byte_offset_of(Klass, _next_sibling); }
 #endif
   static ByteSize bitmap_offset()                { return byte_offset_of(Klass, _bitmap); }
+  static ByteSize hash_slot_offset()             { return byte_offset_of(Klass, _hash_slot); }
 
   // Unpacking layout_helper:
   static const int _lh_neutral_value           = 0;  // neutral non-array non-instance value

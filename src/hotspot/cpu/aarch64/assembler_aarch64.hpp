@@ -2536,6 +2536,7 @@ template<typename R, typename... Rx>
     ldst_sstr(T, index, a, op1, op2, Vt, Vt2, Vt3, Vt4);                \
   }
 
+  INSN1(ld1, 0b001101010, 0b0000);
   INSN1(st1, 0b001101000, 0b0000);
   INSN2(st2, 0b001101001, 0b0000);
   INSN3(st3, 0b001101000, 0b0010);
@@ -2879,7 +2880,7 @@ template<typename R, typename... Rx>
     rf(Vn, 5), rf(Vd, 0);
   }
 
-  // Floating-point AdvSIMD scalar pairwise
+  // AdvSIMD scalar pairwise
 #define INSN(NAME, op1, op2) \
   void NAME(FloatRegister Vd, FloatRegister Vn, SIMD_RegVariant type) {                 \
     starti;                                                                             \
@@ -2891,6 +2892,17 @@ template<typename R, typename... Rx>
   INSN(faddp, 0b00, 0b0110110);
   INSN(fmaxp, 0b00, 0b0111110);
   INSN(fminp, 0b01, 0b0111110);
+
+#undef INSN
+#define INSN(NAME, op1)                                                 \
+  void NAME(FloatRegister Vd, FloatRegister Vn, SIMD_RegVariant type) { \
+    starti;                                                             \
+    assert(type == D, "Wrong type for addp");                           \
+    f(0b01011110, 31, 24), f(type, 23, 22),                             \
+    f(0b11000, 21, 17), f(op1, 16, 10), rf(Vn, 5), rf(Vd, 0);           \
+  }
+
+  INSN(addp, 0b1101110);
 
 #undef INSN
 
@@ -3183,6 +3195,7 @@ public:
 #define ASSERTION (T == T8B || T == T16B)
   INSN(rev16, 0, 0b00, 0b11, 0b00001);
   INSN(rbit,  1, 0b01, 0b00, 0b00101);
+  // INSN(notr,  1, 0b00, 0b00, 0b00101);
 #undef ASSERTION
 
 #undef MSG
