@@ -63,6 +63,21 @@ public:
     return _last;
   }
 
+  // Append a closure to the generator that can be executed later to
+  // append one or more instructions to the target code buffer.
+  //
+  // Usually, each closure generates a single instruction, in order to
+  // allow multiple generators to interleave parallel instruction
+  // streams to obtain the maximum opportunities for pipeline
+  // parallelism. However, instructions may be bundled in a single
+  // closure such that instructions will be emitted together. This is
+  // essential if the same scratch registers are used by multiple
+  // streams. Where an instruction stream uses a shared scratch
+  // register to hold a temporary that will be consumed by a later
+  // instruction, the closure must generate the full instruction
+  // sequence between the writer and last reader of the temporary as a
+  // block, ensuring that instructions from parallel streams which
+  // write or read the same scratch register cannot affect each other.
   template<typename T>
   WrapperNode *operator<<(T t) {
     auto vv = new LambdaWrapper<decltype(t)>(t);
@@ -78,6 +93,10 @@ public:
 
   virtual int length() { return _count; }
 
+  // Return an iterator which invokes each closure in sequence.
+  // Clients which employ multiple generators use this method to
+  // interleave instructions belonging to independent instruction
+  // streams in the target code buffer.
   struct Iterator {
     WrapperNode *_next;
     Iterator(AsmGenerator *gen): _next(gen->_holder_list_head) { }
@@ -107,6 +126,9 @@ public:
     return Iterator(this);
   }
 
+  // Invoke all the closures appended to the generator in order,
+  // inserting the associated instructions into the target code
+  // buffer.
   void gen() {
     for (auto it = iterator(); *it; it++) {
       it();
@@ -116,6 +138,8 @@ public:
 
 class OopMap;
 
+// A RegPair contains a pair of registers which hold the lower and
+// upper halves of a 128-bit value.
 class RegPair {
 public:
   Register _lo, _hi;

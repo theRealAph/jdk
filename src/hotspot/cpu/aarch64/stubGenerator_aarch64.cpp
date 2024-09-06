@@ -8799,7 +8799,11 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::aarch64::_spin_wait = generate_spin_wait();
 
     if (UsePoly1305Intrinsics) {
-      StubRoutines::_poly1305_processBlocks = generate_poly1305_processBlocks2();
+      if (getenv("APH_OLD_POLY1305")) {
+        StubRoutines::_poly1305_processBlocks = generate_poly1305_processBlocks();
+      } else {
+        StubRoutines::_poly1305_processBlocks = generate_poly1305_processBlocks2();
+      }
     }
 
 #if defined (LINUX) && !defined (__ARM_FEATURE_ATOMICS)
