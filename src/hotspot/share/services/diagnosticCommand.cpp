@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "cds/cdsConfig.hpp"
 #include "cds/cds_globals.hpp"
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/classLoaderHierarchyDCmd.hpp"
@@ -308,7 +309,7 @@ void JVMTIAgentLoadDCmd::execute(DCmdSource source, TRAPS) {
 
   if (is_java_agent) {
     if (_option.value() == nullptr) {
-      JvmtiAgentList::load_agent("instrument", "false", _libpath.value(), output());
+      JvmtiAgentList::load_agent("instrument", false, _libpath.value(), output());
     } else {
       size_t opt_len = strlen(_libpath.value()) + strlen(_option.value()) + 2;
       if (opt_len > 4096) {
@@ -325,12 +326,12 @@ void JVMTIAgentLoadDCmd::execute(DCmdSource source, TRAPS) {
       }
 
       jio_snprintf(opt, opt_len, "%s=%s", _libpath.value(), _option.value());
-      JvmtiAgentList::load_agent("instrument", "false", opt, output());
+      JvmtiAgentList::load_agent("instrument", false, opt, output());
 
       os::free(opt);
     }
   } else {
-    JvmtiAgentList::load_agent(_libpath.value(), "true", _option.value(), output());
+    JvmtiAgentList::load_agent(_libpath.value(), true, _option.value(), output());
   }
 }
 
@@ -472,7 +473,7 @@ void FinalizerInfoDCmd::execute(DCmdSource source, TRAPS) {
 #if INCLUDE_SERVICES // Heap dumping/inspection supported
 HeapDumpDCmd::HeapDumpDCmd(outputStream* output, bool heap) :
                            DCmdWithParser(output, heap),
-  _filename("filename","Name of the dump file", "STRING",true),
+  _filename("filename","Name of the dump file", "FILE",true),
   _all("-all", "Dump all objects, including unreachable objects",
        "BOOLEAN", false, "false"),
   _gzip("-gz", "If specified, the heap dump is written in gzipped format "
@@ -851,8 +852,15 @@ void CodeCacheDCmd::execute(DCmdSource source, TRAPS) {
 }
 
 #ifdef LINUX
+PerfMapDCmd::PerfMapDCmd(outputStream* output, bool heap) :
+             DCmdWithParser(output, heap),
+  _filename("filename", "Name of the map file", "FILE", false, DEFAULT_PERFMAP_FILENAME)
+{
+  _dcmdparser.add_dcmd_argument(&_filename);
+}
+
 void PerfMapDCmd::execute(DCmdSource source, TRAPS) {
-  CodeCache::write_perf_map();
+  CodeCache::write_perf_map(_filename.value(), output());
 }
 #endif // LINUX
 
@@ -979,15 +987,18 @@ public:
 };
 
 void ClassesDCmd::execute(DCmdSource source, TRAPS) {
-  VM_PrintClasses vmop(output(), _verbose.is_set());
+  VM_PrintClasses vmop(output(), _verbose.value());
   VMThread::execute(&vmop);
 }
 
 #if INCLUDE_CDS
+#define DEFAULT_CDS_ARCHIVE_FILENAME "java_pid%p_<subcmd>.jsa"
+
 DumpSharedArchiveDCmd::DumpSharedArchiveDCmd(outputStream* output, bool heap) :
                                      DCmdWithParser(output, heap),
   _suboption("subcmd", "static_dump | dynamic_dump", "STRING", true),
-  _filename("filename", "Name of shared archive to be dumped", "STRING", false)
+  _filename("filename", "Name of shared archive to be dumped", "FILE", false,
+            DEFAULT_CDS_ARCHIVE_FILENAME)
 {
   _dcmdparser.add_dcmd_argument(&_suboption);
   _dcmdparser.add_dcmd_argument(&_filename);
@@ -996,7 +1007,11 @@ DumpSharedArchiveDCmd::DumpSharedArchiveDCmd(outputStream* output, bool heap) :
 void DumpSharedArchiveDCmd::execute(DCmdSource source, TRAPS) {
   jboolean is_static;
   const char* scmd = _suboption.value();
-  const char* file = _filename.value();
+
+  // The check for _filename.is_set() is because we don't want to use
+  // DEFAULT_CDS_ARCHIVE_FILENAME, since it is meant as a description
+  // of the default, not the actual default.
+  const char* file = _filename.is_set() ? _filename.value() : nullptr;
 
   if (strcmp(scmd, "static_dump") == 0) {
     is_static = JNI_TRUE;
@@ -1004,7 +1019,7 @@ void DumpSharedArchiveDCmd::execute(DCmdSource source, TRAPS) {
   } else if (strcmp(scmd, "dynamic_dump") == 0) {
     is_static = JNI_FALSE;
     output()->print("Dynamic dump: ");
-    if (!UseSharedSpaces) {
+    if (!CDSConfig::is_using_archive()) {
       output()->print_cr("Dynamic dump is unsupported when base CDS archive is not loaded");
       return;
     }
@@ -1020,7 +1035,7 @@ void DumpSharedArchiveDCmd::execute(DCmdSource source, TRAPS) {
   // call CDS.dumpSharedArchive
   Handle fileh;
   if (file != nullptr) {
-    fileh =  java_lang_String::create_from_str(_filename.value(), CHECK);
+    fileh = java_lang_String::create_from_str(file, CHECK);
   }
   Symbol* cds_name  = vmSymbols::jdk_internal_misc_CDS();
   Klass*  cds_klass = SystemDictionary::resolve_or_fail(cds_name, true /*throw error*/,  CHECK);
@@ -1085,7 +1100,7 @@ ThreadDumpToFileDCmd::ThreadDumpToFileDCmd(outputStream* output, bool heap) :
                                            DCmdWithParser(output, heap),
   _overwrite("-overwrite", "May overwrite existing file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
-  _filepath("filepath", "The file path to the output file", "STRING", true) {
+  _filepath("filepath", "The file path to the output file", "FILE", true) {
   _dcmdparser.add_dcmd_option(&_overwrite);
   _dcmdparser.add_dcmd_option(&_format);
   _dcmdparser.add_dcmd_argument(&_filepath);
@@ -1160,34 +1175,28 @@ void CompilationMemoryStatisticDCmd::execute(DCmdSource source, TRAPS) {
 
 #ifdef LINUX
 
-SystemMapDCmd::SystemMapDCmd(outputStream* output, bool heap) :
-    DCmdWithParser(output, heap),
-  _human_readable("-H", "Human readable format", "BOOLEAN", false, "false") {
-  _dcmdparser.add_dcmd_option(&_human_readable);
-}
+SystemMapDCmd::SystemMapDCmd(outputStream* output, bool heap) : DCmd(output, heap) {}
 
 void SystemMapDCmd::execute(DCmdSource source, TRAPS) {
-  MemMapPrinter::print_all_mappings(output(), _human_readable.value());
+  MemMapPrinter::print_all_mappings(output());
 }
 
+static constexpr char default_filename[] = "vm_memory_map_%p.txt";
+
 SystemDumpMapDCmd::SystemDumpMapDCmd(outputStream* output, bool heap) :
-    DCmdWithParser(output, heap),
-  _human_readable("-H", "Human readable format", "BOOLEAN", false, "false"),
-  _filename("-F", "file path (defaults: \"vm_memory_map_<pid>.txt\")", "STRING", false) {
-  _dcmdparser.add_dcmd_option(&_human_readable);
+  DCmdWithParser(output, heap),
+  _filename("-F", "file path", "FILE", false, default_filename) {
   _dcmdparser.add_dcmd_option(&_filename);
 }
 
 void SystemDumpMapDCmd::execute(DCmdSource source, TRAPS) {
-  stringStream default_name;
-  default_name.print("vm_memory_map_%d.txt", os::current_process_id());
-  const char* name = _filename.is_set() ? _filename.value() : default_name.base();
+  const char* name = _filename.value();
   fileStream fs(name);
   if (fs.is_open()) {
     if (!MemTracker::enabled()) {
       output()->print_cr("(NMT is disabled, will not annotate mappings).");
     }
-    MemMapPrinter::print_all_mappings(&fs, _human_readable.value());
+    MemMapPrinter::print_all_mappings(&fs);
     // For the readers convenience, resolve path name.
     char tmp[JVM_MAXPATHLEN];
     const char* absname = os::Posix::realpath(name, tmp, sizeof(tmp));

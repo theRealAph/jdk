@@ -61,6 +61,9 @@ enum CounterNS {
   JAVA_THREADS,         // Threads System name spaces
   COM_THREADS,
   SUN_THREADS,
+  JAVA_THREADS_CPUTIME, // Thread CPU time name spaces
+  COM_THREADS_CPUTIME,
+  SUN_THREADS_CPUTIME,
   JAVA_PROPERTY,        // Java Property name spaces
   COM_PROPERTY,
   SUN_PROPERTY,
@@ -828,11 +831,20 @@ class PerfTraceTime : public StackObj {
 
   public:
     inline PerfTraceTime(PerfLongCounter* timerp) : _timerp(timerp) {
-      if (!UsePerfData) return;
+      if (!UsePerfData || timerp == nullptr) { return; }
       _t.start();
     }
 
-    ~PerfTraceTime();
+    const char* name() const {
+      assert(_timerp != nullptr, "sanity");
+      return _timerp->name();
+    }
+
+    ~PerfTraceTime() {
+      if (!UsePerfData || !_t.is_active()) { return; }
+      _t.stop();
+      _timerp->inc(_t.ticks());
+    }
 };
 
 /* The PerfTraceTimedEvent class is responsible for counting the
@@ -861,7 +873,7 @@ class PerfTraceTimedEvent : public PerfTraceTime {
 
   public:
     inline PerfTraceTimedEvent(PerfLongCounter* timerp, PerfLongCounter* eventp): PerfTraceTime(timerp), _eventp(eventp) {
-      if (!UsePerfData) return;
+      if (!UsePerfData || timerp == nullptr) { return; }
       _eventp->inc();
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,15 +54,28 @@ void InterpreterMacroAssembler::jump_to_entry(address entry) {
 void InterpreterMacroAssembler::profile_obj_type(Register obj, const Address& mdo_addr) {
   Label update, next, none;
 
+#ifdef _LP64
+  assert_different_registers(obj, rscratch1, mdo_addr.base(), mdo_addr.index());
+#else
+  assert_different_registers(obj, mdo_addr.base(), mdo_addr.index());
+#endif
+
   interp_verify_oop(obj, atos);
 
   testptr(obj, obj);
   jccb(Assembler::notZero, update);
+  testptr(mdo_addr, TypeEntries::null_seen);
+  jccb(Assembler::notZero, next); // null already seen. Nothing to do anymore.
+  // atomic update to prevent overwriting Klass* with 0
+  lock();
   orptr(mdo_addr, TypeEntries::null_seen);
   jmpb(next);
 
   bind(update);
   load_klass(obj, obj, rscratch1);
+#ifdef _LP64
+  mov(rscratch1, obj);
+#endif
 
   xorptr(obj, mdo_addr);
   testptr(obj, TypeEntries::type_klass_mask);
@@ -77,12 +90,15 @@ void InterpreterMacroAssembler::profile_obj_type(Register obj, const Address& md
   jccb(Assembler::equal, none);
   cmpptr(mdo_addr, TypeEntries::null_seen);
   jccb(Assembler::equal, none);
+#ifdef _LP64
   // There is a chance that the checks above (re-reading profiling
   // data from memory) fail if another thread has just set the
   // profiling to this obj's klass
+  mov(obj, rscratch1);
   xorptr(obj, mdo_addr);
   testptr(obj, TypeEntries::type_klass_mask);
   jccb(Assembler::zero, next);
+#endif
 
   // different than before. Cannot keep accurate profile.
   orptr(mdo_addr, TypeEntries::type_unknown);
@@ -91,6 +107,10 @@ void InterpreterMacroAssembler::profile_obj_type(Register obj, const Address& md
   bind(none);
   // first time here. Set profile type.
   movptr(mdo_addr, obj);
+#ifdef ASSERT
+  andptr(obj, TypeEntries::type_klass_mask);
+  verify_klass_ptr(obj);
+#endif
 
   bind(next);
 }
@@ -443,11 +463,6 @@ void InterpreterMacroAssembler::get_cache_index_at_bcp(Register index,
     load_unsigned_short(index, Address(_bcp_register, bcp_offset));
   } else if (index_size == sizeof(u4)) {
     movl(index, Address(_bcp_register, bcp_offset));
-    // Check if the secondary index definition is still ~x, otherwise
-    // we have to change the following assembler code to calculate the
-    // plain index.
-    assert(ConstantPool::decode_invokedynamic_index(~123) == 123, "else change next line");
-    notl(index);  // convert to plain index
   } else if (index_size == sizeof(u1)) {
     load_unsigned_byte(index, Address(_bcp_register, bcp_offset));
   } else {
@@ -1168,13 +1183,11 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     if (LockingMode == LM_LIGHTWEIGHT) {
 #ifdef _LP64
       const Register thread = r15_thread;
+      lightweight_lock(lock_reg, obj_reg, swap_reg, thread, tmp_reg, slow_case);
 #else
-      const Register thread = lock_reg;
-      get_thread(thread);
+      // Lacking registers and thread on x86_32. Always take slow path.
+      jmp(slow_case);
 #endif
-      // Load object header, prepare for CAS from unlocked to locked.
-      movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
-      lightweight_lock(obj_reg, swap_reg, thread, tmp_reg, slow_case);
     } else if (LockingMode == LM_LEGACY) {
       // Load immediate 1 into swap_reg %rax
       movl(swap_reg, 1);
@@ -1236,15 +1249,9 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     bind(slow_case);
 
     // Call the runtime routine for slow case
-    if (LockingMode == LM_LIGHTWEIGHT) {
-      call_VM(noreg,
-              CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj),
-              obj_reg);
-    } else {
-      call_VM(noreg,
-              CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
-              lock_reg);
-    }
+    call_VM(noreg,
+            CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
+            lock_reg);
     bind(done);
   }
 }
@@ -1291,20 +1298,11 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
 
     if (LockingMode == LM_LIGHTWEIGHT) {
 #ifdef _LP64
-      const Register thread = r15_thread;
+      lightweight_unlock(obj_reg, swap_reg, r15_thread, header_reg, slow_case);
 #else
-      const Register thread = header_reg;
-      get_thread(thread);
+      // Lacking registers and thread on x86_32. Always take slow path.
+      jmp(slow_case);
 #endif
-      // Handle unstructured locking.
-      Register tmp = swap_reg;
-      movl(tmp, Address(thread, JavaThread::lock_stack_top_offset()));
-      cmpptr(obj_reg, Address(thread, tmp, Address::times_1,  -oopSize));
-      jcc(Assembler::notEqual, slow_case);
-      // Try to swing header from locked to unlocked.
-      movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
-      andptr(swap_reg, ~(int32_t)markWord::lock_mask_in_place);
-      lightweight_unlock(obj_reg, swap_reg, header_reg, slow_case);
     } else if (LockingMode == LM_LEGACY) {
       // Load the old header from BasicLock structure
       movptr(header_reg, Address(swap_reg,
@@ -1949,8 +1947,7 @@ void InterpreterMacroAssembler::notify_method_entry() {
     bind(L);
   }
 
-  {
-    SkipIfEqual skip(this, &DTraceMethodProbes, false, rscratch1);
+  if (DTraceMethodProbes) {
     NOT_LP64(get_thread(rthread);)
     get_method(rarg);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_entry),
@@ -1994,8 +1991,7 @@ void InterpreterMacroAssembler::notify_method_exit(
     pop(state);
   }
 
-  {
-    SkipIfEqual skip(this, &DTraceMethodProbes, false, rscratch1);
+  if (DTraceMethodProbes) {
     push(state);
     NOT_LP64(get_thread(rthread);)
     get_method(rarg);

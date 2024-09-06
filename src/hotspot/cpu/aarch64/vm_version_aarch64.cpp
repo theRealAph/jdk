@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, 2020, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -143,10 +143,18 @@ void VM_Version::initialize() {
     }
   }
 
-  // Ampere CPUs: Ampere-1 and Ampere-1A
-  if (_cpu == CPU_AMPERE && ((_model == CPU_MODEL_AMPERE_1) || (_model == CPU_MODEL_AMPERE_1A))) {
+  // Ampere CPUs
+  if (_cpu == CPU_AMPERE && ((_model == CPU_MODEL_AMPERE_1)  ||
+                             (_model == CPU_MODEL_AMPERE_1A) ||
+                             (_model == CPU_MODEL_AMPERE_1B))) {
     if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
       FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
+    }
+    if (FLAG_IS_DEFAULT(OnSpinWaitInst)) {
+      FLAG_SET_DEFAULT(OnSpinWaitInst, "isb");
+    }
+    if (FLAG_IS_DEFAULT(OnSpinWaitInstCount)) {
+      FLAG_SET_DEFAULT(OnSpinWaitInstCount, 2);
     }
   }
 
@@ -204,8 +212,13 @@ void VM_Version::initialize() {
     }
   }
 
-  // Neoverse N1, N2 and V1
-  if (_cpu == CPU_ARM && (model_is(0xd0c) || model_is(0xd49) || model_is(0xd40))) {
+  // Neoverse
+  //   N1: 0xd0c
+  //   N2: 0xd49
+  //   V1: 0xd40
+  //   V2: 0xd4f
+  if (_cpu == CPU_ARM && (model_is(0xd0c) || model_is(0xd49) ||
+                          model_is(0xd40) || model_is(0xd4f))) {
     if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
       FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
     }
@@ -216,6 +229,9 @@ void VM_Version::initialize() {
 
     if (FLAG_IS_DEFAULT(OnSpinWaitInstCount)) {
       FLAG_SET_DEFAULT(OnSpinWaitInstCount, 1);
+    }
+    if (FLAG_IS_DEFAULT(AlwaysMergeDMB)) {
+      FLAG_SET_DEFAULT(AlwaysMergeDMB, false);
     }
   }
 
@@ -234,8 +250,10 @@ void VM_Version::initialize() {
     FLAG_SET_DEFAULT(UseCRC32, false);
   }
 
-  // Neoverse V1
-  if (_cpu == CPU_ARM && model_is(0xd40)) {
+  // Neoverse
+  //   V1: 0xd40
+  //   V2: 0xd4f
+  if (_cpu == CPU_ARM && (model_is(0xd40) || model_is(0xd4f))) {
     if (FLAG_IS_DEFAULT(UseCryptoPmullForCRC32)) {
       FLAG_SET_DEFAULT(UseCryptoPmullForCRC32, true);
     }
@@ -588,12 +606,12 @@ static bool check_info_file(const char* fpath,
     return false;
   }
   while (fgets(line, sizeof(line), fp) != nullptr) {
-    if (strcasestr(line, virt1) != 0) {
+    if (strcasestr(line, virt1) != nullptr) {
       Abstract_VM_Version::_detected_virtualization = vt1;
       fclose(fp);
       return true;
     }
-    if (virt2 != nullptr && strcasestr(line, virt2) != 0) {
+    if (virt2 != nullptr && strcasestr(line, virt2) != nullptr) {
       Abstract_VM_Version::_detected_virtualization = vt2;
       fclose(fp);
       return true;

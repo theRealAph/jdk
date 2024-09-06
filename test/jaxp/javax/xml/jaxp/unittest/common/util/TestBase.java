@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import javax.xml.XMLConstants;
 import javax.xml.catalog.CatalogFeatures;
@@ -102,7 +103,7 @@ public class TestBase {
 
     // Impl Specific Properties
     public static final String SP_DTD = "jdk.xml.dtd.support";
-    public static final String SP_CATALOG = "jdk.xml.jdkCatalog.resolve";
+    public static final String SP_CATALOG = "jdk.xml.jdkcatalog.resolve";
     public static final String OVERRIDE_PARSER = "jdk.xml.overrideDefaultParser";
 
     // DTD/CATALOG constants
@@ -121,6 +122,12 @@ public class TestBase {
     // CATALOG=strict
     public static final String CONFIG_CATALOG_STRICT = "catalog2.properties";
 
+    // JAXP Configuration Files to be added to $JAVA_HOME/conf/
+    public static final String CONFIG_DEFAULT = "jaxp.properties";
+    public static final String CONFIG_STRICT = "jaxp-strict.properties";
+    public static final String CONFIG_TEMPLATE_STRICT = "jaxp-strict.properties.template";
+
+    public static final String UNKNOWN_HOST = "invalid.site.com";
 
     String xmlExternalEntity, xmlExternalEntityId;
     String xmlGE_Expansion, xmlGE_ExpansionId;
@@ -132,6 +139,7 @@ public class TestBase {
         // config file: CATALOG = strict
         CONFIG_FILE_CATALOG_STRICT(null, CONFIG_FILE, Type.FEATURE, getPath(CONFIG_FILE_PATH, CONFIG_CATALOG_STRICT)),
         CONFIG_FILE_DTD2(null, CONFIG_FILE, Type.FEATURE, getPath(CONFIG_FILE_PATH, JCF_DTD2)),
+
         FSP(XMLConstants.FEATURE_SECURE_PROCESSING, null, Type.FEATURE, "true"),
         FSP_FALSE(XMLConstants.FEATURE_SECURE_PROCESSING, null, Type.FEATURE, "false"),
 
@@ -334,15 +342,17 @@ public class TestBase {
 
     protected void processError(boolean expectError, String error, Exception e)
             throws Exception {
-        //e.printStackTrace();
         String str = e.getMessage();
-//        System.out.println("Exp Msg: " + str);
-        //e.printStackTrace();
         if (!expectError) {
-            Assert.assertTrue(false, "Expected pass, but Exception is thrown " +
-                    str);
+            Assert.assertTrue(false, "Expected pass, but Exception is thrown " + str);
         } else {
-            Assert.assertTrue((str != null) && str.contains(error));
+            // This check is necessary since errors other than UnknownHostException
+            // can contain the host name in the System ID
+            if (UNKNOWN_HOST.equals(error)) {
+                Assert.assertTrue((str != null) && str.equals(error));
+            } else {
+                Assert.assertTrue((str != null) && str.contains(error));
+            }
         }
     }
 
@@ -712,7 +722,7 @@ public class TestBase {
         return temp;
     }
 
-    static class Assert {
+    public static class Assert {
         public static void assertTrue(boolean condition) {
             assertTrue(condition, null);
         }
@@ -729,6 +739,12 @@ public class TestBase {
 
         public static void fail(String message) {
             throw new RuntimeException("Test failed. " + message);
+        }
+
+        public static void assertEquals(Object actual, Object expected) {
+            if (!Objects.equals(actual, expected)) {
+                throw new RuntimeException("Expected: " + expected + " but actual result was " + actual);
+            }
         }
     }
 }
