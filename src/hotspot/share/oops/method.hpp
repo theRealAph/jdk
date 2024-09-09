@@ -82,6 +82,8 @@ class Method : public Metadata {
 
   u2                _intrinsic_id;               // vmSymbols::intrinsic_id (0 == _none)
 
+  uint64_t          _hash_code;
+
   JFR_ONLY(DEFINE_TRACE_FLAG;)
 
 #ifndef PRODUCT
@@ -371,6 +373,8 @@ private:
   void clear_method_data() {
     _method_data = nullptr;
   }
+
+  static uintx compute_hash_code(Symbol*);
 
 public:
   static void set_code(const methodHandle& mh, nmethod* code);
