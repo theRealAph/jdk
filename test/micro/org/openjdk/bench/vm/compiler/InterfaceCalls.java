@@ -217,6 +217,11 @@ public class InterfaceCalls {
         return as[0].getIntFirst();
     }
 
+    @Benchmark
+    public int testMonomorphicDontInline() {
+        return noninlinedextext[0].getIntFirst();
+    }
+
     int l = 0;
 
     /** Tests single base interface method call */
