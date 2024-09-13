@@ -644,6 +644,11 @@ void MacroAssembler::set_last_Java_frame(Register last_java_sp,
   // last_java_fp is optional
   if (last_java_fp->is_valid()) {
     str(last_java_fp, Address(rthread, JavaThread::last_Java_fp_offset()));
+  } else {
+    // push(RegSet::of(rscratch1), sp);
+    // mov(rscratch1, -1ull);
+    // str(rscratch1, Address(rthread, JavaThread::last_Java_fp_offset()));
+    // pop(RegSet::of(rscratch1), sp);
   }
 }
 

@@ -62,6 +62,17 @@ class PackageEntry;
 class ParCompactionManager;
 class PSPromotionManager;
 class vtableEntry;
+class Method;
+
+class MtableEntry{
+public:
+  typedef union {
+    uint64_t _bits;
+    void *_address;
+    Method *_method;
+  } u;
+  u slots[2];
+};
 
 class Klass : public Metadata {
   friend class VMStructs;
@@ -171,6 +182,9 @@ class Klass : public Metadata {
   // Bitmap and hash code used by hashed secondary supers.
   uintx    _bitmap;
   uint8_t  _hash_slot;
+
+public:
+  MtableEntry _mtable[16];
 
 private:
   // This is an index into FileMapHeader::_shared_path_table[], to

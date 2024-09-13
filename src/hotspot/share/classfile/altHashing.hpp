@@ -47,5 +47,6 @@ class AltHashing : AllStatic {
   static uint32_t halfsiphash_32(uint64_t seed, const void* in, int len);
   // For Strings
   static uint32_t halfsiphash_32(uint64_t seed, const uint16_t* data, int len);
+  static uint64_t siphash_64(uint64_t seed, const void* data, int len);
 };
 #endif // SHARE_CLASSFILE_ALTHASHING_HPP

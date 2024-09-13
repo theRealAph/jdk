@@ -1354,6 +1354,7 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
       }
 
       itableOffsetEntry::method_entry(_klass, method_table_offset)[ime_num].initialize(_klass, target);
+
       if (log_develop_is_enabled(Trace, itables)) {
         ResourceMark rm;
         if (target != nullptr) {
@@ -1369,6 +1370,9 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
         }
       }
     }
+  }
+  if (ime_count) {
+    initialize_mtable();
   }
 }
 
@@ -1395,6 +1399,95 @@ void klassItable::adjust_method_entries(bool * trace_name_printed) {
       ("itable method update: class: %s method: %s", _klass->external_name(), new_method->external_name());
   }
 }
+
+int klassItable::mtable_slot(Method* m, int depth) {
+  auto result = m->compute_hash_code() << (exact_log2(64) * depth);
+  result >>= 64 - exact_log2(64);
+  return result;
+}
+
+void klassItable::mtable_sub_insert(Method* m, MtableEntry &entry, int depth) {
+  if (entry.slots[0]._bits == 0) {
+    entry.slots[0]._address = m;
+    entry.slots[1]._address = m->verified_code_entry();
+    goto done;
+  }
+
+  if (entry.slots[0]._address == m) { // Already inserted
+    return;
+  }
+
+  if ((entry.slots[1]._bits & 1) == 0) { // New sub table
+    Method *prev = (Method*)(entry.slots[0]._address);
+    MtableEntry init = {0, 0};
+    auto sub_table = new GrowableArray<MtableEntry>(64, 64, init);
+    entry.slots[0]._bits = 1 << mtable_slot(prev, depth + 1);
+    entry.slots[1]._address = sub_table;
+    entry.slots[1]._bits |= 1;
+    MtableEntry &sub_entry = sub_table->at(mtable_slot(prev, depth + 1));
+    mtable_sub_insert(prev, sub_entry, depth + 1);
+    // fallthrough
+  }
+
+  if (entry.slots[1]._bits & 1) { // Sub table
+    entry.slots[0]._bits |= mtable_slot(m, depth + 1);
+    auto sub_table = (GrowableArray<MtableEntry>*)(entry.slots[1]._bits & -uint64_t(2));
+    MtableEntry &sub_entry = sub_table->at(mtable_slot(m, depth + 1));
+    mtable_sub_insert(m, sub_entry, depth + 1);
+  }
+
+ done: asm("nop");
+}
+
+void klassItable::initialize_mtable() {
+  for (int i = 0; i < _size_method_table; i++) {
+    itableMethodEntry* ime = method_entry(i);
+    Method* m = ime->method();
+    if (m) {
+      uint64_t hash_code = m->compute_hash_code();
+      int index = hash_code >> (64 - exact_log2(16));
+      if (_klass->_mtable[index].slots[0]._bits == 0) {
+        _klass->_mtable[index].slots[0]._method = m;
+        _klass->_mtable[index].slots[1]._address = m->verified_code_entry();
+      } else {
+        if (uint64_t(m) != _klass->_mtable[index].slots[0]._bits) {
+          mtable_sub_insert(m, _klass->_mtable[index], 1);
+        }
+      }
+    }
+  }
+  asm("nop");
+}
+
+void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
+  for (int i = 0; i < length; i++) {
+    if (t[i].slots[0]._bits) {
+      if (t[i].slots[1]._bits & 1) {
+        auto sub = (GrowableArray<MtableEntry>*)(t[i].slots[1]._bits & -uint64_t(2));
+        print_sub_mtable(sub->adr_at(0), 64, depth+1);
+      } else {
+        Method* m = (Method*)(t[i].slots[0]._address);
+        if (m != nullptr) {
+          tty->print("%016lx", m->compute_hash_code());
+          for (int i = 0; i < depth; i++) tty->print(" ");
+          tty->print("      (%5d)  ", i);
+          m->access_flags().print_on(tty);
+          if (m->is_default_method()) {
+            tty->print("default ");
+          }
+          tty->print(" --  ");
+          m->print_name(tty);
+          tty->cr();
+        }
+      }
+    }
+  }
+}
+
+void klassItable::print_mtable() {
+  print_sub_mtable(_klass->_mtable, 16, 1);
+}
+
 
 // an itable should never contain old or obsolete methods
 bool klassItable::check_no_old_or_obsolete_entries() {

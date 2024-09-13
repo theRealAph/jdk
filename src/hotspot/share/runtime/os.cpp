@@ -1240,9 +1240,9 @@ void os::print_location(outputStream* st, intptr_t x, bool verbose) {
   }
 
   // Check if addr points into Java heap.
-  if (Universe::heap()->print_location(st, addr)) {
-    return;
-  }
+  // if (Universe::heap()->print_location(st, addr)) {
+  //   return;
+  // }
 
 #if !INCLUDE_ASAN
 

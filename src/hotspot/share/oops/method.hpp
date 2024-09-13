@@ -150,6 +150,8 @@ class Method : public Metadata {
   u2 signature_index() const                     { return constMethod()->signature_index();         }
   void set_signature_index(int index)            { constMethod()->set_signature_index(index);       }
 
+  uint64_t hash_code()                           { return _hash_code; }
+
   // generics support
   Symbol* generic_signature() const              { int idx = generic_signature_index(); return ((idx != 0) ? constants()->symbol_at(idx) : nullptr); }
   u2 generic_signature_index() const             { return constMethod()->generic_signature_index(); }
@@ -374,8 +376,6 @@ private:
     _method_data = nullptr;
   }
 
-  static uintx compute_hash_code(Symbol*);
-
 public:
   static void set_code(const methodHandle& mh, nmethod* code);
   void set_adapter_entry(AdapterHandlerEntry* adapter) {
@@ -397,6 +397,8 @@ public:
   // clear entry points. Used by sharing code during dump time
   void unlink_method() NOT_CDS_RETURN;
   void remove_unshareable_flags() NOT_CDS_RETURN;
+
+  uintx compute_hash_code();
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
   virtual MetaspaceObj::Type type() const { return MethodType; }
