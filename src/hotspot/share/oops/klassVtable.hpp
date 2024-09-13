@@ -303,8 +303,8 @@ class klassItable {
   // Initialization
   void initialize_itable_and_check_constraints(TRAPS);
   void initialize_itable(GrowableArray<Method*>* supers = nullptr);
-  void initialize_mtable();
-  void mtable_sub_insert(Method* m, MtableEntry &entry, int depth);
+  void initialize_mtable(Method* m, Method *target);
+  void mtable_sub_insert(Method* m, Method *target, MtableEntry &entry, int depth);
   void print_sub_mtable(MtableEntry* t, int length, int depth);
   void print_mtable();
   int mtable_slot(Method* m, int depth);
