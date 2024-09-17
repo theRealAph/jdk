@@ -305,6 +305,7 @@ class klassItable {
   void initialize_itable(GrowableArray<Method*>* supers = nullptr);
   void initialize_mtable(Method* m, Method *target);
   void mtable_sub_insert(Method* m, Method *target, MtableEntry &entry, int depth);
+  MtableEntry* finalize_mtable();
   void print_sub_mtable(MtableEntry* t, int length, int depth);
   void print_mtable();
   int mtable_slot(Method* m, int depth);

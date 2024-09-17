@@ -72,6 +72,15 @@ public:
     Method *_method;
   } u;
   u slots[2];
+  GrowableArray<MtableEntry>* as_GrowableArray() {
+    return (GrowableArray<MtableEntry>*)(slots[1]._bits & -uint64_t(2));
+  }
+  MtableEntry* as_Array() {
+    return (MtableEntry*)(slots[1]._bits & -uint64_t(2));
+  }
+  bool has_sub_table() {
+    return slots[1]._bits & 1;
+  }
 };
 
 class Klass : public Metadata {
@@ -185,6 +194,8 @@ class Klass : public Metadata {
 
 public:
   MtableEntry _mtable[16];
+  Array<MtableEntry> *_mtable_expansion;
+  bool _mtable_finalized;
 
 private:
   // This is an index into FileMapHeader::_shared_path_table[], to

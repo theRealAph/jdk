@@ -46,6 +46,8 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "utilities/copy.hpp"
 
+static int count_subtable_entries(Klass *klass);
+
 inline InstanceKlass* klassVtable::ik() const {
   return InstanceKlass::cast(_klass);
 }
@@ -1226,6 +1228,7 @@ void klassItable::initialize_itable_and_check_constraints(TRAPS) {
   GrowableArray<Method*>* supers =
     new GrowableArray<Method*>(_size_method_table, _size_method_table, nullptr);
   initialize_itable(supers);
+  finalize_mtable();
   check_constraints(supers, CHECK);
 }
 
@@ -1440,6 +1443,86 @@ void klassItable::mtable_sub_insert(Method* m, Method *target, MtableEntry &entr
  done: asm("nop");
 }
 
+static int count_subtable_entries(Klass *klass, GrowableArray<MtableEntry>* table) {
+  int count = 0;
+  for (int i = 0; i < table->length(); i++) {
+    if (table->at(i).slots[0]._bits == 0)
+      continue;
+
+    count ++;
+
+    if (table->at(i).has_sub_table()) {
+      GrowableArray<MtableEntry>* growable = table->at(i).as_GrowableArray();
+      count += count_subtable_entries(klass, growable);
+    }
+  }
+  return count;
+}
+
+static int count_subtable_entries(Klass *klass) {
+  // Count the number of subtable entries.
+  int count = 0;
+  for (int i = 0; i < 16; i++){
+    MtableEntry entry = klass->_mtable[i];
+    if (entry.slots[0]._bits && entry.has_sub_table()) {
+      count += count_subtable_entries(klass, entry.as_GrowableArray());
+      if (count > 100) {
+        asm("nop");
+      }
+    }
+  }
+  return count;
+}
+
+static MtableEntry *walk_mtable(MtableEntry *result, int &index,
+                                MtableEntry *in, int in_length, bool top) {
+  int i = 0;
+  for (;;) {
+    while (! in[i].has_sub_table() && i < in_length)  i++;
+    if (i >= in_length)  break;
+
+    GrowableArray<MtableEntry>* growable = in[i].as_GrowableArray();
+    MtableEntry rewritten = in[i];
+    rewritten.slots[1]._address = &result[index];
+    rewritten.slots[1]._bits |= 1;
+    walk_mtable(result, index, growable->adr_at(0), growable->length(), /*top*/false);
+    in[i] = rewritten;
+    i++;
+  }
+
+  if (!top) {
+    for (int i = 0; i < in_length; i++) {
+      if (in[i].slots[0]._bits != 0) {
+        result[index++] = in[i];
+      }
+    }
+  }
+
+  return result;
+}
+
+MtableEntry *klassItable::finalize_mtable() {
+  int total_size = count_subtable_entries(_klass);
+
+  if (total_size == 0)  return nullptr;
+
+  {
+    ResourceMark rm;
+    tty->print_cr("finalize %s total_size=%d", _klass->external_name(), total_size);
+  }
+  Array<MtableEntry> *result = _klass->_mtable_expansion;
+  if (result == nullptr && total_size) {
+    _klass->_mtable_expansion = result =
+      (MetadataFactory::new_array<MtableEntry>
+       (_klass->class_loader_data(),
+        total_size, JavaThread::cast(Thread::current())));
+  }
+  int index = 0;
+  MtableEntry *flat = walk_mtable(result->data(), index, _klass->_mtable, 16, /*top*/true);
+  _klass->_mtable_finalized = true;
+  return result->data();
+}
+
 void klassItable::initialize_mtable(Method *imethod, Method *target) {
   if (target) {
     uint64_t hash_code = imethod->compute_hash_code();
@@ -1453,23 +1536,33 @@ void klassItable::initialize_mtable(Method *imethod, Method *target) {
       }
     }
   }
-
-  asm("nop");
 }
 
 void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
+  assert(depth<11, "must be");
   for (int i = 0; i < length; i++) {
     if (t[i].slots[0]._bits) {
       if (t[i].slots[1]._bits & 1) {
-        auto sub = (GrowableArray<MtableEntry>*)(t[i].slots[1]._bits & -uint64_t(2));
+        for (int i = 0; i < depth; i++) tty->print("  ");
         tty->print("sub %d\n", i);
-        print_sub_mtable(sub->adr_at(0), 64, depth+1);
+        {
+          MtableEntry* sub;
+          int sub_size = 64;  // Not yet packed
+          if (_klass-> _mtable_finalized) {
+            sub_size = population_count(t[i].slots[0]._bits);
+            sub = t[i].as_Array();
+          } else {
+            sub = t[i].as_GrowableArray()->adr_at(0);
+          }
+          asm("nop");
+          print_sub_mtable(sub, sub_size, depth+1);
+        }
       } else {
         Method* m = (Method*)(t[i].slots[0]._address);
         Method* target = (Method*)(t[i].slots[1]._address);
         if (m != nullptr) {
+          for (int i = 0; i < depth; i++) tty->print("  ");
           tty->print("%016lx", m->compute_hash_code());
-          for (int i = 0; i < depth; i++) tty->print(" ");
           tty->print(" (%2d)  ", i);
           target->access_flags().print_on(tty);
           if (target->is_default_method()) {
@@ -1477,6 +1570,7 @@ void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
           }
           tty->print(" --  ");
           tty->print("%s", target->name_and_sig_as_C_string());
+          tty->print("  implements %s", m->name_and_sig_as_C_string());
           tty->cr();
         }
       }
