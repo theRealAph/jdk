@@ -924,6 +924,7 @@ bool InstanceKlass::link_class_impl(TRAPS) {
       if (need_init_table) {
         vtable().initialize_vtable_and_check_constraints(CHECK_false);
         itable().initialize_itable_and_check_constraints(CHECK_false);
+        asm("nop");
       }
 #ifdef ASSERT
       vtable().verify(tty, true);

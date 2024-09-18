@@ -26,6 +26,7 @@
 #include "cds/cdsConfig.hpp"
 #include "cds/cppVtables.hpp"
 #include "cds/metaspaceShared.hpp"
+#include "classfile/altHashing.hpp"
 #include "classfile/classLoader.hpp"
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/metadataOnStackMark.hpp"
@@ -121,32 +122,39 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name) {
     set_signature_handler(nullptr);
   }
 
-  _hash_code = compute_hash_code(name);
   NOT_PRODUCT(set_compiled_invocation_count(0);)
   // Name is very useful for debugging.
   NOT_PRODUCT(_name = name;)
 }
 
-uint64_t Method::compute_hash_code(Symbol* n) {
-  uint64_t hash_code;
+uint64_t Method::compute_hash_code() {
+  if (_hash_code == 0) {
+    uint64_t hash_code;
 
-  {
-    auto s = (const jbyte*) n->bytes();
-    hash_code = java_lang_String::hash_code(s, n->utf8_length());
+    auto sym = name();
+    auto s = (const jbyte*) sym->bytes();
+    hash_code = AltHashing::siphash_64(0, s, sym->utf8_length());
     // We use String::hash_code here (rather than e.g.
     // Symbol::identity_hash()) in order to have a hash code that
     // does not change from run to run. We want that because the
     // hash value for a secondary superclass appears in generated
     // code as a constant.
 
+    sym = signature();
+    s = (const jbyte*) sym->bytes();
+    hash_code = AltHashing::siphash_64(hash_code, s, sym->utf8_length());
+
+    sym = method_holder()->name();
+    s = (const jbyte*) sym->bytes();
+    hash_code = AltHashing::siphash_64(hash_code, s, sym->utf8_length());
+
     // This constant is magic: see Knuth, "Fibonacci Hashing".
     constexpr uint64_t multiplier
       = 11400714819323198485llu; // pow(2, 64) / ((1 + sqrt(5)) / 2 )
     // The leading bits of the least significant half of the product.
-    hash_code = (hash_code * multiplier);
+    _hash_code = (hash_code * multiplier);
   }
-
-  return hash_code;
+  return _hash_code;
 }
 
 // Release Method*.  The nmethod will be gone when we get here because
