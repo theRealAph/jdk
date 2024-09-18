@@ -206,22 +206,22 @@ public class VirtualCalls {
 
     @Benchmark
     public int test2ndClass2Types() {
-        SecondClass ai = (SecondClass) as[l];
+        SecondClass ai = (SecondClass) as[l+1];
         l = 1 - l;
         return ai.getIntSecond();
     }
 
     @Benchmark
     public int test2ndClass3Types() {
-        SecondClass ai = (SecondClass) as[l];
+        SecondClass ai = (SecondClass) as[l+1];
         l = ++ l % 3;
         return ai.getIntSecond();
     }
 
     @Benchmark
-    public int test2ndInt5Types() {
-        SecondClass ai = (SecondClass) as[l];
-        l = ++ l % asLength;
+    public int test2ndClass4Types() {
+        SecondClass ai = (SecondClass) as[l+1];
+        l = l % 4;
         return ai.getIntSecond();
     }
 }
