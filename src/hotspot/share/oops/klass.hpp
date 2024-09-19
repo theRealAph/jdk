@@ -82,6 +82,9 @@ public:
   bool has_sub_table() {
     return slots[1]._bits & 3;
   }
+  bool exists() {
+    return slots[1]._bits != 0;
+  }
 };
 
 class Klass : public Metadata {

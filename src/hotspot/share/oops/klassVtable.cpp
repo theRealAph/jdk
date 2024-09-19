@@ -1505,31 +1505,37 @@ static int count_subtable_entries(Klass *klass) {
   return count;
 }
 
-static MtableEntry *walk_mtable(Klass *klass, MtableEntry *result, int &index,
-                                MtableEntry *in, int in_length, bool top) {
+static int walk_mtable(Klass *klass, MtableEntry *result, int &index,
+                       MtableEntry *in, int in_length, bool top) {
+  bool acted = false;
   int i = 0;
   for (;;) {
-    while (! in[i].has_sub_table() && i < in_length)  i++;
+    while (! in[i].exists() && i < in_length)  i++;
     if (i >= in_length)  break;
 
-    GrowableArray<MtableEntry>* growable = in[i].as_GrowableArray();
-    MtableEntry rewritten = in[i];
-    rewritten.slots[1]._address = &result[index];
-    rewritten.slots[1]._bits |= 2;
-    walk_mtable(klass, result, index, growable->adr_at(0), growable->length(), /*top*/false);
-    in[i] = rewritten;
+    if (in[i].has_sub_table()) {
+      acted = true;
+      GrowableArray<MtableEntry>* growable = in[i].as_GrowableArray();
+      int sub_index = walk_mtable(klass, result, index, growable->adr_at(0), growable->length(), /*top*/false);
+      MtableEntry rewritten = in[i];
+      rewritten.slots[1]._address = &result[sub_index];
+      rewritten.slots[1]._bits |= 2;
+      in[i] = rewritten;
+    }
     i++;
   }
 
+  int written = index;
   if (!top) {
     for (int i = 0; i < in_length; i++) {
       if (in[i].slots[0]._bits != 0) {
         result[index++] = in[i];
+        acted = true;
       }
     }
   }
 
-  return result;
+  return written;
 }
 
 MtableEntry *klassItable::finalize_mtable() {
@@ -1549,7 +1555,7 @@ MtableEntry *klassItable::finalize_mtable() {
         total_size, JavaThread::cast(Thread::current())));
   }
   int index = 0;
-  MtableEntry *flat = walk_mtable(_klass, result->data(), index, _klass->_mtable, 16, /*top*/true);
+  walk_mtable(_klass, result->data(), index, _klass->_mtable, 16, /*top*/true);
   _klass->_mtable_finalized = true;
   return result->data();
 }
