@@ -1217,6 +1217,14 @@ void klassItable::check_constraints(GrowableArray<Method*>* supers, TRAPS) {
           THROW_MSG(vmSymbols::java_lang_LinkageError(), ss.as_string());
         }
       }
+
+      if (! _klass->is_abstract()) {
+        Method* found_method = _klass->runtime_lookup_interface_method(interface_method);
+        if (found_method != target) {
+          _klass->runtime_lookup_interface_method(interface_method);
+          ShouldNotReachHere();
+        }
+      }
     }
     ime++;
   }
@@ -1344,6 +1352,7 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
         // Stuff an IllegalAccessError throwing method in there instead.
         itableOffsetEntry::method_entry(_klass, method_table_offset)[m->itable_index()].
             initialize(_klass, Universe::throw_illegal_access_error());
+        initialize_mtable(m, Universe::throw_illegal_access_error());
       }
     } else {
 
@@ -1358,6 +1367,12 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
 
       itableOffsetEntry::method_entry(_klass, method_table_offset)[ime_num].initialize(_klass, target);
 
+      if (strncmp("java/util/ImmutableCollections$Set12", (const char*)_klass->name()->bytes(),
+                  strlen("java/util/ImmutableCollections$Set12")) == 0
+          && (m->name()->equals("size")
+              || m->name()->equals("contains"))) {
+        asm("nop");
+      }
       initialize_mtable(m, target);
 
       if (log_develop_is_enabled(Trace, itables)) {
@@ -1408,7 +1423,16 @@ int klassItable::mtable_slot(Method* m, int depth) {
   return result;
 }
 
+void klassItable::print_mtable() { _klass->print_mtable(); }
+
 void klassItable::mtable_sub_insert(Method* m, Method *target, MtableEntry &entry, int depth) {
+  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
+    tty->print("insert %s", m->name_and_sig_as_C_string());
+    tty->print_cr("");
+    print_mtable();
+    tty->print_cr("");
+  }
+
   if (entry.slots[0]._bits == 0) {
     entry.slots[0]._address = m;
     entry.slots[1]._address = target;
@@ -1441,6 +1465,13 @@ void klassItable::mtable_sub_insert(Method* m, Method *target, MtableEntry &entr
   }
 
  done: asm("nop");
+
+  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
+    tty->print_cr("");
+    print_mtable();
+    tty->print_cr("----------------------------------------------------------------");
+  }
+
 }
 
 static int count_subtable_entries(Klass *klass, GrowableArray<MtableEntry>* table) {
@@ -1474,7 +1505,7 @@ static int count_subtable_entries(Klass *klass) {
   return count;
 }
 
-static MtableEntry *walk_mtable(MtableEntry *result, int &index,
+static MtableEntry *walk_mtable(Klass *klass, MtableEntry *result, int &index,
                                 MtableEntry *in, int in_length, bool top) {
   int i = 0;
   for (;;) {
@@ -1484,8 +1515,8 @@ static MtableEntry *walk_mtable(MtableEntry *result, int &index,
     GrowableArray<MtableEntry>* growable = in[i].as_GrowableArray();
     MtableEntry rewritten = in[i];
     rewritten.slots[1]._address = &result[index];
-    rewritten.slots[1]._bits |= 1;
-    walk_mtable(result, index, growable->adr_at(0), growable->length(), /*top*/false);
+    rewritten.slots[1]._bits |= 2;
+    walk_mtable(klass, result, index, growable->adr_at(0), growable->length(), /*top*/false);
     in[i] = rewritten;
     i++;
   }
@@ -1506,7 +1537,7 @@ MtableEntry *klassItable::finalize_mtable() {
 
   if (total_size == 0)  return nullptr;
 
-  {
+  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
     ResourceMark rm;
     tty->print_cr("finalize %s total_size=%d", _klass->external_name(), total_size);
   }
@@ -1518,7 +1549,7 @@ MtableEntry *klassItable::finalize_mtable() {
         total_size, JavaThread::cast(Thread::current())));
   }
   int index = 0;
-  MtableEntry *flat = walk_mtable(result->data(), index, _klass->_mtable, 16, /*top*/true);
+  MtableEntry *flat = walk_mtable(_klass, result->data(), index, _klass->_mtable, 16, /*top*/true);
   _klass->_mtable_finalized = true;
   return result->data();
 }
@@ -1538,17 +1569,29 @@ void klassItable::initialize_mtable(Method *imethod, Method *target) {
   }
 }
 
-void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
+void print_hash_code(Method *m) {
+  auto x = m->compute_hash_code();
+  {
+    auto tmp = x;
+    tty->print("%ld", tmp >> (64 - 4)); tmp <<= 4;
+    while(tmp) {
+      tty->print(":%02ld", tmp >> (64 - 6)); tmp <<= 6;
+    }
+  }
+}
+
+void Klass::print_sub_mtable(MtableEntry* t, int length, int depth) {
   assert(depth<11, "must be");
   for (int i = 0; i < length; i++) {
     if (t[i].slots[0]._bits) {
-      if (t[i].slots[1]._bits & 1) {
+      if (t[i].slots[1]._bits & 3) {
         for (int i = 0; i < depth; i++) tty->print("  ");
+        tty->print("0x%016lx  ", (uintptr_t)&t[i]);
         tty->print("sub %d\n", i);
         {
           MtableEntry* sub;
           int sub_size = 64;  // Not yet packed
-          if (_klass-> _mtable_finalized) {
+          if (t[i].slots[1]._bits & 2) {
             sub_size = population_count(t[i].slots[0]._bits);
             sub = t[i].as_Array();
           } else {
@@ -1562,7 +1605,8 @@ void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
         Method* target = (Method*)(t[i].slots[1]._address);
         if (m != nullptr) {
           for (int i = 0; i < depth; i++) tty->print("  ");
-          tty->print("%016lx", m->compute_hash_code());
+          tty->print("0x%016lx  ", (uintptr_t)&t[i]);
+          print_hash_code(m);
           tty->print(" (%2d)  ", i);
           target->access_flags().print_on(tty);
           if (target->is_default_method()) {
@@ -1578,12 +1622,12 @@ void klassItable::print_sub_mtable(MtableEntry* t, int length, int depth) {
   }
 }
 
-void klassItable::print_mtable() {
+void Klass::print_mtable() {
   ResourceMark rm;
   tty->print("klass ");
-  _klass->name()->print();
+  name()->print();
   tty->cr();
-  print_sub_mtable(_klass->_mtable, 16, 1);
+  print_sub_mtable(_mtable, 16, 1);
 }
 
 

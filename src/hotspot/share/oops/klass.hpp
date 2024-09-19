@@ -64,22 +64,23 @@ class PSPromotionManager;
 class vtableEntry;
 class Method;
 
-class MtableEntry{
+class MtableEntry {
 public:
   typedef union {
     uint64_t _bits;
     void *_address;
     Method *_method;
+    MtableEntry *_sub_entry;
   } u;
   u slots[2];
   GrowableArray<MtableEntry>* as_GrowableArray() {
-    return (GrowableArray<MtableEntry>*)(slots[1]._bits & -uint64_t(2));
+    return (GrowableArray<MtableEntry>*)(slots[1]._bits & -uint64_t(4));
   }
   MtableEntry* as_Array() {
-    return (MtableEntry*)(slots[1]._bits & -uint64_t(2));
+    return (MtableEntry*)(slots[1]._bits & -uint64_t(4));
   }
   bool has_sub_table() {
-    return slots[1]._bits & 1;
+    return slots[1]._bits & 3;
   }
 };
 
@@ -196,6 +197,9 @@ public:
   MtableEntry _mtable[16];
   Array<MtableEntry> *_mtable_expansion;
   bool _mtable_finalized;
+
+  void print_sub_mtable(MtableEntry* t, int length, int depth);
+  void print_mtable();
 
 private:
   // This is an index into FileMapHeader::_shared_path_table[], to
@@ -766,6 +770,8 @@ protected:
   virtual void oop_print_on      (oop obj, outputStream* st);
 
   void print_secondary_supers_on(outputStream* st) const;
+
+  Method *runtime_lookup_interface_method(Method *interface_method);
 
   virtual const char* internal_name() const = 0;
 

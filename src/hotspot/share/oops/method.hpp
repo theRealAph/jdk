@@ -150,8 +150,6 @@ class Method : public Metadata {
   u2 signature_index() const                     { return constMethod()->signature_index();         }
   void set_signature_index(int index)            { constMethod()->set_signature_index(index);       }
 
-  uint64_t hash_code()                           { return _hash_code; }
-
   // generics support
   Symbol* generic_signature() const              { int idx = generic_signature_index(); return ((idx != 0) ? constants()->symbol_at(idx) : nullptr); }
   u2 generic_signature_index() const             { return constMethod()->generic_signature_index(); }

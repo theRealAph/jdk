@@ -1278,3 +1278,36 @@ void Klass::on_secondary_supers_verification_failure(Klass* super, Klass* sub, b
         msg, sub->external_name(), super->external_name(),
         sub->is_subtype_of(super), linear_result, table_result);
 }
+
+Method *Klass::runtime_lookup_interface_method(Method *interface_method) {
+  const uint64_t hash_code = interface_method->compute_hash_code();
+  int index = hash_code >> (64 - exact_log2(16));
+  MtableEntry e = _mtable[index];
+  if (e.has_sub_table())
+    goto subtable;
+
+  if (e.slots[0]._method == interface_method) { // Got it in one!
+    return e.slots[1]._method;
+  } else {
+    return nullptr; // Incompatible class change
+  }
+
+ subtable:
+  auto hash = hash_code << exact_log2(16);
+  do {
+    uint64_t bitmask = e.slots[0]._bits;
+    MtableEntry *next = e.as_Array();
+    index = hash >> (64 - exact_log2(64));
+    int slot = population_count(bitmask << (64 - 1 - index)) - 1;
+    e = next[slot];
+    if (! e.has_sub_table()) {
+      if (e.slots[0]._method == interface_method) {
+        return e.slots[1]._method;
+      } else {
+        return nullptr; // Incompatible class change
+      }
+    }
+    hash <<= exact_log2(64);
+  } while (hash);
+  ShouldNotReachHere();
+}
