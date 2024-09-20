@@ -396,6 +396,7 @@ public:
   void unlink_method() NOT_CDS_RETURN;
   void remove_unshareable_flags() NOT_CDS_RETURN;
 
+  uintx hash_code() const { return _hash_code; }
   uintx compute_hash_code();
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);

@@ -1426,13 +1426,6 @@ int klassItable::mtable_slot(Method* m, int depth) {
 void klassItable::print_mtable() { _klass->print_mtable(); }
 
 void klassItable::mtable_sub_insert(Method* m, Method *target, MtableEntry &entry, int depth) {
-  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
-    tty->print("insert %s", m->name_and_sig_as_C_string());
-    tty->print_cr("");
-    print_mtable();
-    tty->print_cr("");
-  }
-
   if (entry.slots[0]._bits == 0) {
     entry.slots[0]._address = m;
     entry.slots[1]._address = target;
@@ -1465,13 +1458,6 @@ void klassItable::mtable_sub_insert(Method* m, Method *target, MtableEntry &entr
   }
 
  done: asm("nop");
-
-  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
-    tty->print_cr("");
-    print_mtable();
-    tty->print_cr("----------------------------------------------------------------");
-  }
-
 }
 
 static int count_subtable_entries(Klass *klass, GrowableArray<MtableEntry>* table) {
@@ -1507,14 +1493,12 @@ static int count_subtable_entries(Klass *klass) {
 
 static int walk_mtable(Klass *klass, MtableEntry *result, int &index,
                        MtableEntry *in, int in_length, bool top) {
-  bool acted = false;
   int i = 0;
-  for (;;) {
-    while (! in[i].exists() && i < in_length)  i++;
+  for (int i = 0; ; i++) {
+    while (! in[i].has_sub_table() && i < in_length)  i++;
     if (i >= in_length)  break;
 
-    if (in[i].has_sub_table()) {
-      acted = true;
+    {
       GrowableArray<MtableEntry>* growable = in[i].as_GrowableArray();
       int sub_index = walk_mtable(klass, result, index, growable->adr_at(0), growable->length(), /*top*/false);
       MtableEntry rewritten = in[i];
@@ -1522,7 +1506,6 @@ static int walk_mtable(Klass *klass, MtableEntry *result, int &index,
       rewritten.slots[1]._bits |= 2;
       in[i] = rewritten;
     }
-    i++;
   }
 
   int written = index;
@@ -1530,7 +1513,6 @@ static int walk_mtable(Klass *klass, MtableEntry *result, int &index,
     for (int i = 0; i < in_length; i++) {
       if (in[i].slots[0]._bits != 0) {
         result[index++] = in[i];
-        acted = true;
       }
     }
   }
@@ -1543,10 +1525,10 @@ MtableEntry *klassItable::finalize_mtable() {
 
   if (total_size == 0)  return nullptr;
 
-  if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
-    ResourceMark rm;
-    tty->print_cr("finalize %s total_size=%d", _klass->external_name(), total_size);
-  }
+  // if (_klass->name()->equals("java/util/ImmutableCollections$Set12")) {
+  //   ResourceMark rm;
+  //   tty->print_cr("finalize %s total_size=%d", _klass->external_name(), total_size);
+  // }
   Array<MtableEntry> *result = _klass->_mtable_expansion;
   if (result == nullptr && total_size) {
     _klass->_mtable_expansion = result =

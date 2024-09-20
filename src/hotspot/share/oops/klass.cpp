@@ -1279,13 +1279,17 @@ void Klass::on_secondary_supers_verification_failure(Klass* super, Klass* sub, b
         sub->is_subtype_of(super), linear_result, table_result);
 }
 
+int depth_count[8];
+
 Method *Klass::runtime_lookup_interface_method(Method *interface_method) {
-  const uint64_t hash_code = interface_method->compute_hash_code();
+  int depth = 0;
+  const uint64_t hash_code = interface_method->hash_code();
   int index = hash_code >> (64 - exact_log2(16));
   MtableEntry e = _mtable[index];
   if (e.has_sub_table())
     goto subtable;
 
+  depth_count[depth]++;
   if (e.slots[0]._method == interface_method) { // Got it in one!
     return e.slots[1]._method;
   } else {
@@ -1295,12 +1299,16 @@ Method *Klass::runtime_lookup_interface_method(Method *interface_method) {
  subtable:
   auto hash = hash_code << exact_log2(16);
   do {
+    depth++;
     uint64_t bitmask = e.slots[0]._bits;
     MtableEntry *next = e.as_Array();
     index = hash >> (64 - exact_log2(64));
-    int slot = population_count(bitmask << (64 - 1 - index)) - 1;
+    uint64_t shifted_bitmask = bitmask << (64 - 1 - index);
+    if (shifted_bitmask >> 63 == 0)  return nullptr;  // She's not there
+    int slot = population_count(shifted_bitmask) - 1;
     e = next[slot];
     if (! e.has_sub_table()) {
+      depth_count[depth]++;
       if (e.slots[0]._method == interface_method) {
         return e.slots[1]._method;
       } else {
