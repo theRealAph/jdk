@@ -149,11 +149,6 @@ public class VirtualCalls {
         }
     }
 
-    final int asLength = 5;
-    public FirstClass[] as = new FirstClass[asLength];
-    public FirstClassDontInline[] noninlined = new FirstClassDontInline[asLength];
-
-
     @Setup
     public void setupSubclass() {
         as[0] = new FirstClass();
@@ -169,18 +164,16 @@ public class VirtualCalls {
         noninlined[4] = new FifthClassDontInline();
     }
 
-    int l = 0;
-
         /** Tests single base class method call */
     @Benchmark
-    public int testCall(Blackhole bh) {
-        FirstClassDontInline ai = noninlined[l];
+    public int testIfaceCall(Blackhole bh) {
+        FirstInterface ai = noninlined[l];
         l = ++ l % asLength;
         return ai.getIntFirst();
     }
 
     /**
-     * Call address computation within loop but the receiver preexists
+     * Interface call address computation within loop but the receiver preexists
      * the loop and the ac can be moved outside of the loop
      */
     @Benchmark
@@ -206,22 +199,22 @@ public class VirtualCalls {
 
     @Benchmark
     public int test2ndClass2Types() {
-        SecondClass ai = (SecondClass) as[l+1];
+        SecondClass ai = (SecondClass) as[l];
         l = 1 - l;
         return ai.getIntSecond();
     }
 
     @Benchmark
     public int test2ndClass3Types() {
-        SecondClass ai = (SecondClass) as[l+1];
+        SecondClass ai = (SecondClass) as[l];
         l = ++ l % 3;
         return ai.getIntSecond();
     }
 
     @Benchmark
-    public int test2ndClass4Types() {
-        SecondClass ai = (SecondClass) as[l+1];
-        l = l % 4;
+    public int test2ndInt5Types() {
+        SecondClass ai = (SecondClass) as[l];
+        l = ++ l % asLength;
         return ai.getIntSecond();
     }
 }
