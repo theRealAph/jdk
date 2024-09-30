@@ -143,6 +143,7 @@ class Klass : public Metadata {
   Klass*      _secondary_super_cache;
   // Array of all secondary supertypes
   Array<Klass*>* _secondary_supers;
+  Array<void*> *_secondary_extras;
   // Ordered list of all primary supertypes
   Klass*      _primary_supers[_primary_super_limit];
   // java/lang/Class instance mirroring this class
@@ -427,6 +428,7 @@ protected:
   static ByteSize primary_supers_offset()        { return byte_offset_of(Klass, _primary_supers); }
   static ByteSize secondary_super_cache_offset() { return byte_offset_of(Klass, _secondary_super_cache); }
   static ByteSize secondary_supers_offset()      { return byte_offset_of(Klass, _secondary_supers); }
+  static ByteSize secondary_extras_offset()      { return byte_offset_of(Klass, _secondary_supers); }
   static ByteSize java_mirror_offset()           { return byte_offset_of(Klass, _java_mirror); }
   static ByteSize class_loader_data_offset()     { return byte_offset_of(Klass, _class_loader_data); }
   static ByteSize modifier_flags_offset()        { return byte_offset_of(Klass, _modifier_flags); }
@@ -744,6 +746,7 @@ public:
   virtual void oop_print_on      (oop obj, outputStream* st);
 
   void print_secondary_supers_on(outputStream* st) const;
+  void print_secondary_extras_on(outputStream* st) const;
 
   virtual const char* internal_name() const = 0;
 

@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+
 #include "cds/archiveHeapLoader.hpp"
 #include "cds/cdsConfig.hpp"
 #include "cds/heapShared.hpp"
@@ -465,6 +466,7 @@ Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
 #endif
 
   bitmap = hash_secondary_supers(secondary_supers, /*rewrite=*/true); // rewrites freshly allocated array
+
   return secondary_supers;
 }
 
@@ -574,6 +576,14 @@ void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interf
     uintx bitmap = 0;
     Array<Klass*>* s2 = pack_secondary_supers(class_loader_data(), primaries, secondaries, bitmap, CHECK);
     set_secondary_supers(s2, bitmap);
+    if (_secondary_extras == nullptr) {
+      _secondary_extras
+        = MetadataFactory::new_array<void*>(class_loader_data(), s2->length() * 2, CHECK);
+      for (int i = 0; i < s2->length(); i++) {
+        _secondary_extras->at_put(i * 2, s2->at(i));
+      }
+      asm("nop");
+    }
   }
 }
 
@@ -1281,6 +1291,18 @@ void Klass::print_secondary_supers_on(outputStream* st) const {
     }
   } else {
     st->print("null");
+  }
+}
+
+void Klass::print_secondary_extras_on(outputStream* st) const {
+  if (_secondary_extras != nullptr) {
+    int num_of_extras = _secondary_extras->length();
+
+    for (int i = 0; i < num_of_extras; i += 2) {
+      Klass* secondary_super = (Klass*)_secondary_extras->at(i);
+      st->print("    - %s: 0x%lx\n", secondary_super->name()->as_C_string(),
+                (unsigned long)_secondary_extras->at(i + 1));
+    }
   }
 }
 

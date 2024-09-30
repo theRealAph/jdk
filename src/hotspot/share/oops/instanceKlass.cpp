@@ -3520,6 +3520,7 @@ void InstanceKlass::print_on(outputStream* st) const {
   st->print(BULLET"trans. interfaces: "); transitive_interfaces()->print_value_on(st); st->cr();
 
   st->print(BULLET"secondary supers: "); secondary_supers()->print_value_on(st); st->cr();
+  st->print(BULLET"secondary extras: "); _secondary_extras->print_value_on(st); st->cr();
 
   st->print(BULLET"hash_slot:         %d", hash_slot()); st->cr();
   st->print(BULLET"secondary bitmap: " UINTX_FORMAT_X_0, _secondary_supers_bitmap); st->cr();
@@ -3540,6 +3541,10 @@ void InstanceKlass::print_on(outputStream* st) const {
         st->print_cr(" %p %s", secondary_super, secondary_super->external_name());
       }
     }
+  }
+  if (_secondary_extras != nullptr) {
+    st->print_cr(BULLET"---- secondary extras (%d words):", _secondary_extras->length());
+    print_secondary_extras_on(st);
   }
   st->print(BULLET"constants:         "); constants()->print_value_on(st);         st->cr();
 

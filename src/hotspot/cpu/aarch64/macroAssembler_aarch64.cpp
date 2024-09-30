@@ -1459,11 +1459,12 @@ void MacroAssembler::check_klass_subtype_fast_path(Register sub_klass,
 // scans count pointer sized words at [addr] for occurrence of value,
 // generic
 void MacroAssembler::repne_scan(Register addr, Register value, Register count,
-                                Register scratch) {
+                                Register scratch, int inc) {
   Label Lloop, Lexit;
   cbz(count, Lexit);
   bind(Lloop);
-  ldr(scratch, post(addr, wordSize));
+  ldr(scratch, Address(addr));
+  lea(addr, Address(addr, inc));
   cmp(value, scratch);
   br(EQ, Lexit);
   sub(count, count, 1);
@@ -1733,7 +1734,8 @@ bool MacroAssembler::lookup_secondary_supers_table_const(Register r_sub_klass,
   // NB! r_array_index is off by 1. It is compensated by keeping r_array_base off by 1 word.
 
   // We will consult the secondary-super array.
-  ldr(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_supers_offset())));
+  ldr(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_extras_offset())));
+  lea(r_array_base, Address(r_array_base, -wordSize));
 
   // The value i in r_array_index is >= 1, so even though r_array_base
   // points to the length, we don't need to adjust it to point to the
@@ -1741,7 +1743,8 @@ bool MacroAssembler::lookup_secondary_supers_table_const(Register r_sub_klass,
   assert(Array<Klass*>::base_offset_in_bytes() == wordSize, "Adjust this code");
   assert(Array<Klass*>::length_offset_in_bytes() == 0, "Adjust this code");
 
-  ldr(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
+  lea(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord * 2)));
+  ldr(result, Address(result));
   eor(result, result, r_super_klass);
   cbz(result, L_fallthrough); // Found a match
 
@@ -1853,9 +1856,12 @@ void MacroAssembler::lookup_secondary_supers_table_var(Register r_sub_klass,
   assert(Array<Klass*>::length_offset_in_bytes() == 0, "Adjust this code");
 
   // We will consult the secondary-super array.
-  ldr(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_supers_offset())));
+  ldr(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_extras_offset())));
+  lea(r_array_base, Address(r_array_base, -wordSize));
 
-  ldr(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
+  // lea(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord * 2)));
+  add(result, r_array_base, r_array_index, ext::uxtx, LogBytesPerWord * 2);
+  ldr(result, Address(result));
   eor(result, result, r_super_klass);
   cbz(result, L_success ? *L_success : L_fallthrough); // Found a match
 
@@ -1938,7 +1944,8 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     cmp(r_array_index, r_array_length);
     csel(r_array_index, zr, r_array_index, GE);
 
-    ldr(rscratch1, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
+    lea(rscratch1, Address(r_array_base, r_array_index, Address::lsl(2 * LogBytesPerWord)));
+    ldr(rscratch1, Address(rscratch1));
     eor(result, rscratch1, r_super_klass);
     cbz(result, L_fallthrough);
 
@@ -1955,7 +1962,7 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     // complexity?
     bind(L_huge);
     cmp(sp, zr); // Clear Z flag; SP is never zero
-    repne_scan(r_array_base, r_super_klass, r_array_length, rscratch1);
+    repne_scan(r_array_base, r_super_klass, r_array_length, rscratch1, 2 * wordSize);
     cset(result, NE); // result == 0 iff we got a match.
   }
 
@@ -1989,7 +1996,7 @@ void MacroAssembler::verify_secondary_supers_table(Register r_sub_klass,
   cmp(sp, zr); // Clear Z flag; SP is never zero
   // Scan R2 words at [R5] for an occurrence of R0.
   // Set NZ/Z based on last compare.
-  repne_scan(/*addr*/r_array_base, /*value*/r_super_klass, /*count*/r_array_length, rscratch2);
+  repne_scan(/*addr*/r_array_base, /*value*/r_super_klass, /*count*/r_array_length, rscratch2, wordSize);
   // rscratch1 == 0 iff we got a match.
   cset(rscratch1, NE);
 
