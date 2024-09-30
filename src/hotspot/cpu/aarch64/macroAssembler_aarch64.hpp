@@ -1044,7 +1044,9 @@ public:
                                          Register temp3,
                                          FloatRegister vtemp,
                                          Register result,
-                                         Label *L_success);
+                                         Label *L_success,
+                                         int offset = 0,
+                                         int step = 1);
 
 
   // As above, but with a constant super_klass.
@@ -1071,7 +1073,8 @@ public:
                                                Register r_bitmap,
                                                Register temp1,
                                                Register result,
-                                               bool is_stub = true);
+                                               bool is_stub = true,
+                                               int step = 1);
 
   // Simplified, combined version, good for typical uses.
   // Falls through on failure.
