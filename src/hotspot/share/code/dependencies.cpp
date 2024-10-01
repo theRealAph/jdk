@@ -1975,7 +1975,9 @@ Method* Dependencies::find_unique_concrete_method(InstanceKlass* ctxk, Method* m
     return m; // nothing to do: no witness under ctxk
   }
   LinkedConcreteMethodFinder wf(InstanceKlass::cast(resolved_klass), resolved_method);
-  assert(Dependencies::verify_method_context(ctxk, m), "proper context");
+  if (!(Dependencies::verify_method_context(ctxk, m))) {
+    assert(Dependencies::verify_method_context(ctxk, m), "proper context");
+  }
   wf.record_witnesses(1);
   Klass* wit = wf.find_witness(ctxk);
   if (wit != nullptr) {
