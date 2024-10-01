@@ -401,9 +401,10 @@ protected:
   static uintx hash_secondary_supers(Array<Klass*>* secondaries, bool rewrite);
 
   bool search_secondary_supers(Klass* k) const;
+  int lookup_secondary_supers_index(Klass *k) const;
   bool lookup_secondary_supers_table(Klass *k) const;
-  bool linear_search_secondary_supers(const Klass* k) const;
-  bool fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const;
+  int linear_search_secondary_supers(const Klass* k) const;
+  int fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const;
 
  public:
   // Secondary supers table support

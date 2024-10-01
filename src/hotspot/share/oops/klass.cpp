@@ -164,7 +164,7 @@ void Klass::release_C_heap_structures(bool release_constant_pool) {
   if (_name != nullptr) _name->decrement_refcount();
 }
 
-bool Klass::linear_search_secondary_supers(const Klass* k) const {
+int Klass::linear_search_secondary_supers(const Klass* k) const {
   // Scan the array-of-objects for a match
   // FIXME: We could do something smarter here, maybe a vectorized
   // comparison or a binary search, but is that worth any added
@@ -172,16 +172,16 @@ bool Klass::linear_search_secondary_supers(const Klass* k) const {
   int cnt = secondary_supers()->length();
   for (int i = 0; i < cnt; i++) {
     if (secondary_supers()->at(i) == k) {
-      return true;
+      return i;
     }
   }
-  return false;
+  return -1;
 }
 
 // Given a secondary superklass k, an initial array index, and an
 // occupancy bitmap rotated such that Bit 1 is the next bit to test,
 // search for k.
-bool Klass::fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const {
+int Klass::fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const {
   if (secondary_supers()->length() > SECONDARY_SUPERS_TABLE_SIZE - 2) {
     return linear_search_secondary_supers(k);
   }
@@ -197,11 +197,11 @@ bool Klass::fallback_search_secondary_supers(const Klass* k, int index, uintx ro
       index = 0;
     }
     if (secondary_supers()->at(index) == k) {
-      return true;
+      return index;
     }
     rotated_bitmap = rotate_right(rotated_bitmap, 1);
   }
-  return false;
+  return -1;
 }
 
 // Return self, except for abstract classes with exactly 1
@@ -330,6 +330,14 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
   _secondary_supers_bitmap = bitmap;
   _secondary_supers = secondaries;
 
+  if (secondaries && _secondary_extras == nullptr) {
+    _secondary_extras
+      = MetadataFactory::new_array<void*>(class_loader_data(), secondaries->length() * 2, JavaThread::current());
+    for (int i = 0; i < secondaries->length(); i++) {
+      _secondary_extras->at_put(i * 2, secondaries->at(i));
+    }
+    asm("nop");
+  }
   if (secondaries != nullptr) {
     LogMessage(class, load) msg;
     NonInterleavingLogStream log {LogLevel::Debug, msg};
@@ -1296,6 +1304,7 @@ void Klass::print_secondary_supers_on(outputStream* st) const {
 
 void Klass::print_secondary_extras_on(outputStream* st) const {
   if (_secondary_extras != nullptr) {
+    ResourceMark rm;
     int num_of_extras = _secondary_extras->length();
 
     for (int i = 0; i < num_of_extras; i += 2) {

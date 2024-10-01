@@ -32,7 +32,7 @@
 #include "metaprogramming/primitiveConversions.hpp"
 
 #ifndef PRODUCT
-const uintptr_t Assembler::asm_bp = 0x0000ffffac221240;
+const uintptr_t Assembler::asm_bp = 0xffffe86b94b0;
 #endif
 
 static float unpack(unsigned value);

@@ -1779,6 +1779,10 @@ bool MacroAssembler::lookup_secondary_supers_table_const(Register r_sub_klass,
   return true;
 }
 
+void foo() {
+  asm("nop");
+}
+
 // At runtime, return 0 in result if r_super_klass is a superclass of
 // r_sub_klass, otherwise return nonzero. Use this version of
 // lookup_secondary_supers_table() if you don't know ahead of time
@@ -1805,16 +1809,21 @@ void MacroAssembler::lookup_secondary_supers_table_var(Register r_sub_klass,
     slot          = rscratch1,
     r_bitmap      = rscratch2;
 
+  enter();
+  call_VM_leaf_base(CAST_FROM_FN_PTR(address, &foo), 0);
+  leave();
+
   ldrb(slot, Address(r_super_klass, Klass::hash_slot_offset()));
 
   // Make sure that result is nonzero if the test below misses.
   mov(result, 1);
 
   if (offset == 0) {
-    offset = (int)Klass::secondary_supers_bitmap_offset();
+    offset = in_bytes(Klass::secondary_extras_offset());
+    step = 2;
   }
 
-  ldr(r_bitmap, Address(r_sub_klass, offset));
+  ldr(r_bitmap, Address(r_sub_klass, Klass::secondary_supers_bitmap_offset()));
 
   // First check the bitmap to see if super_klass might be present. If
   // the bit is zero, we are certain that super_klass is not one of
@@ -1858,11 +1867,15 @@ void MacroAssembler::lookup_secondary_supers_table_var(Register r_sub_klass,
   assert(Array<Klass*>::base_offset_in_bytes() == wordSize, "Adjust this code");
   assert(Array<Klass*>::length_offset_in_bytes() == 0, "Adjust this code");
 
-  ldr(r_array_base, Address(r_sub_klass, in_bytes(Klass::secondary_supers_offset())));
+  ldr(r_array_base, Address(r_sub_klass, offset));
   if (step != 1) {
     lsl(r_array_index, r_array_index, exact_log2(step));
+    // Kludge the base pointer
+    sub(result, r_array_base, (step - 1) * wordSize);
+    ldr(result, Address(result, r_array_index, Address::lsl(LogBytesPerWord)));
+  } else {
+    ldr(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
   }
-  ldr(result, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
   eor(result, result, r_super_klass);
   cbz(result, L_success ? *L_success : L_fallthrough); // Found a match
 
@@ -1927,7 +1940,7 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
   // The bitmap is full to bursting.
   // Implicit invariant: BITMAP_FULL implies (length > 0)
   assert(Klass::SECONDARY_SUPERS_BITMAP_FULL == ~uintx(0), "");
-  cmpw(r_array_length, (u1)(Klass::SECONDARY_SUPERS_TABLE_SIZE - 2));
+  cmpw(r_array_length, checked_cast<u1>((Klass::SECONDARY_SUPERS_TABLE_SIZE - 2) * step));
   br(GT, L_huge);
 
   // NB! Our caller has checked bits 0 and 1 in the bitmap. The

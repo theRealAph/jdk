@@ -90,7 +90,7 @@ inline bool Klass::is_subtype_of(Klass* k) const {
 }
 
 // Hashed search for secondary super k.
-inline bool Klass::lookup_secondary_supers_table(Klass* k) const {
+inline int Klass::lookup_secondary_supers_index(Klass* k) const {
   uintx bitmap = _secondary_supers_bitmap;
 
   constexpr int highest_bit_number = SECONDARY_SUPERS_TABLE_SIZE - 1;
@@ -110,7 +110,7 @@ inline bool Klass::lookup_secondary_supers_table(Klass* k) const {
   int index = population_count(shifted_bitmap) - 1;
   if (secondary_supers()->at(index) == k) {
     // Yes! It worked the first time.
-    return true;
+    return index;
   }
 
   // Is there another entry to check? Consult the bitmap. If Bit 1,
@@ -118,11 +118,15 @@ inline bool Klass::lookup_secondary_supers_table(Klass* k) const {
   // not one of the secondary supers.
   bitmap = rotate_right(bitmap, slot);
   if ((bitmap & 2) == 0) {
-    return false;
+    return -1;
   }
 
   // Continue probing the hash table
   return fallback_search_secondary_supers(k, index, bitmap);
+}
+
+inline bool Klass::lookup_secondary_supers_table(Klass* k) const {
+  return lookup_secondary_supers_index(k) >= 0;
 }
 
 inline bool Klass::search_secondary_supers(Klass *k) const {
