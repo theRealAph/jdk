@@ -103,7 +103,7 @@ inline int Klass::lookup_secondary_supers_index(Klass* k) const {
   // the bit is zero, we are certain that super_klass is not one of
   // the secondary supers.
   if (((shifted_bitmap >> highest_bit_number) & 1) == 0) {
-    return false;
+    return -1;
   }
 
   // Calculate the initial hash probe
