@@ -766,6 +766,7 @@ AdapterHandlerEntry* SharedRuntime::generate_i2c2i_adapters(MacroAssembler *masm
 
     __ load_method_holder(rscratch2, rmethod);
     __ clinit_barrier(rscratch2, rscratch1, &L_skip_barrier);
+    __ set_last_Java_frame(sp, rfp, __ pc(), rscratch1);
     __ far_jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub()));
 
     __ bind(L_skip_barrier);
@@ -1575,6 +1576,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     Label L_skip_barrier;
     __ mov_metadata(rscratch2, method->method_holder()); // InstanceKlass*
     __ clinit_barrier(rscratch2, rscratch1, &L_skip_barrier);
+    __ set_last_Java_frame(sp, rfp, __ pc(), rscratch1);
     __ far_jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub()));
 
     __ bind(L_skip_barrier);

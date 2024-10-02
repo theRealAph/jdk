@@ -400,11 +400,11 @@ protected:
   static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap);
   static uintx hash_secondary_supers(Array<Klass*>* secondaries, bool rewrite);
 
-  bool search_secondary_supers(Klass* k) const;
   int lookup_secondary_supers_index(Klass *k) const;
+  int fallback_search_secondary_supers_index(const Klass* k, int index, uintx rotated_bitmap) const;
+  bool search_secondary_supers(Klass* k) const;
   bool lookup_secondary_supers_table(Klass *k) const;
-  int linear_search_secondary_supers(const Klass* k) const;
-  int fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const;
+  bool linear_search_secondary_supers(const Klass* k) const;
 
  public:
   // Secondary supers table support
@@ -731,6 +731,8 @@ public:
   // klass name
   Symbol* name() const                   { return _name; }
   void set_name(Symbol* n);
+
+  void set_secondary_extra(Klass *interf, ptrdiff_t offset);
 
   virtual void release_C_heap_structures(bool release_constant_pool = true);
 

@@ -303,6 +303,7 @@ void LIR_Assembler::clinit_barrier(ciMethod* method) {
 
   __ mov_metadata(rscratch2, method->holder()->constant_encoding());
   __ clinit_barrier(rscratch2, rscratch1, &L_skip_barrier /*L_fast_path*/);
+  __ set_last_Java_frame(sp, rfp, __ pc(), rscratch1);
   __ far_jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub()));
   __ bind(L_skip_barrier);
 }

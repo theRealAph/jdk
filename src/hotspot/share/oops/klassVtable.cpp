@@ -1486,10 +1486,12 @@ class SetupItableClosure : public InterfaceVisiterClosure  {
  private:
   itableOffsetEntry* _offset_entry;
   itableMethodEntry* _method_entry;
+  Klass*             _klass;
   address            _klass_begin;
  public:
-  SetupItableClosure(address klass_begin, itableOffsetEntry* offset_entry, itableMethodEntry* method_entry) {
-    _klass_begin  = klass_begin;
+  SetupItableClosure(Klass *klass, itableOffsetEntry* offset_entry, itableMethodEntry* method_entry) {
+    _klass        = klass;
+    _klass_begin  = (address)klass;
     _offset_entry = offset_entry;
     _method_entry = method_entry;
   }
@@ -1498,6 +1500,7 @@ class SetupItableClosure : public InterfaceVisiterClosure  {
 
   void doit(InstanceKlass* intf, int method_count) {
     int offset = int(((address)_method_entry) - _klass_begin);
+    _klass->set_secondary_extra(intf, offset);
     _offset_entry->initialize(intf, offset);
     _offset_entry++;
     _method_entry += method_count;
@@ -1542,7 +1545,7 @@ void klassItable::setup_itable_offset_table(InstanceKlass* klass) {
   assert((oop*)(end) == (oop*)(ime + nof_methods),                      "wrong offset calculation (2)");
 
   // Visit all interfaces and initialize itable offset table
-  SetupItableClosure sic((address)klass, ioe, ime);
+  SetupItableClosure sic(klass, ioe, ime);
   visit_all_interfaces(klass->transitive_interfaces(), &sic);
 
 #ifdef ASSERT

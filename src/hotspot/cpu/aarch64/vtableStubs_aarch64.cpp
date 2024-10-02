@@ -137,6 +137,10 @@ VtableStub* VtableStubs::create_vtable_stub(int vtable_index) {
 }
 
 
+void foo() {
+  asm("nop");
+}
+
 VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
   const int stub_code_length = code_size_limit(false);
@@ -177,7 +181,9 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   const Register holder_klass_reg   = r16; // declaring interface klass (DEFC)
   const Register resolved_klass_reg = r17; // resolved interface klass (REFC)
   const Register temp_reg           = r11;
-  const Register temp_reg2          = r15;
+  const Register temp_reg2          = r13;
+  const Register temp_reg3          = r14;
+  const Register temp_reg4          = r15;
   const Register icdata_reg         = rscratch2;
 
   Label L_no_such_interface;
@@ -191,13 +197,18 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   address npe_addr = __ pc();
   __ load_klass(recv_klass_reg, j_rarg0);
 
+  __ enter();
+  __ call_VM_leaf(CAST_FROM_FN_PTR(address, &foo), 0);
+  __ leave();
+
   // Receiver subtype check against REFC.
   // Get selected method from declaring class and itable index
   __ lookup_interface_method_stub(recv_klass_reg, holder_klass_reg, resolved_klass_reg, rmethod,
-                                  temp_reg, temp_reg2, itable_index, L_no_such_interface);
+                                  temp_reg, temp_reg2, temp_reg3, temp_reg4,
+                                  itable_index, L_no_such_interface);
 
   // Reduce "estimate" such that "padding" does not drop below 8.
-  const ptrdiff_t estimate = 144;
+  const ptrdiff_t estimate = 512;
   const ptrdiff_t codesize = __ pc() - start_pc;
   slop_delta  = (int)(estimate - codesize);
   slop_bytes += slop_delta;
@@ -227,6 +238,7 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   // wrong method" stub, and so let the interpreter runtime do all the
   // dirty work.
   assert(SharedRuntime::get_handle_wrong_method_stub() != nullptr, "check initialization order");
+  __ set_last_Java_frame(sp, rfp, __ pc(), rscratch1);
   __ far_jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub()));
 
   masm->flush();

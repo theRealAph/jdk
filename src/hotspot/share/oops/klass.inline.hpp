@@ -122,7 +122,7 @@ inline int Klass::lookup_secondary_supers_index(Klass* k) const {
   }
 
   // Continue probing the hash table
-  return fallback_search_secondary_supers(k, index, bitmap);
+  return fallback_search_secondary_supers_index(k, index, bitmap);
 }
 
 inline bool Klass::lookup_secondary_supers_table(Klass* k) const {
@@ -140,6 +140,8 @@ inline bool Klass::search_secondary_supers(Klass *k) const {
   if (VerifySecondarySupers) {
     bool linear_result = linear_search_secondary_supers(k);
     if (linear_result != result) {
+      result = lookup_secondary_supers_table(k);
+      linear_result = linear_search_secondary_supers(k);
       on_secondary_supers_verification_failure((Klass*)this, k, linear_result, result, "mismatch");
     }
   }

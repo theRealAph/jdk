@@ -164,7 +164,7 @@ void Klass::release_C_heap_structures(bool release_constant_pool) {
   if (_name != nullptr) _name->decrement_refcount();
 }
 
-int Klass::linear_search_secondary_supers(const Klass* k) const {
+bool Klass::linear_search_secondary_supers(const Klass* k) const {
   // Scan the array-of-objects for a match
   // FIXME: We could do something smarter here, maybe a vectorized
   // comparison or a binary search, but is that worth any added
@@ -172,16 +172,16 @@ int Klass::linear_search_secondary_supers(const Klass* k) const {
   int cnt = secondary_supers()->length();
   for (int i = 0; i < cnt; i++) {
     if (secondary_supers()->at(i) == k) {
-      return i;
+      return true;
     }
   }
-  return -1;
+  return false;
 }
 
 // Given a secondary superklass k, an initial array index, and an
 // occupancy bitmap rotated such that Bit 1 is the next bit to test,
 // search for k.
-int Klass::fallback_search_secondary_supers(const Klass* k, int index, uintx rotated_bitmap) const {
+int Klass::fallback_search_secondary_supers_index(const Klass* k, int index, uintx rotated_bitmap) const {
   if (secondary_supers()->length() > SECONDARY_SUPERS_TABLE_SIZE - 2) {
     return linear_search_secondary_supers(k);
   }
@@ -347,6 +347,14 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
       print_secondary_supers_on(&log);
     }
   }
+}
+
+void Klass::set_secondary_extra(Klass *interf, ptrdiff_t offset) {
+  int i = lookup_secondary_supers_index(interf);
+  assert(i >= 0, "must be");
+  assert(_secondary_extras->at(i * 2) == interf, "must be");
+  _secondary_extras->at_put(i * 2, interf);
+  _secondary_extras->at_put(i * 2 + 1, (Klass *)offset);
 }
 
 // Hashed secondary superclasses
