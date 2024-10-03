@@ -119,8 +119,8 @@ int VtableStubs::_itab_stub_size = 0;
   // Solaris-sparc:   792     348
   // x86 (Linux):     670     309
   // x86 (MacOS):     682     321
-  static const int first_vtableStub_size = 1024;
-  static const int first_itableStub_size =  512;
+  static const int first_vtableStub_size = 4096;
+  static const int first_itableStub_size = 4096;
 #endif
 
 

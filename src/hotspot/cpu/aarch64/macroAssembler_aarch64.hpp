@@ -968,6 +968,17 @@ public:
                                Label& no_such_interface,
                                bool return_method = true);
 
+  void new_lookup_interface_method_stub(Register recv_klass,
+                                    Register holder_klass,
+                                    Register resolved_klass,
+                                    Register method_result,
+                                    Register temp_itbl_klass,
+                                    Register scan_temp,
+                                    Register temp_reg3,
+                                    Register temp_reg4,
+                                    int itable_index,
+                                    Label& L_no_such_interface);
+
   void lookup_interface_method_stub(Register recv_klass,
                                     Register holder_klass,
                                     Register resolved_klass,
@@ -976,6 +987,15 @@ public:
                                     Register scan_temp,
                                     Register temp_reg3,
                                     Register temp_reg4,
+                                    int itable_index,
+                                    Label& L_no_such_interface);
+
+  void old_lookup_interface_method_stub(Register recv_klass,
+                                    Register holder_klass,
+                                    Register resolved_klass,
+                                    Register method_result,
+                                    Register temp_itbl_klass,
+                                    Register scan_temp,
                                     int itable_index,
                                     Label& L_no_such_interface);
 

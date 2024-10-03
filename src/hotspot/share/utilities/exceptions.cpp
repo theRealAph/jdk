@@ -189,6 +189,13 @@ void Exceptions::_throw(JavaThread* thread, const char* file, int line, Handle h
 
 void Exceptions::_throw_msg(JavaThread* thread, const char* file, int line, Symbol* name, const char* message,
                             Handle h_loader, Handle h_protection_domain) {
+  {
+    ResourceMark rm;
+    auto name_str = name->as_C_string();
+    if (strcmp(name_str, "java/lang/IllegalAccessError")) {
+      asm("nop");
+    }
+  }
   // Check for special boot-strapping/compiler-thread handling
   if (special_exception(thread, file, line, Handle(), name, message)) return;
   // Create and throw exception

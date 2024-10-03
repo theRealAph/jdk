@@ -143,7 +143,7 @@ void foo() {
 
 VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
-  const int stub_code_length = code_size_limit(false);
+  const int stub_code_length = 4096; // code_size_limit(false);
   VtableStub* s = new(stub_code_length) VtableStub(false, itable_index);
   // Can be null if there is no free space in the code cache.
   if (s == nullptr) {
@@ -208,7 +208,7 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
                                   itable_index, L_no_such_interface);
 
   // Reduce "estimate" such that "padding" does not drop below 8.
-  const ptrdiff_t estimate = 512;
+  const ptrdiff_t estimate = 1024;
   const ptrdiff_t codesize = __ pc() - start_pc;
   slop_delta  = (int)(estimate - codesize);
   slop_bytes += slop_delta;
