@@ -3474,6 +3474,10 @@ void nmethod::decode2(outputStream* ost) const {
 #endif
 
 #if defined(SUPPORT_ABSTRACT_ASSEMBLY)
+  // if (getenv("APH_FOO_BAR")) {
+  //   st = tty;
+  // }
+
   //---<  abstract disassembly with comments and section headers merged in  >---
   if (compressed_with_comments) {
     const_cast<nmethod*>(this)->print_constant_pool(st);
@@ -3496,8 +3500,10 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
+        if (AbstractDisassembler::pd_format())  st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
+
 
       //---<  Code comment for current instruction. Address range [p..(p+len))  >---
       unsigned char* p_end = p + (ssize_t)instruction_size_in_bytes;
@@ -3518,12 +3524,17 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
+        if (AbstractDisassembler::pd_format())  st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
 
       //---<  Nicely align instructions for readability  >---
-      if (compressed_format_idx > 1) {
+      if (! AbstractDisassembler::pd_format() && compressed_format_idx > 1) {
         Disassembler::print_delimiter(st);
+      }
+
+      if (AbstractDisassembler::pd_format() && compressed_format_idx > 1) {
+        st->print(", "); // ...
       }
 
       //---<  Now, finally, print the actual instruction bytes  >---
@@ -3687,7 +3698,7 @@ void nmethod::print_nmethod_labels(outputStream* stream, address block_begin, bo
     const char* label = nmethod_section_label(block_begin);
     if (label != nullptr) {
       stream->bol();
-      stream->print_cr("%s", label);
+      stream->print_cr("%s %s", Disassembler::pd_comment_prefix(), label);
     }
   }
 
@@ -3802,6 +3813,11 @@ bool nmethod::has_code_comment(address begin, address end) {
 }
 
 void nmethod::print_code_comment_on(outputStream* st, int column, address begin, address end) {
+  const char *prefix = ";";
+  if (AbstractDisassembler::pd_format()) {
+    prefix = AbstractDisassembler::pd_comment_prefix();
+  }
+
   ImplicitExceptionTable implicit_table(this);
   int pc_offset = (int)(begin - code_begin());
   int cont_offset = implicit_table.continuation_offset(pc_offset);
@@ -3809,10 +3825,11 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
   if (cont_offset != 0) {
     st->move_to(column, 6, 0);
     if (pc_offset == cont_offset) {
-      st->print("; implicit exception: deoptimizes");
+      st->print("%s implicit exception: deoptimizes", prefix);
       oop_map_required = true;
     } else {
-      st->print("; implicit exception: dispatches to " INTPTR_FORMAT, p2i(code_begin() + cont_offset));
+      st->print("%s implicit exception: dispatches to " INTPTR_FORMAT,
+                prefix, p2i(code_begin() + cont_offset));
     }
   }
 
@@ -3836,7 +3853,7 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
 #endif
         if (is_implicit_deopt ? pc == begin : pc > begin && pc <= end) {
           st->move_to(column, 6, 0);
-          st->print("; ");
+          st->print("%s ", prefix);
           om->print_on(st);
           oop_map_required = false;
         }
@@ -3855,17 +3872,17 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
   if (sd != nullptr) {
     st->move_to(column, 6, 0);
     if (sd->bci() == SynchronizationEntryBCI) {
-      st->print(";*synchronization entry");
+      st->print("%s *synchronization entry", prefix);
     } else if (sd->bci() == AfterBci) {
-      st->print(";* method exit (unlocked if synchronized)");
+      st->print("%s * method exit (unlocked if synchronized)", prefix);
     } else if (sd->bci() == UnwindBci) {
-      st->print(";* unwind (locked if synchronized)");
+      st->print("%s * unwind (locked if synchronized)", prefix);
     } else if (sd->bci() == AfterExceptionBci) {
-      st->print(";* unwind (unlocked if synchronized)");
+      st->print("%s * unwind (unlocked if synchronized)", prefix);
     } else if (sd->bci() == UnknownBci) {
-      st->print(";* unknown");
+      st->print("%s * unknown", prefix);
     } else if (sd->bci() == InvalidFrameStateBci) {
-      st->print(";* invalid frame state");
+      st->print("%s * invalid frame state", prefix);
     } else {
       if (sd->method() == nullptr) {
         st->print("method is nullptr");
@@ -3873,7 +3890,7 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
         st->print("method is native");
       } else {
         Bytecodes::Code bc = sd->method()->java_code_at(sd->bci());
-        st->print(";*%s", Bytecodes::name(bc));
+        st->print("%s *%s", prefix, Bytecodes::name(bc));
         switch (bc) {
         case Bytecodes::_invokevirtual:
         case Bytecodes::_invokespecial:
@@ -3910,7 +3927,7 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
     // Print all scopes
     for (;sd != nullptr; sd = sd->sender()) {
       st->move_to(column, 6, 0);
-      st->print("; -");
+      st->print("%s -", prefix);
       if (sd->should_reexecute()) {
         st->print(" (reexecute)");
       }
@@ -3936,7 +3953,7 @@ void nmethod::print_code_comment_on(outputStream* st, int column, address begin,
   if (str != nullptr) {
     if (sd != nullptr) st->cr();
     st->move_to(column, 6, 0);
-    st->print(";   {%s}", str);
+    st->print("%s   {%s}", prefix, str);
   }
 }
 

@@ -58,6 +58,15 @@ class AbstractDisassembler {
   static bool _show_comment;       // print instruction comments
   static bool _show_block_comment; // print block comments
 
+  static bool _pd_format;      // print in a form suitable for platform assembler
+  static const char *_pd_hex_prefix;
+  static const char *_pd_comment_prefix;
+  static const char *_pd_inline_comment_open;
+  static const char *_pd_inline_comment_close;
+  static const char *_pd_origin_command;
+  static const char *_pd_start_text_command;
+  static const char *_pd_insns_start;
+
  public:
   // Platform-independent location and instruction formatting.
   // All functions return #characters printed.
@@ -65,8 +74,11 @@ class AbstractDisassembler {
   static int  print_instruction(address here, int len, int max_len,    outputStream* st, bool align, bool print_header);
   static int  print_hexdata(address here, int len, outputStream* st, bool print_header = false);
   static int  print_delimiter(outputStream* st);
-  static bool start_newline(int byte_count) { return byte_count >= abstract_instruction_bytes_per_line; }
-
+  static bool start_newline(int byte_count) {
+    int per_line = pd_format() ? abstract_instruction_bytes_per_line/2
+                               : abstract_instruction_bytes_per_line;
+    return byte_count >= per_line;
+  }
   static void toggle_align_instr()        { _align_instr        = !_align_instr; }
   static void toggle_show_pc()            { _show_pc            = !_show_pc; }
   static void toggle_show_offset()        { _show_offset        = !_show_offset; }
@@ -88,6 +100,15 @@ class AbstractDisassembler {
   static bool show_structs()       { return _show_structs; }
   static bool show_comment()       { return _show_comment; }
   static bool show_block_comment() { return _show_block_comment; }
+
+  static bool pd_format()                       { return _pd_format; }
+  static const char *pd_comment_prefix()        { return _pd_comment_prefix; }
+  static const char *pd_hex_prefix()            { return _pd_hex_prefix; }
+  static const char *pd_inline_comment_open()   { return _pd_inline_comment_open; }
+  static const char *pd_inline_comment_close()  { return _pd_inline_comment_close; }
+  static const char *pd_origin_command()        { return _pd_origin_command; }
+  static const char *pd_start_text_command()    { return _pd_start_text_command; }
+  static const char *pd_insns_start()           { return _pd_insns_start; }
 
   // Decodes the one instruction at address start in a platform-independent
   // format. Returns the start of the next instruction (which is

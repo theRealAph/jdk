@@ -261,19 +261,19 @@ void WatcherThread::run() {
       // threads.
 
       for (;;) {
-        // Note: we use naked sleep in this loop because we want to avoid using
-        // any kind of VM infrastructure which may be broken at this point.
-        if (VMError::check_timeout()) {
-          // We hit error reporting timeout. Error reporting was interrupted and
-          // will be wrapping things up now (closing files etc). Give it some more
-          // time, then quit the VM.
-          os::naked_short_sleep(200);
-          // Print a message to stderr.
-          fdStream err(defaultStream::output_fd());
-          err.print_raw_cr("# [ timer expired, abort... ]");
-          // skip atexit/vm_exit/vm_abort hooks
-          os::die();
-        }
+        // // Note: we use naked sleep in this loop because we want to avoid using
+        // // any kind of VM infrastructure which may be broken at this point.
+        // if (VMError::check_timeout()) {
+        //   // We hit error reporting timeout. Error reporting was interrupted and
+        //   // will be wrapping things up now (closing files etc). Give it some more
+        //   // time, then quit the VM.
+        //   os::naked_short_sleep(200);
+        //   // Print a message to stderr.
+        //   fdStream err(defaultStream::output_fd());
+        //   err.print_raw_cr("# [ timer expired, abort... ]");
+        //   // skip atexit/vm_exit/vm_abort hooks
+        //   os::die();
+        // }
 
         // Wait a bit, then recheck for timeout.
         os::naked_short_sleep(250);

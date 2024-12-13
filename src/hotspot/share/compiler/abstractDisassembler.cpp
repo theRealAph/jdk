@@ -44,6 +44,15 @@ bool AbstractDisassembler::_show_offset        = false;
 bool AbstractDisassembler::_show_structs       = true;
 bool AbstractDisassembler::_show_comment       = true;
 bool AbstractDisassembler::_show_block_comment = true;
+bool AbstractDisassembler::_pd_format          = true;
+
+const char * AbstractDisassembler::_pd_hex_prefix = "0x";
+const char * AbstractDisassembler::_pd_comment_prefix = "#";
+const char * AbstractDisassembler::_pd_inline_comment_open = "/* ";
+const char * AbstractDisassembler::_pd_inline_comment_close = "*/ ";
+const char * AbstractDisassembler::_pd_origin_command = ".org";
+const char * AbstractDisassembler::_pd_start_text_command = ".text";
+const char * AbstractDisassembler::_pd_insns_start = ".byte";
 
 // set "true" to see what's in memory bit by bit
 // might prove cumbersome on platforms where instr_len is hard to find out
@@ -56,6 +65,8 @@ bool AbstractDisassembler::_show_bytes         = false;
 //                     caller's responsibility to guarantee proper alignment.
 int AbstractDisassembler::print_location(address here, address begin, address end, outputStream* st, bool align, bool print_header) {
   const int     pos_0  = st->position();
+
+  if (pd_format())  st->print("%s", pd_inline_comment_open());
 
   if (show_pc() || show_offset()) {
     st->print(" ");
@@ -88,6 +99,8 @@ int AbstractDisassembler::print_location(address here, address begin, address en
   if ((show_pc() || show_offset()) && !print_header) {
     st->print(": ");
   }
+
+  if (pd_format())  st->print("%s", pd_inline_comment_close());
 
   if (align) {
     const uint tabspacing  = 8;
@@ -277,6 +290,17 @@ address AbstractDisassembler::decode_instruction_abstract(address start,
                                                                           *abstract_instruction_bytes_per_block;
 
   //---<  print the instruction's bytes  >---
+  if (pd_format()) {
+    for (int i = 1; i <= instruction_size_in_bytes; i++) {
+      ++current;
+      st->print("%s%02x", pd_hex_prefix(), *current);
+      if (i != instruction_size_in_bytes) {
+        st->print(", ");
+      }
+    }
+    return (address) current;
+  }
+
   for (int i = 1; i <= instruction_size_in_bytes; i++) {
     st->print("%02x", *current);
     ++current;
