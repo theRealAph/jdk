@@ -3390,6 +3390,10 @@ void nmethod::decode2(outputStream* ost) const {
   // Make sure we have a valid stream to print on.
   outputStream* st = ost ? ost : tty;
 
+  if (getenv("APH_FOO_BAZ")) {
+    st = tty;
+  }
+
 #if defined(SUPPORT_ABSTRACT_ASSEMBLY) && ! defined(SUPPORT_ASSEMBLY)
   const bool use_compressed_format    = true;
   const bool compressed_with_comments = use_compressed_format && (AbstractDisassembler::show_comment() ||
@@ -3474,10 +3478,6 @@ void nmethod::decode2(outputStream* ost) const {
 #endif
 
 #if defined(SUPPORT_ABSTRACT_ASSEMBLY)
-  // if (getenv("APH_FOO_BAR")) {
-  //   st = tty;
-  // }
-
   //---<  abstract disassembly with comments and section headers merged in  >---
   if (compressed_with_comments) {
     const_cast<nmethod*>(this)->print_constant_pool(st);

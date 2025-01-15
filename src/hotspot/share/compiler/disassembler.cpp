@@ -295,7 +295,7 @@ void decode_env::print_hook_comments(address pc, bool newline) {
           st->cr();
         }
         st->move_to(COMMENT_COLUMN);
-        st->print(";;@FILE: %s", file);
+        st->print("%s @FILE: %s", AbstractDisassembler::pd_comment_prefix(), file);
         newline = true;
       }
 
@@ -308,7 +308,7 @@ void decode_env::print_hook_comments(address pc, bool newline) {
           st->cr();
         }
         st->move_to(COMMENT_COLUMN);
-        st->print(";;%5d: %s", line, source_line);
+        st->print("%s %5d: %s", AbstractDisassembler::pd_comment_prefix(), line, source_line);
         newline = true;
       }
     }
