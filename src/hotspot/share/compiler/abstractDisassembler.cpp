@@ -44,7 +44,7 @@ bool AbstractDisassembler::_show_offset        = false;
 bool AbstractDisassembler::_show_structs       = true;
 bool AbstractDisassembler::_show_comment       = true;
 bool AbstractDisassembler::_show_block_comment = true;
-bool AbstractDisassembler::_pd_format          = true;
+// bool AbstractDisassembler::_pd_format          = true;
 
 const char * AbstractDisassembler::_pd_hex_prefix = "0x";
 const char * AbstractDisassembler::_pd_comment_prefix = "#";
@@ -66,7 +66,7 @@ bool AbstractDisassembler::_show_bytes         = false;
 int AbstractDisassembler::print_location(address here, address begin, address end, outputStream* st, bool align, bool print_header) {
   const int     pos_0  = st->position();
 
-  if (pd_format())  st->print("%s", pd_inline_comment_open());
+  st->print("%s", pd_inline_comment_open());
 
   if (show_pc() || show_offset()) {
     st->print(" ");
@@ -100,7 +100,7 @@ int AbstractDisassembler::print_location(address here, address begin, address en
     st->print(": ");
   }
 
-  if (pd_format())  st->print("%s", pd_inline_comment_close());
+  st->print("%s", pd_inline_comment_close());
 
   if (align) {
     const uint tabspacing  = 8;
@@ -286,38 +286,13 @@ address AbstractDisassembler::decode_instruction_abstract(address start,
 
   //---<  current instruction is at the start address  >---
   unsigned char* current = (unsigned char*) start;
-  int            filler_limit = align_instr() ? max_instr_size_in_bytes : ((instruction_size_in_bytes+abstract_instruction_bytes_per_block-1)/abstract_instruction_bytes_per_block)
-                                                                          *abstract_instruction_bytes_per_block;
 
   //---<  print the instruction's bytes  >---
-  if (pd_format()) {
-    for (int i = 1; i <= instruction_size_in_bytes; i++) {
-      ++current;
-      st->print("%s%02x", pd_hex_prefix(), *current);
-      if (i != instruction_size_in_bytes) {
-        st->print(", ");
-      }
-    }
-    return (address) current;
-  }
-
   for (int i = 1; i <= instruction_size_in_bytes; i++) {
-    st->print("%02x", *current);
     ++current;
-    if (abstract_instruction_bytes_per_block <= max_instr_size_in_bytes) {
-      if (i%abstract_instruction_bytes_per_block == 0) st->print(" ");
-    } else {
-      if (i == instruction_size_in_bytes) st->print(" ");
-    }
-  }
-
-  //---<  print some filler spaces to column-align instructions  >---
-  for (int i = instruction_size_in_bytes+1; i <= filler_limit; i++) {
-    st->print("  ");
-    if (abstract_instruction_bytes_per_block <= max_instr_size_in_bytes) {
-      if (i%abstract_instruction_bytes_per_block == 0) st->print(" ");
-    } else {
-      if (i == instruction_size_in_bytes) st->print(" ");
+    st->print("%s%02x", pd_hex_prefix(), *current);
+    if (i != instruction_size_in_bytes) {
+      st->print(", ");
     }
   }
 

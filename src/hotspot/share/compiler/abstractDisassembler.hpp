@@ -58,7 +58,6 @@ class AbstractDisassembler {
   static bool _show_comment;       // print instruction comments
   static bool _show_block_comment; // print block comments
 
-  static bool _pd_format;      // print in a form suitable for platform assembler
   static const char *_pd_hex_prefix;
   static const char *_pd_comment_prefix;
   static const char *_pd_inline_comment_open;
@@ -75,8 +74,7 @@ class AbstractDisassembler {
   static int  print_hexdata(address here, int len, outputStream* st, bool print_header = false);
   static int  print_delimiter(outputStream* st);
   static bool start_newline(int byte_count) {
-    int per_line = pd_format() ? abstract_instruction_bytes_per_line/2
-                               : abstract_instruction_bytes_per_line;
+    int per_line = abstract_instruction_bytes_per_line/2;
     return byte_count >= per_line;
   }
   static void toggle_align_instr()        { _align_instr        = !_align_instr; }
@@ -101,7 +99,6 @@ class AbstractDisassembler {
   static bool show_comment()       { return _show_comment; }
   static bool show_block_comment() { return _show_block_comment; }
 
-  static bool pd_format()                       { return _pd_format; }
   static const char *pd_comment_prefix()        { return _pd_comment_prefix; }
   static const char *pd_hex_prefix()            { return _pd_hex_prefix; }
   static const char *pd_inline_comment_open()   { return _pd_inline_comment_open; }

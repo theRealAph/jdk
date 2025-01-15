@@ -3500,7 +3500,7 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
-        if (AbstractDisassembler::pd_format())  st->print("%s ", AbstractDisassembler::pd_insns_start());
+        st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
 
@@ -3524,22 +3524,24 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
-        if (AbstractDisassembler::pd_format())  st->print("%s ", AbstractDisassembler::pd_insns_start());
+        st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
 
-      //---<  Nicely align instructions for readability  >---
-      if (! AbstractDisassembler::pd_format() && compressed_format_idx > 1) {
-        Disassembler::print_delimiter(st);
-      }
-
-      if (AbstractDisassembler::pd_format() && compressed_format_idx > 1) {
+      if (compressed_format_idx > 1) {
         st->print(", "); // ...
       }
 
       //---<  Now, finally, print the actual instruction bytes  >---
       unsigned char* p0 = p;
-      p = Disassembler::decode_instruction_abstract(p, st, instruction_size_in_bytes, instr_maxlen);
+      // p = Disassembler::decode_instruction_abstract(p, st, instruction_size_in_bytes, instr_maxlen);
+      for (int i = 1; i <= instruction_size_in_bytes; i++) {
+        st->print("%s%02x", AbstractDisassembler::pd_hex_prefix(), *p);
+        ++p;
+        if (i != instruction_size_in_bytes) {
+          st->print(", ");
+        }
+      }
       compressed_format_idx += (int)(p - p0);
 
       if (Disassembler::start_newline(compressed_format_idx-1)) {
@@ -3814,7 +3816,7 @@ bool nmethod::has_code_comment(address begin, address end) {
 
 void nmethod::print_code_comment_on(outputStream* st, int column, address begin, address end) {
   const char *prefix = ";";
-  if (AbstractDisassembler::pd_format()) {
+  if (Disassembler::is_abstract()) {
     prefix = AbstractDisassembler::pd_comment_prefix();
   }
 
