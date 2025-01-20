@@ -3484,6 +3484,8 @@ void nmethod::decode2(outputStream* ost) const {
 
     //---<  Open the output (Marker for post-mortem disassembler)  >---
     st->print_cr("[MachCode]");
+    st->move_to(28);
+    st->print("%s ", AbstractDisassembler::pd_start_text_command());
     while ((p < end) && (p != nullptr)) {
       const int instruction_size_in_bytes = Assembler::instr_len(p);
 
@@ -3500,7 +3502,6 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
-        st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
 
@@ -3524,11 +3525,12 @@ void nmethod::decode2(outputStream* ost) const {
       //---<  New location information after line break  >---
       if (compressed_format_idx == 0) {
         code_comment_column   = Disassembler::print_location(p, pss, end, st, false, false);
-        st->print("%s ", AbstractDisassembler::pd_insns_start());
         compressed_format_idx = 1;
       }
 
-      if (compressed_format_idx > 1) {
+      if (compressed_format_idx == 1) {
+        st->print("%s ", AbstractDisassembler::pd_insns_start());
+      } else if (compressed_format_idx > 1) {
         st->print(", "); // ...
       }
 
