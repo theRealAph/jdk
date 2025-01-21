@@ -31,6 +31,17 @@
 
 #include "utilities/globalDefinitions.hpp"
 
+// Allow OS/CPU to override pseudo-op strings for platform assembler
+struct PlatformDepAsmStrings {
+  const char* _hex_prefix;
+  const char* _comment_prefix;
+  const char* _inline_comment_open;
+  const char* _inline_comment_close;
+  const char* _origin_command;
+  const char* _start_text_command;
+  const char* _insns_start;
+};
+
 class AbstractDisassembler {
 
  private:
@@ -58,13 +69,8 @@ class AbstractDisassembler {
   static bool _show_comment;       // print instruction comments
   static bool _show_block_comment; // print block comments
 
-  static const char *_pd_hex_prefix;
-  static const char *_pd_comment_prefix;
-  static const char *_pd_inline_comment_open;
-  static const char *_pd_inline_comment_close;
-  static const char *_pd_origin_command;
-  static const char *_pd_start_text_command;
-  static const char *_pd_insns_start;
+protected:
+  static bool _library_usable;     // We have a usable disassembler library;
 
  public:
   // Platform-independent location and instruction formatting.
@@ -88,6 +94,8 @@ class AbstractDisassembler {
   static void toggle_show_comment()       { _show_comment       = !_show_comment; }
   static void toggle_show_block_comment() { _show_block_comment = !_show_block_comment; }
 
+  static bool is_abstract()        { return ! _library_usable; }
+
   static bool align_instr()        { return _align_instr; }
   static bool show_pc()            { return _show_pc; }
   static bool show_offset()        { return _show_offset; }
@@ -99,13 +107,16 @@ class AbstractDisassembler {
   static bool show_comment()       { return _show_comment; }
   static bool show_block_comment() { return _show_block_comment; }
 
-  static const char *pd_comment_prefix()        { return _pd_comment_prefix; }
-  static const char *pd_hex_prefix()            { return _pd_hex_prefix; }
-  static const char *pd_inline_comment_open()   { return _pd_inline_comment_open; }
-  static const char *pd_inline_comment_close()  { return _pd_inline_comment_close; }
-  static const char *pd_origin_command()        { return _pd_origin_command; }
-  static const char *pd_start_text_command()    { return _pd_start_text_command; }
-  static const char *pd_insns_start()           { return _pd_insns_start; }
+  static PlatformDepAsmStrings _pd_strings;
+  static const char *pd_comment_prefix()        { return _pd_strings._comment_prefix; }
+  static const char *pd_hex_prefix()            { return _pd_strings._hex_prefix; }
+  static const char *pd_inline_comment_open()   { return _pd_strings._inline_comment_open; }
+  static const char *pd_inline_comment_close()  { return _pd_strings._inline_comment_close; }
+  static const char *pd_origin_command()        { return _pd_strings._origin_command; }
+  static const char *pd_start_text_command()    { return _pd_strings._start_text_command; }
+  static const char *pd_insns_start()           { return _pd_strings._insns_start; }
+  static void set_pd_strings(PlatformDepAsmStrings pd_strings) { _pd_strings = pd_strings; }
+
 
   // Decodes the one instruction at address start in a platform-independent
   // format. Returns the start of the next instruction (which is

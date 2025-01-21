@@ -45,7 +45,6 @@
 
 void*       Disassembler::_library               = nullptr;
 bool        Disassembler::_tried_to_load_library = false;
-bool        Disassembler::_library_usable        = false;
 
 // This routine is in the shared library:
 Disassembler::decode_func_virtual Disassembler::_decode_instructions_virtual = nullptr;

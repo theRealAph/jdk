@@ -56,7 +56,6 @@ class Disassembler : public AbstractDisassembler {
   static void*    _library;
   // bailout
   static bool     _tried_to_load_library;
-  static bool     _library_usable;
   // points to the decode function.
   static decode_func_virtual _decode_instructions_virtual;
 
@@ -85,7 +84,7 @@ class Disassembler : public AbstractDisassembler {
     if (!_tried_to_load_library) {
       load_library();
     }
-    return ! _library_usable;
+    return AbstractDisassembler:: is_abstract();
   }
 
   // Check out if we are doing a live disassembly or a post-mortem

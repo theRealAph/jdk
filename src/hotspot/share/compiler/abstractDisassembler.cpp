@@ -33,6 +33,8 @@
 #include "utilities/debug.hpp"
 #include "utilities/ostream.hpp"
 
+bool AbstractDisassembler::_library_usable     = false;
+
 // Default values for what is being printed as line prefix when disassembling a single instruction.
 // Can be overridden by command line parameter PrintAssemblyOptions.
 bool AbstractDisassembler::_show_data_hex      = true;
@@ -44,15 +46,17 @@ bool AbstractDisassembler::_show_offset        = false;
 bool AbstractDisassembler::_show_structs       = true;
 bool AbstractDisassembler::_show_comment       = true;
 bool AbstractDisassembler::_show_block_comment = true;
-// bool AbstractDisassembler::_pd_format          = true;
 
-const char * AbstractDisassembler::_pd_hex_prefix = "0x";
-const char * AbstractDisassembler::_pd_comment_prefix = "#";
-const char * AbstractDisassembler::_pd_inline_comment_open = "/* ";
-const char * AbstractDisassembler::_pd_inline_comment_close = "*/ ";
-const char * AbstractDisassembler::_pd_origin_command = ".org";
-const char * AbstractDisassembler::_pd_start_text_command = ".text";
-const char * AbstractDisassembler::_pd_insns_start = ".byte";
+// Default values for "typical" platform assembler
+PlatformDepAsmStrings AbstractDisassembler::_pd_strings = PlatformDepAsmStrings {
+  ._hex_prefix = "0x",
+  ._comment_prefix = "#",
+  ._inline_comment_open = "/* ",
+  ._inline_comment_close = "*/ ",
+  ._origin_command = ".org",
+  ._start_text_command = ".text",
+  ._insns_start = ".byte",
+};
 
 // set "true" to see what's in memory bit by bit
 // might prove cumbersome on platforms where instr_len is hard to find out
@@ -66,7 +70,7 @@ bool AbstractDisassembler::_show_bytes         = false;
 int AbstractDisassembler::print_location(address here, address begin, address end, outputStream* st, bool align, bool print_header) {
   const int     pos_0  = st->position();
 
-  st->print("%s", pd_inline_comment_open());
+  if (is_abstract())   st->print("%s", pd_inline_comment_open());
 
   if (show_pc() || show_offset()) {
     st->print(" ");
@@ -100,7 +104,7 @@ int AbstractDisassembler::print_location(address here, address begin, address en
     st->print(": ");
   }
 
-  st->print("%s", pd_inline_comment_close());
+  if (is_abstract())  st->print("%s", pd_inline_comment_close());
 
   if (align) {
     const uint tabspacing  = 8;
