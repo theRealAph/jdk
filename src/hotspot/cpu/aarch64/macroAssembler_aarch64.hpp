@@ -283,10 +283,9 @@ class MacroAssembler: public Assembler {
 
   void membar(Membar_mask_bits order_constraint);
 
-  // using Assembler::add;
   using Assembler::ldr;
-  using Assembler::ldrw;
   using Assembler::str;
+  using Assembler::ldrw;
   using Assembler::strw;
 
   void ldr(Register Rx, const Address &adr);
