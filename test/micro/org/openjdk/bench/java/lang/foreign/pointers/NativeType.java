@@ -83,7 +83,7 @@ public sealed abstract class NativeType<X> {
     final static OfPointer C_VOID_PTR = new OfPointer();
 
     @SuppressWarnings("unchecked")
-    public static final OfPointer<Pointer<Integer>> C_INT_PTR = NativeType.C_VOID_PTR;
+        public static final OfPointer<Pointer<Integer>> C_INT_PTR = (OfPointer<Pointer<Integer>>)NativeType.C_VOID_PTR;
     @SuppressWarnings("unchecked")
     public static final OfPointer<Pointer<Double>> C_DOUBLE_PTR = NativeType.C_VOID_PTR;
 
