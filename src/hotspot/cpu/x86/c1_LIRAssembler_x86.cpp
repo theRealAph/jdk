@@ -1374,6 +1374,9 @@ void LIR_Assembler::emit_op3(LIR_Op3* op) {
               op->in_opr2()->as_xmm_float_reg(),
               op->in_opr3()->as_xmm_float_reg());
       break;
+    case lir_inc_profile_ctr:
+      inc_profile_ctr(op->in_opr1(), op->in_opr2(), op->in_opr3(), op->result_opr(), op->tmp1_opr());
+      break;
     default:      ShouldNotReachHere(); break;
   }
 }
@@ -3511,7 +3514,7 @@ void bar() {
   asm("nop");
 }
 
-void LIR_Assembler::inc_profile_ctr(LIR_Opr incr, LIR_Opr addr, LIR_Opr dest, LIR_Opr temp_op) {
+void LIR_Assembler::inc_profile_ctr(LIR_Opr incr, LIR_Opr state, LIR_Opr addr, LIR_Opr dest, LIR_Opr temp_op) {
   Register temp = temp_op->as_register();
   Address dest_adr = as_Address(addr->as_address_ptr());
 

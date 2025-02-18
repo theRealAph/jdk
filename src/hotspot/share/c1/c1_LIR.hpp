@@ -970,13 +970,13 @@ enum LIR_Code {
       , lir_throw
       , lir_xadd
       , lir_xchg
-      , lir_inc_profile_ctr
   , end_op2
   , begin_op3
       , lir_idiv
       , lir_irem
       , lir_fmad
       , lir_fmaf
+      , lir_inc_profile_ctr
   , end_op3
   , begin_op4
       , lir_cmove
@@ -1792,15 +1792,25 @@ class LIR_Op3: public LIR_Op {
   LIR_Opr _opr1;
   LIR_Opr _opr2;
   LIR_Opr _opr3;
+  LIR_Opr _tmp1;
  public:
   LIR_Op3(LIR_Code code, LIR_Opr opr1, LIR_Opr opr2, LIR_Opr opr3, LIR_Opr result, CodeEmitInfo* info = nullptr)
     : LIR_Op(code, result, info)
     , _opr1(opr1)
     , _opr2(opr2)
-    , _opr3(opr3)                                { assert(is_in_range(code, begin_op3, end_op3), "code check"); }
-  LIR_Opr in_opr1() const                        { return _opr1; }
-  LIR_Opr in_opr2() const                        { return _opr2; }
-  LIR_Opr in_opr3() const                        { return _opr3; }
+    , _opr3(opr3)
+    , _tmp1(LIR_OprFact::illegalOpr) { assert(is_in_range(code, begin_op3, end_op3), "code check"); }
+  LIR_Op3(LIR_Code code, LIR_Opr opr1, LIR_Opr opr2, LIR_Opr opr3, LIR_Opr result,
+          LIR_Opr t1, CodeEmitInfo* info = nullptr)
+    : LIR_Op(code, result, info)
+    , _opr1(opr1)
+    , _opr2(opr2)
+    , _opr3(opr3)
+    , _tmp1(t1) { }
+  LIR_Opr in_opr1()  const                        { return _opr1; }
+  LIR_Opr in_opr2()  const                        { return _opr2; }
+  LIR_Opr in_opr3()  const                        { return _opr3; }
+  LIR_Opr tmp1_opr() const                        { return _tmp1; }
 
   virtual void emit_code(LIR_Assembler* masm);
   virtual LIR_Op3* as_Op3() { return this; }
@@ -2301,7 +2311,7 @@ class LIR_List: public CompilationResourceObj {
   void volatile_store_mem_reg(LIR_Opr src, LIR_Address* address, CodeEmitInfo* info, LIR_PatchCode patch_code = lir_patch_none);
   void volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offset, BasicType type, CodeEmitInfo* info, LIR_PatchCode patch_code);
 
-  void inc_profile_ctr(LIR_Opr src, LIR_Address* addr, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info = nullptr);
+  void inc_profile_ctr(LIR_Opr src, LIR_Opr state, LIR_Address* addr, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info = nullptr);
 
   void idiv(LIR_Opr left, LIR_Opr right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);
   void idiv(LIR_Opr left, int   right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);
@@ -2434,7 +2444,7 @@ class LIR_InsertionBuffer : public CompilationResourceObj {
   // instruction
   void move(int index, LIR_Opr src, LIR_Opr dst, CodeEmitInfo* info = nullptr) { append(index, new LIR_Op1(lir_move, src, dst, dst->type(), lir_patch_none, info)); }
 
-  void inc_profile_ctr(LIR_Opr src, LIR_Address* addr, LIR_Opr res, CodeEmitInfo* info = nullptr);
+  void inc_profile_ctr(LIR_Opr src, LIR_Opr state, LIR_Address* addr, LIR_Opr res, CodeEmitInfo* info = nullptr);
 };
 
 

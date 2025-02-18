@@ -168,6 +168,7 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   Values        _instruction_for_operand;
 #endif
   BitMap2D      _vreg_flags; // flags which can be set on a per-vreg basis
+  LIR_Opr       _profile_rng_state;
   LIR_List*     _lir;
 
   LIRGenerator* gen() {
