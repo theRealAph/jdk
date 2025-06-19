@@ -646,6 +646,7 @@ void TemplateTable::fast_iload2()
 {
   transition(vtos, itos);
   locals_index(r1);
+  __ cbnz(as_Register(31), __ pc());
   __ ldr(r0, iaddress(r1));
   __ push(itos);
   locals_index(r1, 3);

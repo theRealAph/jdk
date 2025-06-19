@@ -428,28 +428,88 @@ void NativePostCallNop::make_deopt() {
   NativeDeoptInstruction::insert(addr_at(0));
 }
 
-#ifdef ASSERT
-static bool is_movk_to_zr(uint32_t insn) {
-  return ((insn & 0xffe0001f) == 0xf280001f);
+static int slot_counts[1024*1024];
+static int offset_counts[1024*1024];
+
+void print_array(int a[1024*1024], int lim) {
+  int all = 0, hi = 0;
+  for (int i = 0; i < 1024*1024; i++) {
+    if (a[i]) {
+      fprintf(stderr, "%d:%d, ", i, a[i]);
+      all += a[i];
+      if (i >= lim)
+        hi += a[i];
+    }
+  }
+  fprintf(stderr, "\n");
+  {
+    fprintf(stderr, "all = %d, hi = %d\n", all, hi);
+  }
 }
-#endif
+
+
+void print_counts() {
+  fprintf(stderr, "oopmap_slots: ");
+  print_array(slot_counts,128);
+  fprintf(stderr, "cb offsets: ");
+  print_array(offset_counts,32768);
+}
+
+static long hits, misses, offset_misses, slot_misses;
 
 bool NativePostCallNop::patch(int32_t oopmap_slot, int32_t cb_offset) {
-  if (((oopmap_slot & 0xff) != oopmap_slot) || ((cb_offset & 0xffffff) != cb_offset)) {
+  static bool blub, blab;
+  if (blub == 0 && getenv("APH_PRINT_COUNTS")) {
+    atexit(print_counts);
+    blub = 1;
+  }
+  if (blab==0 && getenv("APH_PRINT_HITS_AND_MISSES")) {
+    atexit([] {
+      long sum = hits + misses;
+
+      fprintf(stderr, "hits = %ld, misses = %ld, (%4.2f%%)\n",
+              hits, misses, misses*100.0/sum);
+      fprintf(stderr, "hits = %ld, offset_misses = %ld, (%4.2f%%)\n",
+              hits, offset_misses, offset_misses*100.0/sum);
+      fprintf(stderr, "hits = %ld, slot_misses = %ld, (%4.2f%%)\n",
+              hits, slot_misses, slot_misses*100.0/sum);
+      });
+    blab = 1;
+  }
+
+  slot_counts[oopmap_slot]++;
+  offset_counts[cb_offset]++;
+
+  uint32_t data = (uint32_t)oopmap_slot * interval + (cb_offset >> 2);
+
+  bool offset_fits = (unsigned int)cb_offset >> 2 < interval;
+  bool slot_fits = oopmap_slot * interval + interval < field_size - 1;
+
+  if (! slot_fits) {
+    slot_misses++;
+  }
+  if (! offset_fits) {
+    offset_misses++;
+  }
+
+  if (! (offset_fits && slot_fits)) {
+    misses++;
     return false; // cannot encode
   }
-  uint32_t data = ((uint32_t)oopmap_slot << 24) | cb_offset;
+
+  hits++;
 #ifdef ASSERT
   assert(data != 0, "must be");
-  uint32_t insn1 = uint_at(4);
-  uint32_t insn2 = uint_at(8);
-  assert (is_movk_to_zr(insn1) && is_movk_to_zr(insn2), "must be");
+  assert(data / interval == (uint32_t)oopmap_slot, "must be");
+  assert((data % interval) << 2 == (uint32_t)cb_offset, "must be");
 #endif
 
-  uint32_t lo = data & 0xffff;
-  uint32_t hi = data >> 16;
-  Instruction_aarch64::patch(addr_at(4), 20, 5, lo);
-  Instruction_aarch64::patch(addr_at(8), 20, 5, hi);
+  uint32_t hi = data >> 19;
+  uint32_t lo = data & right_n_bits(19);
+  Instruction_aarch64::patch(addr_at(0), 23, 5, lo);
+  Instruction_aarch64::patch(addr_at(0), 31, 31, hi);
+
+  assert(check(), "must be");
   return true; // successfully encoded
 }
 

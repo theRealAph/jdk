@@ -522,34 +522,37 @@ inline NativeLdSt* NativeLdSt_at(address addr) {
   return (NativeLdSt*)addr;
 }
 
-// A NativePostCallNop takes the form of three instructions:
-//     nop; movk zr, lo; movk zr, hi
+// A NativePostCallNop takes the form of one instruction, effectively
+// a nop:
 //
-// The nop is patchable for a deoptimization trap. The two movk
-// instructions execute as nops but have a 16-bit payload in which we
-// can store an offset from the initial nop to the nmethod.
+//     cbnz zr, #payload
+//
+// The nop is patchable for a deoptimization trap. The cbnz
+// instruction executes as a nop but has a 20-bit payload in which we
+// can store an offset from the instruction to the nmethod and an
+// oopmap slot. The slot is stored in the top 7.5 bits, the
+// 4-byte-aligned offset in the lower 12.5 bits.
 
 class NativePostCallNop: public NativeInstruction {
 public:
   bool check() const {
-    uint64_t insns = *(uint64_t*)addr_at(0);
-    // Check for two instructions: nop; movk zr, xx
-    // These instructions only ever appear together in a post-call
-    // NOP, so it's unnecessary to check that the third instruction is
-    // a MOVK as well.
-    return (insns & 0xffe0001fffffffff) == 0xf280001fd503201f;
+    // Check for instruction: cbnz zr, #payload
+    return (encoding() & 0x7f00001f) == 0x3500001f;
   }
 
+  static constexpr unsigned int interval = 8192;
+  static constexpr unsigned int field_size = 1 << 20;
+
   bool decode(int32_t& oopmap_slot, int32_t& cb_offset) const {
-    uint64_t movk_insns = *(uint64_t*)addr_at(4);
-    uint32_t lo = (movk_insns >> 5) & 0xffff;
-    uint32_t hi = (movk_insns >> (5 + 32)) & 0xffff;
-    uint32_t data = (hi << 16) | lo;
-    if (data == 0) {
+    assert(check(), "must be");
+
+    uint32_t payload = Instruction_aarch64::extract(encoding(), 23, 5);
+    payload |= Instruction_aarch64::extract(encoding(), 31, 31) << 19;
+    cb_offset = (payload % interval) << 2;
+    oopmap_slot = payload / interval;
+    if (payload == 0) {
       return false; // no information encoded
     }
-    cb_offset = (data & 0xffffff);
-    oopmap_slot = (data >> 24) & 0xff;
     return true; // decoding succeeded
   }
 

@@ -48,7 +48,7 @@ NSK_SHARE_DIR := $(VM_TESTBASE_DIR)/nsk/share
 ################################################################################
 # Platform independent setup
 
-# Optimization -O3 needed, HIGH == -O3
+# Optimization -Og needed, HIGH == -Og
 HOTSPOT_JTREG_LIBRARIES_OPTIMIZATION_libNoFramePointer := HIGH
 
 HOTSPOT_JTREG_EXECUTABLES_JDK_LIBS_exesigtest := java.base:libjvm

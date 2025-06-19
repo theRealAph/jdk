@@ -958,7 +958,7 @@ public:
   void NAME(Register Rt, address dest) {                \
     int64_t offset = (dest - pc()) >> 2;                \
     starti;                                             \
-    f(opcode, 31, 24), sf(offset, 23, 5), rf(Rt, 0);    \
+    f(opcode, 31, 24), sf(offset, 23, 5), zrf(Rt, 0);   \
   }                                                     \
   void NAME(Register Rt, Label &L) {                    \
     wrap_label(Rt, L, &Assembler::NAME);                \
