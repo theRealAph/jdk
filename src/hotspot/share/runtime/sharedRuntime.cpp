@@ -71,6 +71,7 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "runtime/threadWXSetters.inline.hpp"
 #include "runtime/synchronizer.inline.hpp"
 #include "runtime/timerTrace.hpp"
 #include "runtime/vframe.inline.hpp"
@@ -1419,12 +1420,17 @@ methodHandle SharedRuntime::resolve_helper(bool is_virtual, bool is_optimized, T
 
 
   CompiledICLocker ml(caller_nm);
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(current);
+#endif
   if (is_virtual && !is_optimized) {
     CompiledIC* inline_cache = CompiledIC_before(caller_nm, caller_frame.pc());
+    REQUIRE_THREAD_WX_MODE_WRITE
     inline_cache->update(&call_info, receiver->klass());
   } else {
     // Callsite is a direct call - set it to the destination method
     CompiledDirectCall* callsite = CompiledDirectCall::before(caller_frame.pc());
+    REQUIRE_THREAD_WX_MODE_WRITE
     callsite->set(callee_method);
   }
 
@@ -1641,6 +1647,9 @@ methodHandle SharedRuntime::handle_ic_miss_helper(TRAPS) {
   nmethod* caller_nm = cb->as_nmethod();
 
   CompiledICLocker ml(caller_nm);
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(current);
+#endif
   CompiledIC* inline_cache = CompiledIC_before(caller_nm, caller_frame.pc());
   inline_cache->update(&call_info, receiver()->klass());
 
@@ -1695,6 +1704,9 @@ methodHandle SharedRuntime::reresolve_call_site(TRAPS) {
     //       we will wind up in the interprter (thru a c2i with c2).
     //
     CompiledICLocker ml(caller_nm);
+#if INCLUDE_WX_NEW
+    auto _wx = WXWriteMark(current);
+#endif
     address call_addr = caller_nm->call_instruction_address(pc);
 
     if (call_addr != nullptr) {
@@ -1809,7 +1821,7 @@ JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
 
   // write lock needed because we might patch call site by set_to_clean()
   // and is_unloading() can modify nmethod's state
-  MACOS_AARCH64_ONLY(ThreadWXEnable __wx(WXWrite, JavaThread::current()));
+  WX_OLD_ONLY(ThreadWXEnable __wx(WXWrite, JavaThread::current()));
 
   CodeBlob* cb = CodeCache::find_blob(caller_pc);
   if (cb == nullptr || !cb->is_nmethod() || !callee->is_in_use() || callee->is_unloading()) {
@@ -1846,6 +1858,10 @@ JRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
   }
 
   CompiledDirectCall* callsite = CompiledDirectCall::before(return_pc);
+  // write lock needed because we might patch call site by set_to_clean()
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(Thread::current());
+#endif
   callsite->set_to_clean();
 JRT_END
 
@@ -2872,6 +2888,10 @@ AdapterHandlerEntry* AdapterHandlerLibrary::create_adapter(AdapterBlob*& adapter
                                                            int total_args_passed,
                                                            BasicType* sig_bt,
                                                            bool is_transient) {
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(Thread::current());
+#endif
+
   AdapterFingerPrint* fp = AdapterFingerPrint::allocate(total_args_passed, sig_bt);
   AdapterHandlerEntry* handler = AdapterHandlerLibrary::new_entry(fp);
   if (!generate_adapter_code(adapter_blob, handler, total_args_passed, sig_bt, is_transient)) {
@@ -3134,6 +3154,9 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
     ResourceMark rm;
     BufferBlob*  buf = buffer_blob(); // the temporary code buffer in CodeCache
     if (buf != nullptr) {
+#if INCLUDE_WX_NEW
+      auto _wx = WXWriteMark(Thread::current());
+#endif
       CodeBuffer buffer(buf);
 
       if (method->is_continuation_enter_intrinsic()) {

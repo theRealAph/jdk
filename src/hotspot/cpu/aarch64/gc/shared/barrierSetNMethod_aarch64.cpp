@@ -118,6 +118,7 @@ public:
   }
 
   void set_value(int value) {
+    REQUIRE_THREAD_WX_MODE_WRITE
     Atomic::release_store(guard_addr(), value);
   }
 

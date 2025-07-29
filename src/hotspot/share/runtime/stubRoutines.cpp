@@ -34,6 +34,7 @@
 #include "runtime/timerTrace.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "runtime/threadWXSetters.inline.hpp"
 #include "utilities/align.hpp"
 #include "utilities/copy.hpp"
 #ifdef COMPILER2
@@ -138,6 +139,11 @@ static BufferBlob* initialize_stubs(BlobId blob_id,
                                     const char* buffer_name,
                                     const char* assert_msg) {
   assert(StubInfo::is_stubgen(blob_id), "not a stubgen blob %s", StubInfo::name(blob_id));
+
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(Thread::current());
+#endif
+
   ResourceMark rm;
   if (code_size == 0) {
     LogTarget(Info, stubs) lt;

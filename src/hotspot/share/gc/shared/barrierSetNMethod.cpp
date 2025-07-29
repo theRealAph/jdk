@@ -181,7 +181,7 @@ void BarrierSetNMethod::arm_all_nmethods() {
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
   // Enable WXWrite: the function is called directly from nmethod_entry_barrier
   // stub.
-  MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, Thread::current()));
+  WX_OLD_ONLY(ThreadWXEnable wx(WXWrite, Thread::current()));
 
   address return_address = *return_address_ptr;
   AARCH64_PORT_ONLY(return_address = pauth_strip_pointer(return_address));
@@ -190,6 +190,10 @@ int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
 
   nmethod* nm = cb->as_nmethod();
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+
+#if INCLUDE_WX_NEW
+  auto _wx = WXWriteMark(Thread::current());
+#endif
 
   // Called upon first entry after being armed
   bool may_enter = !bs_nm->is_not_entrant(nm) && bs_nm->nmethod_entry_barrier(nm);
