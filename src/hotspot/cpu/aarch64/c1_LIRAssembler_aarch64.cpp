@@ -2595,6 +2595,7 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
 }
 
 void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_op,
+                                          LIR_Opr md_op, LIR_Opr md_offset_op,
                                           LIR_Opr freq_op,
                                           CodeStub* overflow_stub) {
 #ifndef PRODUCT

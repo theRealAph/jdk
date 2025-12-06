@@ -1073,7 +1073,8 @@ void LIR_OpAssert::emit_code(LIR_Assembler* masm) {
 
 void LIR_OpIncrementCounter::emit_code(LIR_Assembler* masm) {
   masm->increment_profile_ctr
-    (_step, _counter_addr, _dest, _temp_op, _freq_op, _overflow_stub);
+    (_step, _counter_addr, _dest, _temp_op, _freq_op, _md_op, _md_offset_op,
+     _overflow_stub);
   if (overflow_stub()) {
     masm->append_code_stub(overflow_stub());
   }
@@ -1285,13 +1286,16 @@ void LIR_List::volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offs
 
 
 void LIR_List::increment_counter(LIR_Opr step, LIR_Address* addr, LIR_Opr dest, LIR_Opr tmp,
-                                 LIR_Opr freq, CodeStub* overflow, CodeEmitInfo* info) {
+                                 LIR_Opr freq, LIR_Opr md_op, LIR_Opr md_offset_op,
+                                 CodeStub* overflow, CodeEmitInfo* info) {
     append(new LIR_OpIncrementCounter (
             step,
             LIR_OprFact::address(addr),
             dest,
             tmp,
             freq,
+            md_op,
+            md_offset_op,
             overflow,
             info));
 }
