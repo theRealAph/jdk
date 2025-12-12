@@ -446,7 +446,7 @@ class LIR_Opr {
   Register as_register_lo() const;
   Register as_register_hi() const;
 
-  Register as_pointer_register() {
+  Register as_pointer_register() const {
 #ifdef _LP64
     if (is_double_cpu()) {
       assert(as_register_lo() == as_register_hi(), "should be a single register");
@@ -1943,6 +1943,7 @@ class LIR_OpIncrementCounter : public LIR_Op {
   LIR_Opr _dest;
   LIR_Opr _temp_op;
   LIR_Opr _freq_op;
+  LIR_Opr _md_reg;
   LIR_Opr _md_op;
   LIR_Opr _md_offset_op;
   CodeStub* _overflow_stub;
@@ -1950,7 +1951,7 @@ class LIR_OpIncrementCounter : public LIR_Op {
  public:
   // Destroys recv
   LIR_OpIncrementCounter(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_op,
-                         LIR_Opr freq_op, LIR_Opr md_op, LIR_Opr md_offset_op,
+                         LIR_Opr freq_op, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset_op,
                          CodeStub* overflow_stub, CodeEmitInfo *info)
     : LIR_Op(lir_increment_counter, LIR_OprFact::illegalOpr, info)
     , _step(step)
@@ -1958,6 +1959,7 @@ class LIR_OpIncrementCounter : public LIR_Op {
     , _dest(dest)
     , _temp_op(temp_op)
     , _freq_op(freq_op)
+    , _md_reg(md_reg)
     , _md_op(md_op)
     , _md_offset_op(md_offset_op)
     , _overflow_stub(overflow_stub) { }
@@ -1967,8 +1969,9 @@ class LIR_OpIncrementCounter : public LIR_Op {
   LIR_Opr   dest()          const            { return _dest;          }
   LIR_Opr   temp_op()       const            { return _temp_op;       }
   LIR_Opr   freq_op()       const            { return _freq_op;       }
+  LIR_Opr   md_reg()        const            { return _md_reg;        }
   LIR_Opr   md_op()         const            { return _md_op;         }
-  LIR_Opr   md_offset_op()   const           { return _md_offset_op;  }
+  LIR_Opr   md_offset_op()  const            { return _md_offset_op;  }
 
   CodeStub* overflow_stub() const            { return _overflow_stub; };
 
@@ -2279,13 +2282,14 @@ class LIR_List: public CompilationResourceObj {
   void volatile_store_mem_reg(LIR_Opr src, LIR_Address* address, CodeEmitInfo* info, LIR_PatchCode patch_code = lir_patch_none);
   void volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offset, BasicType type, CodeEmitInfo* info, LIR_PatchCode patch_code);
 
-  void increment_counter(LIR_Opr src, LIR_Address* addr, LIR_Opr res, LIR_Opr tmp,
-                         LIR_Opr freq, LIR_Opr md_op, LIR_Opr(md_offset),
+  void increment_counter(LIR_Opr src, LIR_Opr addr, LIR_Opr res, LIR_Opr tmp,
+                         LIR_Opr freq, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr(md_offset),
                          CodeStub* overflow, CodeEmitInfo* info);
-  void increment_counter(LIR_Opr src, LIR_Address* addr, LIR_Opr res, LIR_Opr tmp,
+  void increment_counter(LIR_Opr src, LIR_Opr addr, LIR_Opr res, LIR_Opr tmp,
                          CodeStub* overflow = nullptr) {
     increment_counter(src, addr, res, tmp,
-             LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr,
+             LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr,
+             LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr,
              overflow, nullptr);
   }
 

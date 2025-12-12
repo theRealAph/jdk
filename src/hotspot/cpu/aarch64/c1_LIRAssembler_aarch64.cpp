@@ -2594,9 +2594,13 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj);
 }
 
-void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_op,
-                                          LIR_Opr md_op, LIR_Opr md_offset_op,
-                                          LIR_Opr freq_op,
+#if 1
+int floofy;
+#endif
+
+void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_opr,
+                                          LIR_Opr freq_opr,
+                                          LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
                                           CodeStub* overflow_stub) {
 #ifndef PRODUCT
   if (CommentedAssembly) {
@@ -2613,21 +2617,52 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
   ProfileStub *counter_stub
     = profile_capture_ratio > 1 ? new ProfileStub() : nullptr;
 
-  Register temp = temp_op->is_register() ? temp_op->as_register() : noreg;
-  Address raw_dest_adr = as_Address(counter_addr->as_address_ptr());
+  Register temp = temp_opr->is_register() ? temp_opr->as_register() : noreg;
 
-  auto lambda = [counter_stub, overflow_stub, freq_op, ratio_shift, step,
-                 temp, dest, raw_dest_adr] (LIR_Assembler* ce, LIR_Op* op) {
+  Address raw_dest_adr;
+  if (counter_addr->is_valid()) {
+    raw_dest_adr = as_Address(counter_addr->as_address_ptr());
+  }
+
+  auto lambda = [counter_stub, overflow_stub, freq_opr, ratio_shift, step,
+                 temp, raw_dest_adr, dest, counter_addr,
+                 md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
 #undef __
 #define __ masm->
 
     auto masm = ce->masm();
+    Address real_address = raw_dest_adr;
 
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
+    if (!counter_addr->is_valid() &&
+        md_opr->is_valid()) {
+#if 1
+      if (! md_offset_opr->is_constant()) {
+      __ lea(rscratch1, ExternalAddress((address)&floofy));
+      __ ldr(rscratch2, Address(rscratch1));
+      __ add(rscratch2, rscratch2, (u1)1);
+      __ str(rscratch2, Address(rscratch1));
+      }
+#endif
+      switch(md_opr->type()) {
+        case T_METADATA:
+          __ mov_metadata(md_reg->as_register(),
+                          md_opr->as_constant_ptr()->as_metadata());
+          break;
+        default:
+          __ mov(md_reg->as_pointer_register(),
+                 md_opr->as_constant_ptr()->as_pointer());
+      }
+      RegisterOrConstant offset =
+        md_offset_opr->is_constant()
+        ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
+        : RegisterOrConstant(md_offset_opr->as_register_lo());
+      real_address = Address(md_reg->as_pointer_register(), offset);
+    }
     if (step->is_register()) {
-      Address dest_adr = __ legitimize_address(raw_dest_adr, sizeof (jint), rscratch2);
+      Address dest_adr = __ legitimize_address(real_address, sizeof (jint), rscratch2);
       Register inc = step->as_register();
       __ ldrw(temp, dest_adr);
       if (ProfileCaptureRatio > 1) {
@@ -2644,7 +2679,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
       jint inc = step->as_constant_ptr()->as_jint_bits();
       switch (dest->type()) {
         case T_INT: {
-          Address dest_adr = __ legitimize_address(raw_dest_adr, sizeof (jint), rscratch2);
+          Address dest_adr = __ legitimize_address(real_address, sizeof (jint), rscratch2);
           inc *= ProfileCaptureRatio;
           __ incrementw(dest_adr, inc, temp);
           if (dest->is_register())  __ movw(dest->as_register(), temp);
@@ -2652,7 +2687,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
           break;
         }
         case T_LONG: {
-          Address dest_adr = __ legitimize_address(raw_dest_adr, sizeof (jlong), rscratch2);
+          Address dest_adr = __ legitimize_address(real_address, sizeof (jlong), rscratch2);
           inc *= ProfileCaptureRatio;
           __ increment(dest_adr, inc, temp);
           if (dest->is_register())  __ mov(dest->as_register_lo(), temp);
@@ -2664,7 +2699,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
       }
 
       if (step->is_valid() && overflow_stub) {
-        if (!freq_op->is_valid()) {
+        if (!freq_opr->is_valid()) {
           if (!step->is_constant()) {
             __ cbz(step->as_register(), *overflow_stub->entry());
           } else {
@@ -2682,7 +2717,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
             __ mov(temp, InvocationCounter::count_increment * ProfileCaptureRatio);
             __ csel(result, result, temp, __ NE);
           }
-          juint mask = freq_op->as_jint();
+          juint mask = freq_opr->as_jint();
           __ andw(rscratch1, result,  mask);
           __ cbzw(rscratch1, *overflow_stub->entry());
         }
