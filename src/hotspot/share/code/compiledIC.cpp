@@ -432,6 +432,7 @@ void CompiledDirectCall::print() {
 void CompiledDirectCall::verify_mt_safe(const methodHandle& callee, address entry,
                                         NativeMovConstReg* method_holder,
                                         NativeJump* jump) {
+  bool x = callee->is_compiled_lambda_form();
   _call->verify();
   // A generated lambda form might be deleted from the Lambdaform
   // cache in MethodTypeForm.  If a jit compiled lambdaform method

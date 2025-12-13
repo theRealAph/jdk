@@ -2761,6 +2761,11 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   int bci          = op->profiled_bci();
   ciMethod* callee = op->profiled_callee();
 
+#ifndef PRODUCT
+  if (CommentedAssembly) {
+    __ block_comment("profile_call {");
+  }
+#endif
 
   Register temp = op->tmp1()->as_register_lo();
 
@@ -2875,6 +2880,12 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   } else {
     lambda(this, op);
   }
+
+#ifndef PRODUCT
+  if (CommentedAssembly) {
+    __ block_comment("} profile_call");
+  }
+#endif
 }
 
 

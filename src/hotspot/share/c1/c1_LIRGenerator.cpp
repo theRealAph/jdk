@@ -2376,14 +2376,21 @@ void LIRGenerator::do_Goto(Goto* x) {
       offset = md->byte_offset_of_slot(data, JumpData::taken_offset());
     }
     LIR_Opr md_reg = new_register(T_METADATA);
-    __ metadata2reg(md->constant_encoding(), md_reg);
+    // __ metadata2reg(md->constant_encoding(), md_reg);
 
-    LIR_Address *counter_addr = new LIR_Address(md_reg, offset,
-                                           NOT_LP64(T_INT) LP64_ONLY(T_LONG));
+    // LIR_Address *counter_addr = new LIR_Address(md_reg, offset,
+    //                                        NOT_LP64(T_INT) LP64_ONLY(T_LONG));
     LIR_Opr tmp = new_register(T_INT);
-    LIR_Opr dummy = LIR_OprFact::intConst(0);
+    LIR_Opr dummy = LIR_OprFact::intptrConst((intptr_t)0);
     LIR_Opr inc = LIR_OprFact::intConst(DataLayout::counter_increment);
-    __ increment_counter(inc, counter_addr, dummy, tmp, nullptr);
+    // __ increment_counter(inc, counter_addr, dummy, tmp, nullptr);
+    __ increment_counter(inc, /*counter_addr*/LIR_OprFact::illegalOpr, dummy,
+                         tmp,
+                         /*freq*/LIR_OprFact::illegalOpr,
+                         md_reg,
+                         LIR_OprFact::metadataConst(md->constant_encoding()),
+                         LIR_OprFact::intConst(offset),
+                         /*overflow*/nullptr, /*info*/nullptr);
   }
 
   // emit phi-instruction move after safepoint since this simplifies
