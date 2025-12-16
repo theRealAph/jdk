@@ -2104,7 +2104,11 @@ void LIR_OpIncrementCounter::print_instr(outputStream* out) const {
   dest()->print(out);          out->print(" ");
   temp_op()->print(out);       out->print(" ");
   freq_op()->print(out);       out->print(" ");
+  md_reg()->print(out);        out->print(" ");
+  md_op()->print(out);         out->print(" ");
+  md_offset_op()->print(out);  out->print(" ");
 }
+
 #endif // PRODUCT
 
 // Implementation of LIR_InsertionBuffer

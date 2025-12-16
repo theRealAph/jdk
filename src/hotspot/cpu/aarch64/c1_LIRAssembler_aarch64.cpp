@@ -2598,7 +2598,7 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
 int floofy;
 #endif
 
-void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_opr,
+void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest_op, LIR_Opr temp_opr,
                                           LIR_Opr freq_opr,
                                           LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
                                           CodeStub* overflow_stub) {
@@ -2625,7 +2625,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
   }
 
   auto lambda = [counter_stub, overflow_stub, freq_opr, ratio_shift, step,
-                 temp, raw_dest_adr, dest, counter_addr,
+                 temp, raw_dest_adr, dest_op, counter_addr,
                  md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
 #undef __
@@ -2670,19 +2670,18 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
       }
       __ addw(temp, temp, inc);
       __ strw(temp, dest_adr);
-      if (dest->is_register())  __ mov(dest->as_register(), temp);
+      if (dest_op->is_register())  __ mov(dest_op->as_register(), temp);
       if (ProfileCaptureRatio > 1) {
         __ lsr(inc, inc, ratio_shift);
       }
-      if (dest->is_register())  __ mov(dest->as_register(), temp);
     } else {
       jint inc = step->as_constant_ptr()->as_jint_bits();
-      switch (dest->type()) {
+      switch (dest_op->type()) {
         case T_INT: {
           Address dest_adr = __ legitimize_address(real_address, sizeof (jint), rscratch2);
           inc *= ProfileCaptureRatio;
           __ incrementw(dest_adr, inc, temp);
-          if (dest->is_register())  __ movw(dest->as_register(), temp);
+          if (dest_op->is_register())  __ movw(dest_op->as_register(), temp);
 
           break;
         }
@@ -2690,7 +2689,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
           Address dest_adr = __ legitimize_address(real_address, sizeof (jlong), rscratch2);
           inc *= ProfileCaptureRatio;
           __ increment(dest_adr, inc, temp);
-          if (dest->is_register())  __ mov(dest->as_register_lo(), temp);
+          if (dest_op->is_register())  __ mov(dest_op->as_register_lo(), temp);
 
           break;
         }
@@ -2708,8 +2707,8 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr counter_addr, LI
           }
         } else {
           Register result =
-            dest->type() == T_INT ? dest->as_register() :
-            dest->type() == T_LONG ? dest->as_register_lo() :
+            dest_op->type() == T_INT ? dest_op->as_register() :
+            dest_op->type() == T_LONG ? dest_op->as_register_lo() :
             noreg;
           if (!step->is_constant()) {
             // If step is 0, make sure the stub check below always fails

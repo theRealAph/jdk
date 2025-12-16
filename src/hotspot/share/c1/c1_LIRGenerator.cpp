@@ -929,14 +929,16 @@ void LIRGenerator::profile_branch(If* if_instr, If::Condition cond) {
     // LIR_Address* data_addr = new LIR_Address(md_reg, data_offset_reg, data_reg->type());
     LIR_Opr tmp = new_register(T_INT);
     LIR_Opr step = LIR_OprFact::intConst(DataLayout::counter_increment);
+    LIR_Opr dummy = LIR_OprFact::intConst(0);
     // __ increment_counter(step, data_addr, LIR_OprFact::intConst(0), tmp, nullptr);
-    __ increment_counter(step, /*counter_addr*/LIR_OprFact::illegalOpr, LIR_OprFact::intConst(0),
-                         tmp,
-                         /*freq*/LIR_OprFact::illegalOpr,
-                         md_reg,
-                         LIR_OprFact::metadataConst(md->constant_encoding()),
-                         data_offset_reg,
-                         /*overflow*/nullptr, /*info*/nullptr);
+    // __ increment_counter(step, /*counter_addr*/LIR_OprFact::illegalOpr, LIR_OprFact::intConst(0),
+    //                      tmp,
+    //                      /*freq*/LIR_OprFact::illegalOpr,
+    //                      md_reg,
+    //                      LIR_OprFact::metadataConst(md->constant_encoding()),
+    //                      data_offset_reg,
+    //                      /*overflow*/nullptr, /*info*/nullptr);
+    __ increment_counter(step, dummy, md_reg, md->constant_encoding(), data_offset_reg, tmp);
   }
 }
 
@@ -2384,13 +2386,14 @@ void LIRGenerator::do_Goto(Goto* x) {
     LIR_Opr dummy = LIR_OprFact::intptrConst((intptr_t)0);
     LIR_Opr inc = LIR_OprFact::intConst(DataLayout::counter_increment);
     // __ increment_counter(inc, counter_addr, dummy, tmp, nullptr);
-    __ increment_counter(inc, /*counter_addr*/LIR_OprFact::illegalOpr, dummy,
-                         tmp,
-                         /*freq*/LIR_OprFact::illegalOpr,
-                         md_reg,
-                         LIR_OprFact::metadataConst(md->constant_encoding()),
-                         LIR_OprFact::intConst(offset),
-                         /*overflow*/nullptr, /*info*/nullptr);
+    // __ increment_counter(inc, /*counter_addr*/LIR_OprFact::illegalOpr, dummy,
+    //                      tmp,
+    //                      /*freq*/LIR_OprFact::illegalOpr,
+    //                      md_reg,
+    //                      LIR_OprFact::metadataConst(md->constant_encoding()),
+    //                      LIR_OprFact::intConst(offset),
+    //                      /*overflow*/nullptr, /*info*/nullptr);
+    __ increment_counter(inc, dummy, md_reg, md->constant_encoding(), offset, tmp);
   }
 
   // emit phi-instruction move after safepoint since this simplifies
@@ -3167,7 +3170,6 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
 
   int offset = -1;
   LIR_Opr counter_holder;
-  LIR_Address* counter = nullptr;
   LIR_Opr counters_base;
   if (level == CompLevel_limited_profile) {
     MethodCounters* counters_adr = method->ensure_method_counters();
@@ -3180,7 +3182,6 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     offset = in_bytes(backedge ? MethodCounters::backedge_counter_offset() :
                                  MethodCounters::invocation_counter_offset());
     counters_base = LIR_OprFact::intptrConst(counters_adr);
-    // counter = new LIR_Address(counter_holder, offset, T_INT);
   } else if (level == CompLevel_full_profile) {
     counter_holder = new_register(T_METADATA);
     offset = in_bytes(backedge ? MethodData::backedge_counter_offset() :
@@ -3188,7 +3189,6 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     counters_base = LIR_OprFact::metadataConst
                      (method ->method_data_or_null()
                       ->constant_encoding());
-    // counter = new LIR_Address(counter_holder, offset, T_INT);
     // ciMethodData* md = method->method_data_or_null();
     // assert(md != nullptr, "Sanity");
     // __ metadata2reg(md->constant_encoding(), counter_holder);
@@ -3208,17 +3208,17 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     unsigned int freq = (unsigned int)frequency
                          >> ratio_shift << ratio_shift
                          << InvocationCounter::count_shift;
-    __ increment_counter(step, counter ? LIR_OprFact::address(counter)
-                                       : LIR_OprFact::illegalOpr,
-                         result, tmp,
+    __ increment_counter(step, result,
                          LIR_OprFact::intConst(freq),
-                         counter_holder, counters_base, LIR_OprFact::intConst(offset),
+                         counter_holder, counters_base, offset,
+                         tmp,
                          overflow, info);
   } else {
-    __ increment_counter(step, counter ? LIR_OprFact::intptrConst(counter)
-                                       : LIR_OprFact::illegalOpr, result, tmp,
-                         LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, LIR_OprFact::intConst(offset),
-                         LIR_OprFact::illegalOpr, nullptr, info);
+    __ increment_counter(step, result,
+                         /*freq*/LIR_OprFact::illegalOpr,
+                         counter_holder, counters_base, offset,
+                         tmp,
+                         /*overflow*/nullptr, info);
   }
 }
 

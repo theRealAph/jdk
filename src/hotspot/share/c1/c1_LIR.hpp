@@ -2283,16 +2283,31 @@ class LIR_List: public CompilationResourceObj {
   void volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offset, BasicType type, CodeEmitInfo* info, LIR_PatchCode patch_code);
 
   void increment_counter(LIR_Opr src, LIR_Opr addr, LIR_Opr res, LIR_Opr tmp,
-                         LIR_Opr freq, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr(md_offset),
+                         LIR_Opr freq, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset,
                          CodeStub* overflow, CodeEmitInfo* info);
-  void increment_counter(LIR_Opr src, LIR_Opr addr, LIR_Opr res, LIR_Opr tmp,
-                         CodeStub* overflow = nullptr) {
-    increment_counter(src, addr, res, tmp,
-             LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr,
-             LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr,
-             overflow, nullptr);
-  }
 
+  void increment_counter(LIR_Opr step, LIR_Opr dummy,
+                         LIR_Opr md_reg, Metadata* md, LIR_Opr offset, LIR_Opr tmp) {
+    increment_counter(step, /*counter_addr*/LIR_OprFact::illegalOpr, dummy,
+                      tmp, /*freq*/LIR_OprFact::illegalOpr,
+                      md_reg, LIR_OprFact::metadataConst(md),
+                      offset,
+                      /*overflow*/nullptr, /*info*/nullptr);
+  }
+  void increment_counter(LIR_Opr step, LIR_Opr dummy,
+                         LIR_Opr md_reg, Metadata* md, int offset, LIR_Opr tmp) {
+    increment_counter(step, dummy, md_reg, md,
+                      LIR_OprFact::intConst(offset), tmp);
+  }
+  void increment_counter(LIR_Opr step, LIR_Opr result, LIR_Opr freq,
+                         LIR_Opr md_reg, LIR_Opr md, int offset,
+                         LIR_Opr tmp,
+                         CodeStub* overflow, CodeEmitInfo* info) {
+    increment_counter(step, LIR_OprFact::illegalOpr, result, tmp,
+                      freq,
+                      md_reg, md, LIR_OprFact::intConst(offset),
+                      overflow, info);
+  }
 
   void idiv(LIR_Opr left, LIR_Opr right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);
   void idiv(LIR_Opr left, int   right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);
