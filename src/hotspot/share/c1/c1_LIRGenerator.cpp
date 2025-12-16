@@ -2393,7 +2393,7 @@ void LIRGenerator::do_Goto(Goto* x) {
     //                      LIR_OprFact::metadataConst(md->constant_encoding()),
     //                      LIR_OprFact::intConst(offset),
     //                      /*overflow*/nullptr, /*info*/nullptr);
-    __ increment_counter(inc, dummy, md_reg, md->constant_encoding(), offset);
+    __ increment_counter(inc, tmp, md_reg, md->constant_encoding(), offset);
   }
 
   // emit phi-instruction move after safepoint since this simplifies
