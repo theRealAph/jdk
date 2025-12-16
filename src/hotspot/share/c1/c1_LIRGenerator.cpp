@@ -938,7 +938,7 @@ void LIRGenerator::profile_branch(If* if_instr, If::Condition cond) {
     //                      LIR_OprFact::metadataConst(md->constant_encoding()),
     //                      data_offset_reg,
     //                      /*overflow*/nullptr, /*info*/nullptr);
-    __ increment_counter(step, dummy, md_reg, md->constant_encoding(), data_offset_reg, tmp);
+    __ increment_counter(step, tmp, md_reg, md->constant_encoding(), data_offset_reg);
   }
 }
 
@@ -2393,7 +2393,7 @@ void LIRGenerator::do_Goto(Goto* x) {
     //                      LIR_OprFact::metadataConst(md->constant_encoding()),
     //                      LIR_OprFact::intConst(offset),
     //                      /*overflow*/nullptr, /*info*/nullptr);
-    __ increment_counter(inc, dummy, md_reg, md->constant_encoding(), offset, tmp);
+    __ increment_counter(inc, dummy, md_reg, md->constant_encoding(), offset);
   }
 
   // emit phi-instruction move after safepoint since this simplifies
@@ -3211,13 +3211,11 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     __ increment_counter(step, result,
                          LIR_OprFact::intConst(freq),
                          counter_holder, counters_base, offset,
-                         tmp,
                          overflow, info);
   } else {
     __ increment_counter(step, result,
                          /*freq*/LIR_OprFact::illegalOpr,
                          counter_holder, counters_base, offset,
-                         tmp,
                          /*overflow*/nullptr, info);
   }
 }

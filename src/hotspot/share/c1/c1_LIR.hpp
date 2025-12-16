@@ -1939,9 +1939,6 @@ class LIR_OpIncrementCounter : public LIR_Op {
 
  private:
   LIR_Opr _step;
-  LIR_Opr _counter_addr;
-  LIR_Opr _dest;
-  LIR_Opr _temp_op;
   LIR_Opr _freq_op;
   LIR_Opr _md_reg;
   LIR_Opr _md_op;
@@ -1950,14 +1947,11 @@ class LIR_OpIncrementCounter : public LIR_Op {
 
  public:
   // Destroys recv
-  LIR_OpIncrementCounter(LIR_Opr step, LIR_Opr counter_addr, LIR_Opr dest, LIR_Opr temp_op,
+  LIR_OpIncrementCounter(LIR_Opr step, LIR_Opr dest,
                          LIR_Opr freq_op, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset_op,
                          CodeStub* overflow_stub, CodeEmitInfo *info)
-    : LIR_Op(lir_increment_counter, LIR_OprFact::illegalOpr, info)
+    : LIR_Op(lir_increment_counter, dest, info)
     , _step(step)
-    , _counter_addr(counter_addr)
-    , _dest(dest)
-    , _temp_op(temp_op)
     , _freq_op(freq_op)
     , _md_reg(md_reg)
     , _md_op(md_op)
@@ -1965,9 +1959,7 @@ class LIR_OpIncrementCounter : public LIR_Op {
     , _overflow_stub(overflow_stub) { }
 
   LIR_Opr   step()          const            { return _step;          }
-  LIR_Opr   counter_addr()  const            { return _counter_addr;  }
-  LIR_Opr   dest()          const            { return _dest;          }
-  LIR_Opr   temp_op()       const            { return _temp_op;       }
+  LIR_Opr   dest()          const            { return result_opr();   }
   LIR_Opr   freq_op()       const            { return _freq_op;       }
   LIR_Opr   md_reg()        const            { return _md_reg;        }
   LIR_Opr   md_op()         const            { return _md_op;         }
@@ -2282,28 +2274,27 @@ class LIR_List: public CompilationResourceObj {
   void volatile_store_mem_reg(LIR_Opr src, LIR_Address* address, CodeEmitInfo* info, LIR_PatchCode patch_code = lir_patch_none);
   void volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offset, BasicType type, CodeEmitInfo* info, LIR_PatchCode patch_code);
 
-  void increment_counter(LIR_Opr src, LIR_Opr addr, LIR_Opr res, LIR_Opr tmp,
+  void increment_counter(LIR_Opr src, LIR_Opr res,
                          LIR_Opr freq, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset,
                          CodeStub* overflow, CodeEmitInfo* info);
 
   void increment_counter(LIR_Opr step, LIR_Opr dummy,
-                         LIR_Opr md_reg, Metadata* md, LIR_Opr offset, LIR_Opr tmp) {
-    increment_counter(step, /*counter_addr*/LIR_OprFact::illegalOpr, dummy,
-                      tmp, /*freq*/LIR_OprFact::illegalOpr,
+                         LIR_Opr md_reg, Metadata* md, LIR_Opr offset) {
+    increment_counter(step, dummy,
+                      /*freq*/LIR_OprFact::illegalOpr,
                       md_reg, LIR_OprFact::metadataConst(md),
                       offset,
                       /*overflow*/nullptr, /*info*/nullptr);
   }
   void increment_counter(LIR_Opr step, LIR_Opr dummy,
-                         LIR_Opr md_reg, Metadata* md, int offset, LIR_Opr tmp) {
+                         LIR_Opr md_reg, Metadata* md, int offset) {
     increment_counter(step, dummy, md_reg, md,
-                      LIR_OprFact::intConst(offset), tmp);
+                      LIR_OprFact::intConst(offset));
   }
   void increment_counter(LIR_Opr step, LIR_Opr result, LIR_Opr freq,
                          LIR_Opr md_reg, LIR_Opr md, int offset,
-                         LIR_Opr tmp,
                          CodeStub* overflow, CodeEmitInfo* info) {
-    increment_counter(step, LIR_OprFact::illegalOpr, result, tmp,
+    increment_counter(step, result,
                       freq,
                       md_reg, md, LIR_OprFact::intConst(offset),
                       overflow, info);
