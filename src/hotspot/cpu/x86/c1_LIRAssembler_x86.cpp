@@ -2852,8 +2852,10 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj, rscratch1);
 }
 
-void LIR_Assembler::increment_profile_ctr(LIR_Opr incr, LIR_Opr addr, LIR_Opr dest, LIR_Opr temp_op,
-                                          LIR_Opr freq_op, CodeStub* overflow_stub) {
+void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
+                                          LIR_Opr freq_opr,
+                                          LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
+                                          CodeStub* overflow_stub) {
 #ifndef PRODUCT
   if (CommentedAssembly) {
     __ block_comment("increment_profile_ctr" " {");
@@ -2869,20 +2871,42 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr incr, LIR_Opr addr, LIR_Opr de
   ProfileStub *counter_stub
     = profile_capture_ratio > 1 ? new ProfileStub() : nullptr;
 
-  Register temp = temp_op->is_register() ? temp_op->as_register() : noreg;
-  Address dest_adr = as_Address(addr->as_address_ptr());
-
-  auto lambda = [counter_stub, overflow_stub, freq_op, ratio_shift, incr,
-                 temp, dest, dest_adr] (LIR_Assembler* ce, LIR_Op* op) {
+  Register dest = as_reg(dest_opr);
+  auto lambda = [counter_stub, overflow_stub, freq_opr, dest_opr, dest, ratio_shift, step,
+                 md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
 #undef __
 #define __ masm->
 
     auto masm = ce->masm();
+    Address counter_address;
 
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
-    if (incr->is_register()) {
+    if (md_opr->is_valid()) {
+#if 0
+      if (! md_offset_opr->is_constant()) {
+      __ lea(rscratch1, ExternalAddress((address)&floofy));
+      __ ldr(rscratch2, Address(rscratch1));
+      __ add(rscratch2, rscratch2, (u1)1);
+      __ str(rscratch2, Address(rscratch1));
+      }
+#endif
+      if (md_opr->type() == T_METADATA) {
+        __ mov_metadata(md_reg->as_register(),
+                          md_opr->as_constant_ptr()->as_metadata());
+      } else {
+        __ mov(md_reg->as_pointer_register(),
+               md_opr->as_constant_ptr()->as_pointer());
+      }
+      RegisterOrConstant offset =
+        md_offset_opr->is_constant()
+        ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
+        : as_reg(md_offset_opr);
+      counter_address = Address(md_reg->as_pointer_register(), offset);
+    }
+
+ if (incr->is_register()) {
       Register inc = incr->as_register();
       __ movl(temp, dest_adr);
       if (ProfileCaptureRatio > 1) {
