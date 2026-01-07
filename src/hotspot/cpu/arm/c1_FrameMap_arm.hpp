@@ -95,7 +95,8 @@
   }
 
   static int adjust_reg_range(int range) {
-    return range;
+    
+    return range - (ProfileCaptureRatio > 1);
   }
 
   static int nof_caller_save_cpu_regs() {

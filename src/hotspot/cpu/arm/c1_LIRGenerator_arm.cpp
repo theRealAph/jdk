@@ -1275,6 +1275,11 @@ void LIRGenerator::do_If(If* x) {
 
   __ cmp(lir_cond(cond), left, right);
   profile_branch(x, cond);
+  // If we're subsampling counter updates, then profiling code kills flags
+  // if (ProfileCaptureRatio != 1)
+    {
+    __ cmp(lir_cond(cond), left, right);
+  }
   move_to_phi(x->state());
   if (x->x()->type()->is_float_kind()) {
     __ branch(lir_cond(cond), x->tsux(), x->usux());

@@ -222,6 +222,58 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register basic
   // Success: fall through
 }
 
+// Increments mdp data. Sets bumped_count register to adjusted counter.
+void C1_MacroAssembler::increment_mdp_data_at(Address data,
+					      Register bumped_count,
+					      int increment) {
+  assert(ProfileInterpreter, "must be profiling interpreter");
+
+  ldr(bumped_count, data);
+  if (increment < 0) {
+    // Decrement the register. Set condition codes.
+    subs(bumped_count, bumped_count, -increment);
+    // Avoid overflow.
+    add(bumped_count, bumped_count, -increment, pl);
+  } else {
+    // Increment the register. Set condition codes.
+    adds(bumped_count, bumped_count, increment);
+    // Avoid overflow.
+    sub(bumped_count, bumped_count, increment, mi);
+  }
+  str(bumped_count, data);
+}
+
+// Randomized profile capture.
+
+void C1_MacroAssembler::step_random(Register state, Register temp, Register data) {
+  // if (VM_Version::supports_crc32()) {
+  //   /* CRC used as a psuedo-random-number generator */
+  //   // In effect, the CRC instruction is being used here for its
+  //   // linear feedback shift register. It's unbeatably fast, and
+  //   // plenty good enough for what we need.
+  //   crc32h(state, state, data);
+  // } else
+    {
+    /* LCG from glibc. */
+    mov_slow(temp, 1103515245);
+    mul(state, state, temp);
+    add(state, state, 12345);
+  }
+}
+
+void C1_MacroAssembler::save_profile_rng() {
+  if (ProfileCaptureRatio != 1) {
+    str(r_profile_rng, Address(Rthread, JavaThread::profile_rng_offset()));
+  }
+}
+
+void C1_MacroAssembler::restore_profile_rng() {
+  if (ProfileCaptureRatio != 1) {
+    ldr(r_profile_rng, Address(Rthread, JavaThread::profile_rng_offset()));
+  }
+}
+
+ 
 #ifndef PRODUCT
 
 void C1_MacroAssembler::verify_stack_oop(int stack_offset) {
