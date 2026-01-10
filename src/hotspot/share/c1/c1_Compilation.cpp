@@ -263,6 +263,10 @@ void Compilation::emit_lir() {
     hir()->iterate_linear_scan_order(&gen);
   }
 
+  if (PrintLIR && !bailed_out()) {
+    print_LIR(hir()->code());
+  }
+
   CHECK_BAILOUT();
 
   {

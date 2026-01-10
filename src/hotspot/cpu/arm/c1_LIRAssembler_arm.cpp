@@ -1401,8 +1401,15 @@ void LIR_Assembler::emit_compare_and_swap(LIR_OpCompareAndSwap* op) {
     Register new_value_lo = op->new_value()->as_register_lo();
     Register new_value_hi = op->new_value()->as_register_hi();
     Register dest = op->result_opr()->as_register();
-    Register tmp_lo = op->tmp1()->as_register_lo();
-    Register tmp_hi = op->tmp1()->as_register_hi();
+    Register tmp_lo, tmp_hi;
+
+    if (op->tmp1()->is_valid()) {
+      tmp_lo = op->tmp1()->as_register_lo();
+      tmp_hi = op->tmp1()->as_register_hi();
+    } else {
+      tmp_lo = Rthread, tmp_hi = FP;
+      __ push(RegisterSet(Rthread, FP));
+    }
 
     assert_different_registers(tmp_lo, tmp_hi, cmp_value_lo, cmp_value_hi, dest, new_value_lo, new_value_hi, addr);
     assert(tmp_hi->encoding() == tmp_lo->encoding() + 1, "non aligned register pair");
@@ -1411,6 +1418,9 @@ void LIR_Assembler::emit_compare_and_swap(LIR_OpCompareAndSwap* op) {
     assert((new_value_lo->encoding() & 0x1) == 0, "misaligned register pair");
     __ atomic_cas64(tmp_lo, tmp_hi, dest, cmp_value_lo, cmp_value_hi,
                     new_value_lo, new_value_hi, addr, 0);
+    if (!op->tmp1()->is_valid()) {
+      __ pop(RegisterSet(Rthread, FP));
+    }
   } else {
     Unimplemented();
   }

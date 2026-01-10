@@ -1848,7 +1848,7 @@ void LIR_OpCompareAndSwap::print_instr(outputStream* out) const {
   new_value()->print(out); out->print(" ");
   tmp1()->print(out);      out->print(" ");
   tmp2()->print(out);      out->print(" ");
-
+  result_opr()->print(out); out->print(" ");
 }
 
 // LIR_Op0

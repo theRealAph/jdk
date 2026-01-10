@@ -95,8 +95,9 @@
   }
 
   static int adjust_reg_range(int range) {
-    
-    return range - (ProfileCaptureRatio > 1);
+    int result = range - (ProfileCaptureRatio > 1);
+    // return (result & 1) == 0 ? result - 1 : result;  // ouch
+    return align_down(result, 2);  // ouch
   }
 
   static int nof_caller_save_cpu_regs() {

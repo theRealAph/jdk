@@ -227,7 +227,17 @@ void C1_MacroAssembler::increment_mdp_data_at(Address data,
 					      Register bumped_count,
 					      int increment) {
   assert(ProfileInterpreter, "must be profiling interpreter");
+  assert_different_registers(data.base(), Rtemp);
+  assert(data.mode() == basic_offset, "must be");
 
+  int offset = data.disp();
+  bool is_memoryI =  offset < 4096 && offset > -4096;
+
+  if (!is_memoryI) {
+    block_comment("Move slow");
+    mov_slow(Rtemp, offset);
+    data = Address(data.base(), Rtemp);
+  }
   ldr(bumped_count, data);
   if (increment < 0) {
     // Decrement the register. Set condition codes.
@@ -257,7 +267,8 @@ void C1_MacroAssembler::step_random(Register state, Register temp, Register data
     /* LCG from glibc. */
     mov_slow(temp, 1103515245);
     mul(state, state, temp);
-    add(state, state, 12345);
+    // add(state, state, 12345);
+    add(state, state, 251);
   }
 }
 

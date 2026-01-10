@@ -110,6 +110,11 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
 bool Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   switch (id) {
   case vmIntrinsics::_compareAndSetLong:
+#if defined (ARM)
+    if (ProfileCaptureRatio > 1) {
+      return false;
+    }
+#endif
     break;
   case vmIntrinsics::_getAndAddInt:
     if (!VM_Version::supports_atomic_getadd4()) return false;
