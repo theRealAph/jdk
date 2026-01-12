@@ -774,7 +774,7 @@ LIR_Opr LIRGenerator::atomic_cmpxchg(BasicType type, LIR_Opr addr, LIRItem& cmp_
   } else if (type == T_LONG) {
     if (ProfileCaptureRatio > 1) {
       // Call out to runtime because we don't have enough registers to
-      // expand compareAndSet inline.
+      // expand compareAndSet(long) inline.
       arm_cas_long(addr, cmp_value, new_value, result);
     } else {
       tmp1 = new_register(T_LONG);
