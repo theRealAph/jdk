@@ -779,8 +779,8 @@ const char *Runtime1::pd_name_for_address(address entry) {
   return "";
 }
 #else  // __SOFTFP__
-  if (entry == StubRoutines::atomic_cmpxchg_long_entry()) {
-    return "StubRoutines::atomic_cmpxchg_long";
+if (entry == StubRoutines::Arm::atomic_compareAndSet_long_entry()) {
+    return "StubRoutines::atomic_compareAndSet_long";
   }
   return "<unknown function>";
 #endif // __SOFTFP__

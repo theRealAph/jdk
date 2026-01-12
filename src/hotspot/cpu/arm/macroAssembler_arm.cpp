@@ -1627,6 +1627,13 @@ int MacroAssembler::patchable_call(address target, RelocationHolder const& rspec
   } else {
     Label ret_addr;
     InlinedAddress address_literal(target);
+#ifndef PRODUCT
+  {
+    char buffer[20];
+    os::snprintf_checked(buffer, sizeof(buffer), "call %p", target);
+    block_comment(buffer);
+  }
+#endif
     adr(LR, ret_addr);
     ldr_literal(PC, address_literal);
     bind_literal(address_literal);
