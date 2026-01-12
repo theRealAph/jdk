@@ -3366,7 +3366,6 @@ LIR_Opr LIRGenerator::call_runtime(Value arg1, Value arg2, address entry, ValueT
   return call_runtime(&signature, &args, entry, result_type, info);
 }
 
-
 LIR_Opr LIRGenerator::call_runtime(BasicTypeArray* signature, LIR_OprList* args,
                                    address entry, ValueType* result_type, CodeEmitInfo* info) {
   // get a result register

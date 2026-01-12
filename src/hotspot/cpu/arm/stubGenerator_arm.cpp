@@ -159,6 +159,10 @@ static arraycopy_platform_config arraycopy_configurations[] = {
   }
 };
 
+#if 1
+int floofy;
+#endif
+
 class StubGenerator: public StubCodeGenerator {
 
 #ifdef PRODUCT
@@ -620,6 +624,11 @@ class StubGenerator: public StubCodeGenerator {
     // Stack is unaligned, maintain double word alignment by pushing
     // odd number of regs.
     __ push(RegisterSet(temp_result) | RegisterSet(temp_lo, temp_hi));
+    __ lea(temp_result, ExternalAddress((address)&floofy));
+    __ ldr(Rtemp, Address(temp_result));
+    __ add(Rtemp, Rtemp, 1);
+    __ str(Rtemp, Address(temp_result));
+
     __ ldr(addr, Address(SP, 12));
 
     // atomic_cas64 returns previous value in temp_lo, temp_hi

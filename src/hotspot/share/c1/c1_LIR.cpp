@@ -1889,6 +1889,15 @@ void LIR_OpRTCall::print_instr(outputStream* out) const {
   out->print("%s", Runtime1::name_for_address(addr()));
   out->print(" ");
   tmp()->print(out);
+  int n = _arguments->length();
+  for (int i = 0; i < n; i++) {
+    _arguments->at(i)->print(out);
+    out->print(" ");
+  }
+  if (_result->is_valid()) {
+    _result->print(out);
+    out->print(" ");
+  }
 }
 
 void LIR_Op1::print_patch_code(outputStream* out, LIR_PatchCode code) {
