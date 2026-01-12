@@ -240,15 +240,9 @@ void C1_MacroAssembler::increment_mdp_data_at(Address data,
   }
   ldr(bumped_count, data);
   if (increment < 0) {
-    // Decrement the register. Set condition codes.
-    subs(bumped_count, bumped_count, -increment);
-    // Avoid overflow.
-    add(bumped_count, bumped_count, -increment, pl);
+    sub(bumped_count, bumped_count, -increment);
   } else {
-    // Increment the register. Set condition codes.
-    adds(bumped_count, bumped_count, increment);
-    // Avoid overflow.
-    sub(bumped_count, bumped_count, increment, mi);
+    add(bumped_count, bumped_count, increment);
   }
   str(bumped_count, data);
 }
