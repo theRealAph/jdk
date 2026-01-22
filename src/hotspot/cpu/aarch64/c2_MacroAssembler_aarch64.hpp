@@ -34,19 +34,65 @@
   void neon_reduce_logical_helper(int opc, bool sf, Register Rd, Register Rn, Register Rm,
                                   enum shift_kind kind = Assembler::LSL, unsigned shift = 0);
 
+  // Depending on the parameter t, call either m1 or m2 with the
+  // arguments provided.
+  template<typename M1, typename M2,
+           typename T1, typename T2, typename T3, typename T4>
+    void choose(bool t, M1 m1, M2 m2, T1 a1, T2 a2, T3 a3, T4 a4) {
+    t ? (this->*m1)(a1, a2, a3, a4) : (this->*m2)(a1, a2, a3, a4);
+  }
+
+  template<typename M1, typename M2,
+           typename T1, typename T2, typename T3>
+  void choose(bool t, M1 m1, M2 m2, T1 a1, T2 a2, T3 a3) {
+    t ? (this->*m1)(a1, a2, a3) : (this->*m2)(a1, a2, a3);
+  }
+
+  typedef void (Assembler::*f1type)(FloatRegister,
+                                    Assembler::SIMD_Arrangement, FloatRegister);
+  typedef void (Assembler::*f2type)(FloatRegister,
+                                    Assembler::SIMD_RegVariant, PRegister, FloatRegister);
+
+  f1type choose(bool t, f1type m1, f1type m2) {
+    return t ? m1 : m2;
+  }
+  f2type choose(bool t, f2type m1, f2type m2) {
+    return t ? m1 : m2;
+  }
+
   // Helper functions for min/max reduction operations
   void neon_minp(bool is_unsigned, FloatRegister dst, SIMD_Arrangement size,
-                 FloatRegister src1, FloatRegister src2);
+                 FloatRegister src1, FloatRegister src2) {
+    choose(is_unsigned, &Assembler::uminp, &Assembler::sminp, dst, size, src1, src2);
+  }
   void neon_maxp(bool is_unsigned, FloatRegister dst, SIMD_Arrangement size,
-                 FloatRegister src1, FloatRegister src2);
+                   FloatRegister src1, FloatRegister src2) {
+    choose(is_unsigned, &Assembler::umaxp, &Assembler::smaxp, dst, size, src1, src2);
+  }
   void neon_minv(bool is_unsigned, FloatRegister dst, SIMD_Arrangement size,
-                 FloatRegister src);
+                 FloatRegister src) {
+    f1type f
+      = choose(is_unsigned, (f1type)&Assembler::uminv, (f1type)&Assembler::sminv);
+    (this->*f)(dst, size, src);
+  }
   void neon_maxv(bool is_unsigned, FloatRegister dst, SIMD_Arrangement size,
-                 FloatRegister src);
+                 FloatRegister src) {
+    f1type f
+      = choose(is_unsigned, &Assembler::umaxv, &Assembler::smaxv);
+    (this->*f)(dst, size, src);
+  }
   void sve_minv(bool is_unsigned, FloatRegister dst, SIMD_RegVariant size,
-                PRegister pg, FloatRegister src);
+                PRegister pg, FloatRegister src) {
+    f2type f
+      = choose(is_unsigned, &Assembler::sve_uminv, &Assembler::sve_sminv);
+    (this->*f)(dst, size, pg, src);
+  }
   void sve_maxv(bool is_unsigned, FloatRegister dst, SIMD_RegVariant size,
-                PRegister pg, FloatRegister src);
+                PRegister pg, FloatRegister src) {
+    f2type f
+      = choose(is_unsigned, &Assembler::sve_umaxv, &Assembler::sve_smaxv);
+    (this->*f)(dst, size, pg, src);
+  }
 
   void select_from_two_vectors_neon(FloatRegister dst, FloatRegister src1,
                                     FloatRegister src2, FloatRegister index,
