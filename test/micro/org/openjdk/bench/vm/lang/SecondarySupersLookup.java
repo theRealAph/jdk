@@ -22,9 +22,25 @@
  */
 package org.openjdk.bench.vm.lang;
 
-import org.openjdk.jmh.annotations.*;
-import java.util.concurrent.TimeUnit;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.classfile.*;
+import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
+import java.lang.constant.MethodTypeDesc;
+import java.lang.invoke.MethodHandles;
+import java.security.SecureClassLoader;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import org.openjdk.jmh.annotations.*;
+
+import static java.lang.classfile.ClassFile.*;
+import static java.lang.invoke.MethodType.methodType;
 
 
 @BenchmarkMode(Mode.AverageTime)
@@ -34,6 +50,9 @@ import java.util.Random;
 @Measurement(iterations = 3, time = 1)
 @Fork(value = 5)
 public class SecondarySupersLookup {
+    @Param("100")
+    private int interfaceCount;
+
     interface J  {}
     interface I01 {}
     interface I02 extends I01 {}
@@ -143,6 +162,117 @@ public class SecondarySupersLookup {
             case 9: return I10.class;
         }
         throw new InternalError("" + i);
+    }
+
+    private static final ClassDesc CD_Hello = ClassDesc.of("Hello");
+    private static final MethodTypeDesc MTD_void_StringArray = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_String.arrayType());
+    private static final MethodTypeDesc MTD_void_String = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_String);
+    private static final MethodTypeDesc MTD_Class_boolean = MethodTypeDesc.of(ConstantDescs.CD_boolean, ConstantDescs.CD_Class);
+    private static final MethodTypeDesc MTD_Object_boolean = MethodTypeDesc.of(ConstantDescs.CD_boolean, ConstantDescs.CD_Object);
+    private static final ClassDesc CD_System = ClassDesc.of("java.lang.System");
+    private static final ClassDesc CD_PrintStream = ClassDesc.of("java.io.PrintStream");
+
+    static class MyLoader extends SecureClassLoader {
+        public Class defineClass(String name, byte[] bytes) {
+            try {
+                try (FileOutputStream fos = new FileOutputStream("/tmp/" + name + ".class")) {
+                    fos.write(bytes);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return defineClass(name, bytes, 0, bytes.length);
+        }
+    }
+
+    static MyLoader LOADER = new MyLoader();
+
+    static String interfaceName(Integer suffix) {
+        return String.format("I%04d", suffix);
+    }
+
+    private static Class<?>[] genInterfaces(Function<Integer, String> name, int first, int last) {
+        Class<?>[] interfaces = new Class[last + 1];
+        for (int n = first; n <= last; n++) {
+            byte[] bytes = ClassFile.of().build(ClassDesc.of(name.apply(n)),
+                (ClassBuilder clb) -> clb.withFlags(ACC_INTERFACE | ACC_PUBLIC | ACC_ABSTRACT));
+            interfaces[n] = LOADER.defineClass(interfaceName(n), bytes);
+        }
+        System.out.println("LENGTH = " + interfaces.length);
+        return interfaces;
+    }
+
+    Class<?>[] interfaces;
+
+    public Class<?>[] genClasses(Class<?>[] interfaces, int length) {
+        Class<?>[] impls = new Class[length];
+        for (int n = 0; n < length; n++) {
+            var klass = genClass(List.of(interfaces).stream()
+                .map(iface -> ClassDesc.of(iface.getName())).toList(), "Impl" + n);
+            impls[n] = klass;
+        }
+        return impls;
+    }
+
+    private Class genClass(Class<?>[] interfaces, String name) {
+        return genClass(List.of(interfaces).stream()
+                        .map(iface -> ClassDesc.of(iface.getName())).toList(),
+                        name);
+    }
+
+    private Class<?> genClass(List<ClassDesc> interfaceDesc, String name) {
+        byte[] bytes = ClassFile.of().build(ClassDesc.of(name),
+            clb -> {
+                clb = clb.withFlags(ACC_PUBLIC);
+                var cpool = clb.constantPool();
+                Stream<ClassEntry> interfaceEntryStream = interfaceDesc.stream()
+                    .map(cpool::classEntry);
+                var interfaceEntries = interfaceEntryStream.toList();
+                clb
+                    .withInterfaces(interfaceEntries)
+                    .withMethod(ConstantDescs.INIT_NAME, ConstantDescs.MTD_void,
+                        ClassFile.ACC_PUBLIC,
+                        mb -> mb.withCode(
+                            cob -> cob.aload(0)
+                                .invokespecial(ConstantDescs.CD_Object,
+                                    ConstantDescs.INIT_NAME, ConstantDescs.MTD_void)
+                                .return_()))
+                    .withMethod("isInstance", MTD_Class_boolean,
+                        ACC_PUBLIC,
+                        mb -> mb.withCode(
+                            cob -> cob
+                                .aload(1)
+                                .aload(0)
+                                .invokevirtual(ConstantDescs.CD_Class, "isInstance",
+                                    MethodTypeDesc.of(ConstantDescs.CD_boolean,
+                                        ConstantDescs.CD_Object))
+                                .ireturn()))
+                    .withMethod("is" + interfaceEntries.get(Math.min(27,
+                                                  interfaceEntries.size() / 2)).name(),
+                        MethodTypeDesc.of(ConstantDescs.CD_boolean),
+                        ACC_PUBLIC,
+                        mb -> mb.withCode(
+                            cob -> cob
+                                .aload(0)
+                                .instanceOf(interfaceEntries.get
+                                        (Math.min(27,
+                                                  interfaceEntries.size() / 2)))
+                                .ireturn()
+                        ));
+            });
+        return LOADER.defineClass(name, bytes);
+    }
+
+    Object testInstance;
+
+    @Setup
+    public void init() throws Exception {
+        interfaces = genInterfaces(SecondarySupersLookup::interfaceName, 0, interfaceCount);
+        Class<?> barf = genClass(interfaces, "Humongous");
+        testInstance = barf.getConstructor().newInstance();
+        System.out.println("COUNT = " + interfaceCount);
     }
 
     @Setup
@@ -306,5 +436,9 @@ public class SecondarySupersLookup {
 
     @Benchmark public void testNegative64() {
         test(obj64, J.class, false);
+    }
+
+    @Benchmark public void testPositiveN() {
+        test(testInstance, interfaces[interfaceCount >>> 1], true);
     }
 }
