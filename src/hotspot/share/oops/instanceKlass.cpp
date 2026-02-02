@@ -1573,7 +1573,7 @@ GrowableArray<Klass*>* InstanceKlass::compute_secondary_supers(int num_extra_slo
   } else if (num_extra_slots == 0 && interfaces->length() <= 1) {
     // We will reuse the transitive interfaces list if we're certain
     // it's in hash order.
-    uintx bitmap = compute_secondary_supers_bitmap(interfaces);
+    uintx bitmap = compute_secondary_supers_bitmap(&interfaces);
     set_secondary_supers(interfaces, bitmap);
     return nullptr;
   }
@@ -3748,8 +3748,9 @@ void InstanceKlass::print_on(outputStream* st) const {
   if (secondary_supers() != nullptr) {
     if (Verbose) {
       bool is_hashed = (_secondary_supers_bitmap != SECONDARY_SUPERS_BITMAP_FULL);
-      st->print_cr(BULLET"---- secondary supers (%d words):", _secondary_supers->length());
-      for (int i = 0; i < _secondary_supers->length(); i++) {
+      auto length = _secondary_supers->length();
+      st->print_cr(BULLET"---- secondary supers (%d words):", length);
+      for (int i = 0; i < length; i++) {
         ResourceMark rm; // for external_name()
         Klass* secondary_super = _secondary_supers->at(i);
         st->print(BULLET"%2d:", i);
@@ -3757,6 +3758,11 @@ void InstanceKlass::print_on(outputStream* st) const {
           int home_slot = compute_home_slot(secondary_super, _secondary_supers_bitmap);
           int distance = (i - home_slot) & SECONDARY_SUPERS_TABLE_MASK;
           st->print(" dist:%02d:", distance);
+        } else {
+          int home_slot = (secondary_super->hash_code() * length) >> 16;
+          int distance = (i - home_slot + length) % length;
+          st->print(" hash:%5d: slot:%5d: dist:%02d:",
+                    secondary_super->hash_code(), home_slot, distance);
         }
         st->print_cr(" %p %s", secondary_super, secondary_super->external_name());
       }

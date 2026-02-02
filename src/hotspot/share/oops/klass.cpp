@@ -57,6 +57,12 @@
 #include "utilities/rotate_bits.hpp"
 #include "utilities/stack.inline.hpp"
 
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <iostream>
+#include <string_view>
+
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -72,7 +78,8 @@ bool Klass::is_cloneable() const {
          is_subtype_of(vmClasses::Cloneable_klass());
 }
 
-uint8_t Klass::compute_hash_slot(Symbol* n) {
+uint32_t
+Klass::compute_hash(Symbol* n) {
   uint hash_code;
   // Special cases for the two superclasses of all Array instances.
   // Code elsewhere assumes, for all instances of ArrayKlass, that
@@ -98,9 +105,8 @@ uint8_t Klass::compute_hash_slot(Symbol* n) {
     // This constant is magic: see Knuth, "Fibonacci Hashing".
     constexpr uint multiplier
       = 2654435769; // (uint)(((u8)1 << 32) / ((1 + sqrt(5)) / 2 ))
-    constexpr uint hash_shift = sizeof(hash_code) * 8 - 6;
     // The leading bits of the least significant half of the product.
-    hash_code = (hash_code * multiplier) >> hash_shift;
+    hash_code *= multiplier;
 
     if (StressSecondarySupers) {
       // Generate many hash collisions in order to stress-test the
@@ -110,7 +116,7 @@ uint8_t Klass::compute_hash_slot(Symbol* n) {
     }
   }
 
-  return (hash_code & SECONDARY_SUPERS_TABLE_MASK);
+  return hash_code + 1;
 }
 
 void Klass::set_name(Symbol* n) {
@@ -343,7 +349,7 @@ bool Klass::can_be_primary_super_slow() const {
 void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
 #ifdef ASSERT
   if (secondaries != nullptr) {
-    uintx real_bitmap = compute_secondary_supers_bitmap(secondaries);
+    uintx real_bitmap = compute_secondary_supers_bitmap(&secondaries);
     assert(bitmap == real_bitmap, "must be");
     assert(secondaries->length() >= (int)population_count(bitmap), "must be");
   }
@@ -372,7 +378,15 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
 // a kind of Bloom filter, which in many cases allows us quickly to
 // eliminate the possibility that something is a member of a set of
 // secondaries.
-uintx Klass::hash_secondary_supers(Array<Klass*>* secondaries, bool rewrite) {
+
+int my_compare(const void *a, const void *b) {
+  Klass *pa = *(Klass**)a, *pb = *(Klass**)b;
+  return pa->hash_slot() - pb->hash_slot();
+}
+
+uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
+                                   uint16_t *probe_length, ClassLoaderData* loader_data) {
+  auto secondaries = *secondaries_p;
   const int length = secondaries->length();
 
   if (length == 0) {
@@ -386,10 +400,41 @@ uintx Klass::hash_secondary_supers(Array<Klass*>* secondaries, bool rewrite) {
 
   // Invariant: _secondary_supers.length >= population_count(_secondary_supers_bitmap)
 
+
+
   // Don't attempt to hash a table that's completely full, because in
   // the case of an absent interface linear probing would not
   // terminate.
   if (length >= SECONDARY_SUPERS_TABLE_SIZE) {
+    if (rewrite) {
+      qsort(secondaries->adr_at(0), secondaries->length(),
+          sizeof secondaries->at(0),
+          [](const void *a, const void *b) {
+            Klass *pa = *(Klass**)a, *pb = *(Klass**)b;
+            return pa->hash_code() - pb->hash_code();
+          });
+      int shift = 0, delta = 0;
+      for (int i = 0; i < length; i++) {
+        Klass* secondary_super = secondaries->at(i);
+        int cslot = (secondary_super->hash_code() * length) >> 16;
+        shift = MAX(shift, cslot - i);
+        delta = MIN(delta, cslot - i);
+      }
+      if (shift) {
+        auto a = secondaries->adr_at(0);
+        int probe = shift - delta;
+        auto new_length = length + probe;
+        Array<Klass*>* secondary_supers
+          = MetadataFactory::new_array<Klass*>(loader_data, new_length, CHECK_NULL);
+        std::copy(a, a + length, secondary_supers->adr_at(probe));
+        std::copy(a, probe, secondary_supers->adr_at(0));
+        // std::reverse(a, a + length);
+        // std::reverse(a, a + shift);
+        // std::reverse(a + shift, a + length);
+      }
+      if (probe_length != nullptr)  *probe_length = probe;
+      asm("nop");
+    }
     return SECONDARY_SUPERS_BITMAP_FULL;
   }
 
@@ -466,7 +511,7 @@ void Klass::hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx&
 Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
                                             GrowableArray<Klass*>* primaries,
                                             GrowableArray<Klass*>* secondaries,
-                                            uintx& bitmap, TRAPS) {
+                                            uintx& bitmap, uint16_t *probe_length, TRAPS) {
   int new_length = primaries->length() + secondaries->length();
   Array<Klass*>* secondary_supers = MetadataFactory::new_array<Klass*>(loader_data, new_length, CHECK_NULL);
 
@@ -486,12 +531,13 @@ Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
   }
 #endif
 
-  bitmap = hash_secondary_supers(secondary_supers, /*rewrite=*/true); // rewrites freshly allocated array
+  // rewrites freshly allocated array
+  bitmap = hash_secondary_supers(&secondary_supers, /*rewrite=*/true, probe_length, loader_data);
   return secondary_supers;
 }
 
-uintx Klass::compute_secondary_supers_bitmap(Array<Klass*>* secondary_supers) {
-  return hash_secondary_supers(secondary_supers, /*rewrite=*/false); // no rewrites allowed
+uintx Klass::compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers) {
+  return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr); // no rewrites allowed
 }
 
 uint8_t Klass::compute_home_slot(Klass* k, uintx bitmap) {
@@ -594,7 +640,8 @@ void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interf
     }
     // Combine the two arrays into a metadata object to pack the array.
     uintx bitmap = 0;
-    Array<Klass*>* s2 = pack_secondary_supers(class_loader_data(), primaries, secondaries, bitmap, CHECK);
+    Array<Klass*>* s2 = pack_secondary_supers(class_loader_data(), primaries, secondaries,
+                                              bitmap, &_probe_length, CHECK);
     set_secondary_supers(s2, bitmap);
   }
 }
@@ -811,7 +858,8 @@ void Klass::remove_unshareable_info() {
     // Note that the bitmap is guaranteed to be deterministic, regardless of the
     // actual addresses of the elements in _secondary_supers. So rehashing shouldn't
     // change it.
-    uintx bitmap = hash_secondary_supers(secondary_supers(), true);
+    auto secondaries = secondary_supers();
+    uintx bitmap = hash_secondary_supers(&secondaries, true, /*probe_length*/nullptr);
     assert(bitmap == _secondary_supers_bitmap, "bitmap should not be changed due to rehashing");
   }
 }

@@ -161,6 +161,8 @@ class Klass : public Metadata {
 
   // Bitmap and hash code used by hashed secondary supers.
   uintx    _secondary_supers_bitmap;
+  uint16_t _full_hash;
+  uint16_t _probe_length;  // How far should we probe before giving up?
   uint8_t  _hash_slot;
 
 private:
@@ -245,6 +247,9 @@ protected:
   void set_secondary_supers(Array<Klass*>* k, uintx bitmap);
 
   uint8_t hash_slot() const { return _hash_slot; }
+  uint16_t hash_code() {
+    return _full_hash ? _full_hash : _full_hash = compute_hash(name());
+  }
 
   // Return the element of the _super chain of the given depth.
   // If there is no such element, return either null or this.
@@ -414,11 +419,18 @@ protected:
   void     set_next_sibling(Klass* s);
  protected:                                // internal accessors
   void     set_subklass(Klass* s);
+  static uint32_t compute_hash(Symbol* s);
 
  private:
-  static uint8_t compute_hash_slot(Symbol* s);
+  static uint8_t compute_hash_slot(Symbol* s) {
+    uint16_t hash = compute_hash(s);
+    // The leading bits of the least significant half of the product.
+    constexpr uint hash_shift = sizeof (hash) * 8 - 6;
+    return (hash >> hash_shift) & SECONDARY_SUPERS_TABLE_MASK;
+  }
   static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap);
-  static uintx hash_secondary_supers(Array<Klass*>* secondaries, bool rewrite);
+  static uintx hash_secondary_supers(Array<Klass*>** secondaries, bool rewrite,
+                                     uint16_t *probe_length, ClassLoaderData* loader_data);
 
   bool search_secondary_supers(Klass* k) const;
   bool lookup_secondary_supers_table(Klass *k) const;
@@ -430,10 +442,10 @@ protected:
   static Array<Klass*>* pack_secondary_supers(ClassLoaderData* loader_data,
                                               GrowableArray<Klass*>* primaries,
                                               GrowableArray<Klass*>* secondaries,
-                                              uintx& bitmap,
+                                              uintx& bitmap, uint16_t* probe_length,
                                               TRAPS);
 
-  static uintx   compute_secondary_supers_bitmap(Array<Klass*>* secondary_supers);
+  static uintx   compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers);
   static uint8_t compute_home_slot(Klass* k, uintx bitmap);
 
   static constexpr int SECONDARY_SUPERS_TABLE_SIZE = sizeof(_secondary_supers_bitmap) * 8;
@@ -458,6 +470,8 @@ protected:
   static ByteSize secondary_supers_bitmap_offset()
                                                  { return byte_offset_of(Klass, _secondary_supers_bitmap); }
   static ByteSize hash_slot_offset()             { return byte_offset_of(Klass, _hash_slot); }
+  static ByteSize full_hash_offset()             { return byte_offset_of(Klass, _full_hash); }
+  static ByteSize probe_length_offset()          { return byte_offset_of(Klass, _probe_length); }
   static ByteSize misc_flags_offset()            { return byte_offset_of(Klass, _misc_flags._flags); }
 
   // Unpacking layout_helper:
