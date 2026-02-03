@@ -3740,9 +3740,11 @@ void InstanceKlass::print_on(outputStream* st) const {
   st->print(BULLET"local interfaces:  "); local_interfaces()->print_value_on(st);      st->cr();
   st->print(BULLET"trans. interfaces: "); transitive_interfaces()->print_value_on(st); st->cr();
 
-  st->print(BULLET"secondary supers: "); secondary_supers()->print_value_on(st); st->cr();
+  st->print(BULLET"secondary supers: %p : ", secondary_supers()); secondary_supers()->print_value_on(st); st->cr();
+  st->print(BULLET"probe length    :  %d", _probe_length);      st->cr();
 
   st->print(BULLET"hash_slot:         %d", hash_slot()); st->cr();
+  st->print(BULLET"full hash:         %d", _full_hash); st->cr();
   st->print(BULLET"secondary bitmap: " UINTX_FORMAT_X_0, _secondary_supers_bitmap); st->cr();
 
   if (secondary_supers() != nullptr) {

@@ -130,7 +130,12 @@ void Klass::set_name(Symbol* n) {
     elapsedTimer selftime;
     selftime.start();
 
-    _hash_slot = compute_hash_slot(n);
+    uint32_t hash = compute_hash(n);
+    // The leading bits of the least significant half of the product.
+    constexpr uint hash_shift = sizeof (hash) * 8 - 6;
+    _hash_slot = (hash >> hash_shift) & SECONDARY_SUPERS_TABLE_MASK;
+    _full_hash = hash;
+
     assert(_hash_slot < SECONDARY_SUPERS_TABLE_SIZE, "required");
 
     selftime.stop();
@@ -420,19 +425,22 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
         shift = MAX(shift, cslot - i);
         delta = MIN(delta, cslot - i);
       }
-      if (shift) {
+      if ((shift | delta) != 0) {
         auto a = secondaries->adr_at(0);
         int probe = shift - delta;
         auto new_length = length + probe;
+#if 0
         Array<Klass*>* secondary_supers
           = MetadataFactory::new_array<Klass*>(loader_data, new_length, CHECK_NULL);
         std::copy(a, a + length, secondary_supers->adr_at(probe));
         std::copy(a, probe, secondary_supers->adr_at(0));
-        // std::reverse(a, a + length);
-        // std::reverse(a, a + shift);
-        // std::reverse(a + shift, a + length);
-      }
+#else
+        std::reverse(a, a + length);
+        std::reverse(a, a + shift);
+        std::reverse(a + shift, a + length);
+#endif
       if (probe_length != nullptr)  *probe_length = probe;
+      }
       asm("nop");
     }
     return SECONDARY_SUPERS_BITMAP_FULL;
@@ -537,7 +545,7 @@ Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
 }
 
 uintx Klass::compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers) {
-  return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr); // no rewrites allowed
+  return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr, nullptr); // no rewrites allowed
 }
 
 uint8_t Klass::compute_home_slot(Klass* k, uintx bitmap) {
@@ -859,7 +867,7 @@ void Klass::remove_unshareable_info() {
     // actual addresses of the elements in _secondary_supers. So rehashing shouldn't
     // change it.
     auto secondaries = secondary_supers();
-    uintx bitmap = hash_secondary_supers(&secondaries, true, /*probe_length*/nullptr);
+    uintx bitmap = hash_secondary_supers(&secondaries, true, /*probe_length*/nullptr, nullptr);
     assert(bitmap == _secondary_supers_bitmap, "bitmap should not be changed due to rehashing");
   }
 }

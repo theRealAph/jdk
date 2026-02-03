@@ -422,12 +422,7 @@ protected:
   static uint32_t compute_hash(Symbol* s);
 
  private:
-  static uint8_t compute_hash_slot(Symbol* s) {
-    uint16_t hash = compute_hash(s);
-    // The leading bits of the least significant half of the product.
-    constexpr uint hash_shift = sizeof (hash) * 8 - 6;
-    return (hash >> hash_shift) & SECONDARY_SUPERS_TABLE_MASK;
-  }
+  static uint8_t compute_hash_slot(Symbol* s);
   static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap);
   static uintx hash_secondary_supers(Array<Klass*>** secondaries, bool rewrite,
                                      uint16_t *probe_length, ClassLoaderData* loader_data);
