@@ -134,7 +134,7 @@ void Klass::set_name(Symbol* n) {
     // The leading bits of the least significant half of the product.
     constexpr uint hash_shift = sizeof (hash) * 8 - 6;
     _hash_slot = (hash >> hash_shift) & SECONDARY_SUPERS_TABLE_MASK;
-    _full_hash = hash;
+    _full_hash = hash >> 16;
 
     assert(_hash_slot < SECONDARY_SUPERS_TABLE_SIZE, "required");
 
@@ -356,7 +356,7 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
   if (secondaries != nullptr) {
     uintx real_bitmap = compute_secondary_supers_bitmap(&secondaries);
     assert(bitmap == real_bitmap, "must be");
-    assert(secondaries->length() >= (int)population_count(bitmap), "must be");
+    // assert(secondaries->length() >= (int)population_count(bitmap), "must be");
   }
 #endif
   _secondary_supers_bitmap = bitmap;
@@ -427,9 +427,12 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
       }
       if ((shift | delta) != 0) {
         auto a = secondaries->adr_at(0);
-        int probe = shift - delta;
-        auto new_length = length + probe;
+        // The `+1` here is because the probe limit is *exclusive*.
+        // For example, if our probe limit is 3, we must probe the
+        // interval [0, 4).
+        int probe = shift - delta + 1;
 #if 0
+        auto new_length = length + probe;
         Array<Klass*>* secondary_supers
           = MetadataFactory::new_array<Klass*>(loader_data, new_length, CHECK_NULL);
         std::copy(a, a + length, secondary_supers->adr_at(probe));

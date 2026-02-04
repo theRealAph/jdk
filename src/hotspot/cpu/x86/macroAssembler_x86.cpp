@@ -4518,8 +4518,8 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
 
   // The bitmap is full to bursting.
   // Implicit invariant: BITMAP_FULL implies (length > 0)
-  cmpl(r_array_length, (int32_t)Klass::SECONDARY_SUPERS_TABLE_SIZE - 2);
-  jcc(Assembler::greater, L_huge);
+  cmpl(r_array_length, (int32_t)Klass::SECONDARY_SUPERS_TABLE_SIZE);
+  jcc(Assembler::greaterEqual, L_huge);
 
   // NB! Our caller has checked bits 0 and 1 in the bitmap. The
   // current slot (at secondary_supers[r_array_index]) has not yet
@@ -4587,20 +4587,22 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     movw(temp2, Address(r_sub_klass, Klass::probe_length_offset()));
     movzwl(temp2, temp2);
 
-    xorl(r_bitmap, r_bitmap);
-    Label L_again;
-    bind(L_again);
+    Label no_wrap;
 
     // Check for array wraparound.
-    cmpl(r_array_index, r_array_length);
-    cmovl(Assembler::greaterEqual, r_array_index, r_bitmap);
+    addl(temp2, r_array_index);     // temp2 = limit to scan
+    cmpl(temp2, r_array_length);
+    jccb(Assembler::less, no_wrap);
+    {
+      repne_scanq(r_array_base, r_super_klass, r_array_index, r_array_length, L_success);
+      subl(temp2, r_array_length);
+      jccb(Assembler::lessEqual, *L_failure);
+      // Start from the beginning of the array
+      xorl(r_array_index, r_array_index);
+    }
 
-    cmpq(r_super_klass, Address(r_array_base, r_array_index, Address::times_8));
-    jcc(Assembler::equal, *L_success);
-
-    addl(r_array_index, 1);
-    subl(temp2, 1);
-    jcc(Assembler::greaterEqual, L_again);
+    bind(no_wrap);
+    repne_scanq(r_array_base, r_super_klass, r_array_index, temp2, L_success);
 
     if (&L_fallthrough != L_failure)
       jmp(*L_failure);

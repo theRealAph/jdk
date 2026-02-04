@@ -187,13 +187,13 @@ public class SecondarySupersLookup {
         }
     }
 
-    static MyLoader LOADER = new MyLoader();
+    MyLoader LOADER;
 
     static String interfaceName(Integer suffix) {
         return String.format("I%04d", suffix);
     }
 
-    private static Class<?>[] genInterfaces(Function<Integer, String> name, int first, int last) {
+    private Class<?>[] genInterfaces(Function<Integer, String> name, int first, int last) {
         Class<?>[] interfaces = new Class[last + 1];
         for (int n = first; n <= last; n++) {
             byte[] bytes = ClassFile.of().build(ClassDesc.of(name.apply(n)),
@@ -269,6 +269,7 @@ public class SecondarySupersLookup {
 
     @Setup
     public void init() throws Exception {
+        LOADER = new MyLoader();
         interfaces = genInterfaces(SecondarySupersLookup::interfaceName, 0, interfaceCount);
         Class<?> barf = genClass(interfaces, "Humongous");
         testInstance = barf.getConstructor().newInstance();
@@ -439,6 +440,7 @@ public class SecondarySupersLookup {
     }
 
     @Benchmark public void testPositiveN() {
-        test(testInstance, interfaces[interfaceCount >>> 1], true);
+        test(testInstance, interfaces[(Math.min(140,
+                                                  interfaces.length - 1))], true);
     }
 }
