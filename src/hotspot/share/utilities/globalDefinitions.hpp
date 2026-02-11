@@ -1171,12 +1171,11 @@ inline int build_int_from_shorts( u2 low, u2 high ) {
 }
 
 // swap a & b
-// template<class T> static void swap(T& a, T& b) {
-//   T tmp = a;
-//   a = b;
-//   b = tmp;
-// }
-using std::swap;
+template<class T> static void swap(T& a, T& b) {
+  T tmp = a;
+  a = b;
+  b = tmp;
+}
 
 // array_size_impl is a function that takes a reference to T[N] and
 // returns a reference to char[N].  It is not ODR-used, so not defined.

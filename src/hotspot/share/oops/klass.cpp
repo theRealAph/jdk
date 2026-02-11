@@ -54,6 +54,7 @@
 #include "runtime/perfData.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
+#include "utilities/quickSort.hpp"
 #include "utilities/rotate_bits.hpp"
 #include "utilities/stack.inline.hpp"
 
@@ -116,7 +117,7 @@ Klass::compute_hash(Symbol* n) {
     }
   }
 
-  return hash_code + 1;
+  return hash_code;
 }
 
 void Klass::set_name(Symbol* n) {
@@ -356,7 +357,7 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
   if (secondaries != nullptr) {
     uintx real_bitmap = compute_secondary_supers_bitmap(&secondaries);
     assert(bitmap == real_bitmap, "must be");
-    // assert(secondaries->length() >= (int)population_count(bitmap), "must be");
+    assert(secondaries->length() >= (int)population_count(bitmap), "must be");
   }
 #endif
   _secondary_supers_bitmap = bitmap;
@@ -373,6 +374,18 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
   }
 }
 
+// Equivalent to std::reverse.
+//
+// The range is the half-open interval starting with first but not
+// including last. Defined here to avoid compatibility issues with
+// libstdc++.
+template <typename T>
+static void reverse_array(T* first, T* last) {
+  while (first < last) {
+    swap(*first++, *--last);
+  }
+}
+
 // Hashed secondary superclasses
 //
 // We use a compressed 64-entry hash table with linear probing. We
@@ -383,14 +396,8 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
 // a kind of Bloom filter, which in many cases allows us quickly to
 // eliminate the possibility that something is a member of a set of
 // secondaries.
-
-int my_compare(const void *a, const void *b) {
-  Klass *pa = *(Klass**)a, *pb = *(Klass**)b;
-  return pa->hash_slot() - pb->hash_slot();
-}
-
 uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
-                                   uint16_t *probe_length, ClassLoaderData* loader_data) {
+                                   uint16_t *probe_length) {
   auto secondaries = *secondaries_p;
   const int length = secondaries->length();
 
@@ -405,19 +412,15 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
 
   // Invariant: _secondary_supers.length >= population_count(_secondary_supers_bitmap)
 
-
-
   // Don't attempt to hash a table that's completely full, because in
   // the case of an absent interface linear probing would not
   // terminate.
   if (length >= SECONDARY_SUPERS_TABLE_SIZE) {
     if (rewrite) {
-      qsort(secondaries->adr_at(0), secondaries->length(),
-          sizeof secondaries->at(0),
-          [](const void *a, const void *b) {
-            Klass *pa = *(Klass**)a, *pb = *(Klass**)b;
-            return pa->hash_code() - pb->hash_code();
-          });
+      QuickSort::sort(secondaries->adr_at(0), length,
+        [](auto a, auto b) {
+           return a->hash_code() - b->hash_code();
+        });
       int shift = 0, delta = 0;
       for (int i = 0; i < length; i++) {
         Klass* secondary_super = secondaries->at(i);
@@ -426,23 +429,20 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
         delta = MIN(delta, cslot - i);
       }
       if ((shift | delta) != 0) {
-        auto a = secondaries->adr_at(0);
-        // The `+1` here is because the probe limit is *exclusive*.
-        // For example, if our probe limit is 3, we must probe the
+        Klass** a = secondaries->adr_at(0);
+        // The `+1` here is because the probe limit in the Klass is
+        // *inclusive*, but reverse takes a half-open interval. For
+        // example, if our probe limit is 3, we must probe the
         // interval [0, 4).
         int probe = shift - delta + 1;
-#if 0
-        auto new_length = length + probe;
-        Array<Klass*>* secondary_supers
-          = MetadataFactory::new_array<Klass*>(loader_data, new_length, CHECK_NULL);
-        std::copy(a, a + length, secondary_supers->adr_at(probe));
-        std::copy(a, probe, secondary_supers->adr_at(0));
-#else
-        std::reverse(a, a + length);
-        std::reverse(a, a + shift);
-        std::reverse(a + shift, a + length);
-#endif
-      if (probe_length != nullptr)  *probe_length = probe;
+
+        // Rotate the array so that every secondary is in the search
+        // after its home slot.
+        reverse_array(a, a + length);
+        reverse_array(a, a + shift);
+        reverse_array(a + shift, a + length);
+
+        if (probe_length != nullptr)  *probe_length = probe;
       }
       asm("nop");
     }
@@ -457,9 +457,10 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
     auto hashed_secondaries = new GrowableArray<Klass*>(SECONDARY_SUPERS_TABLE_SIZE,
                                                         SECONDARY_SUPERS_TABLE_SIZE, nullptr);
 
+    int probe = 0;
     for (int j = 0; j < length; j++) {
       Klass* k = secondaries->at(j);
-      hash_insert(k, hashed_secondaries, bitmap);
+      hash_insert(k, hashed_secondaries, bitmap, &probe);
     }
 
     // Pack the hashed secondaries array by copying it into the
@@ -472,6 +473,9 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
       if (has_element) {
         Klass* k = hashed_secondaries->at(slot);
         if (rewrite) {
+          if (secondaries->length() > 49) {
+            asm("nop");
+          }
           secondaries->at_put(i, k);
         } else if (secondaries->at(i) != k) {
           assert(false, "broken secondary supers hash table");
@@ -483,11 +487,17 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
     assert(i == secondaries->length(), "mismatch");
     postcond((int)population_count(bitmap) == secondaries->length());
 
+    // The `+1` here is because the probe limit is *inclusive*.
+    // For example, if our probe limit is 3, we must probe the
+    // interval [0, 4).
+    if (probe_length != nullptr)  *probe_length = probe + 1;
     return bitmap;
   }
 }
 
-void Klass::hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap) {
+void
+Klass::hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap,
+                   int *probe_length) {
   assert(bitmap != SECONDARY_SUPERS_BITMAP_FULL, "");
 
   int dist = 0;
@@ -515,6 +525,7 @@ void Klass::hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx&
         dist = existing_dist;
       }
       ++dist;
+      if (dist > *probe_length)  *probe_length = dist;
     }
   }
 }
@@ -543,12 +554,12 @@ Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
 #endif
 
   // rewrites freshly allocated array
-  bitmap = hash_secondary_supers(&secondary_supers, /*rewrite=*/true, probe_length, loader_data);
+  bitmap = hash_secondary_supers(&secondary_supers, /*rewrite=*/true, probe_length);
   return secondary_supers;
 }
 
 uintx Klass::compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers) {
-  return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr, nullptr); // no rewrites allowed
+  return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr); // no rewrites allowed
 }
 
 uint8_t Klass::compute_home_slot(Klass* k, uintx bitmap) {
@@ -654,6 +665,9 @@ void Klass::initialize_supers(Klass* k, Array<InstanceKlass*>* transitive_interf
     Array<Klass*>* s2 = pack_secondary_supers(class_loader_data(), primaries, secondaries,
                                               bitmap, &_probe_length, CHECK);
     set_secondary_supers(s2, bitmap);
+    if (secondaries->length() >= 64) {
+      asm("nop");
+    }
   }
 }
 
@@ -870,7 +884,7 @@ void Klass::remove_unshareable_info() {
     // actual addresses of the elements in _secondary_supers. So rehashing shouldn't
     // change it.
     auto secondaries = secondary_supers();
-    uintx bitmap = hash_secondary_supers(&secondaries, true, /*probe_length*/nullptr, nullptr);
+    uintx bitmap = hash_secondary_supers(&secondaries, true, /*probe_length*/nullptr);
     assert(bitmap == _secondary_supers_bitmap, "bitmap should not be changed due to rehashing");
   }
 }

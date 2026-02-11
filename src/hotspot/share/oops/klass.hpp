@@ -247,9 +247,7 @@ protected:
   void set_secondary_supers(Array<Klass*>* k, uintx bitmap);
 
   uint8_t hash_slot() const { return _hash_slot; }
-  uint16_t hash_code() {
-    return _full_hash ? _full_hash : _full_hash = compute_hash(name());
-  }
+  uint16_t hash_code() { return _full_hash; }
 
   // Return the element of the _super chain of the given depth.
   // If there is no such element, return either null or this.
@@ -423,9 +421,9 @@ protected:
 
  private:
   static uint8_t compute_hash_slot(Symbol* s);
-  static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap);
+  static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap, int *probe_length);
   static uintx hash_secondary_supers(Array<Klass*>** secondaries, bool rewrite,
-                                     uint16_t *probe_length, ClassLoaderData* loader_data);
+                                     uint16_t *probe_length);
 
   bool search_secondary_supers(Klass* k) const;
   bool lookup_secondary_supers_table(Klass *k) const;
