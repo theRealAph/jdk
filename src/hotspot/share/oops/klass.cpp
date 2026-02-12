@@ -431,7 +431,7 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
       if ((shift | delta) != 0) {
         Klass** a = secondaries->adr_at(0);
         // The `+1` here is because the probe limit in the Klass is
-        // *inclusive*, but reverse takes a half-open interval. For
+        // *inclusive*, but probing takes a half-open interval. For
         // example, if our probe limit is 3, we must probe the
         // interval [0, 4).
         int probe = shift - delta + 1;

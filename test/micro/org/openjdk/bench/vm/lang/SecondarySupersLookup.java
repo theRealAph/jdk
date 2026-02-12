@@ -25,24 +25,17 @@ package org.openjdk.bench.vm.lang;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.classfile.*;
-import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
-import java.lang.invoke.*;
 import java.security.SecureClassLoader;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.stream.Stream;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.*;
 
 import static java.lang.classfile.ClassFile.*;
-import static java.lang.invoke.MethodType.methodType;
 
 
 @BenchmarkMode(Mode.AverageTime)
@@ -228,10 +221,10 @@ public class SecondarySupersLookup {
         return klasses;
     }
 
-    private static void genClassBody(ClassBuilder clb, List<ClassDesc> interfaceDesc) {
+    private static void genClassBody(ClassBuilder clb, List<ClassDesc> interfaceDescriptors) {
         clb = clb.withFlags(ACC_PUBLIC);
         var cpool = clb.constantPool();
-        var interfaceEntries = interfaceDesc.stream().map(cpool::classEntry).toList();
+        var interfaceEntries = interfaceDescriptors.stream().map(cpool::classEntry).toList();
         var CD_AClass = ClassDesc.of(AClass.class.getName());
         clb.withSuperclass(CD_AClass)
             .withInterfaces(interfaceEntries)
@@ -268,12 +261,21 @@ public class SecondarySupersLookup {
                     .aload(1)
                     .instanceOf(ClassDesc.of("J"))
                     .ireturn()
+                    ))
+            .withMethod("checkCast",
+                MethodTypeDesc.of(ConstantDescs.CD_Object,
+                                  ConstantDescs.CD_Object),
+                ACC_PUBLIC,
+                mb -> mb.withCode(cob -> cob
+                    .aload(1)
+                    .checkcast(interfaceEntries.get(interfaceEntries.size() - 1))
+                    .areturn()
                     ));
     }
 
-    private Class<?> genClass(List<ClassDesc> interfaceDesc, String name) {
+    private Class<?> genClass(List<ClassDesc> interfaceDescriptors, String name) {
         byte[] bytes = ClassFile.of()
-            .build(ClassDesc.of(name), clb -> genClassBody(clb, interfaceDesc));
+            .build(ClassDesc.of(name), clb -> genClassBody(clb, interfaceDescriptors));
         return LOADER.defineClass(name, bytes);
     }
 
@@ -284,12 +286,10 @@ public class SecondarySupersLookup {
 
     AClass testInstance;
     Object[] testInstances;
+    public final static int TESTINSTANCES=10;
     Class<?> targetInterface;
 
     Class testInterface;
-
-    static MethodHandles.Lookup lookup = MethodHandles.lookup();
-    static MethodType mt = MethodType.methodType(boolean.class, Object.class);
 
     @Setup
     public void init() throws Exception {
@@ -304,12 +304,22 @@ public class SecondarySupersLookup {
         Class<?> barf = genClass(interfaces, "Humongous");
         testInstance = (AClass)(barf.getConstructor().newInstance());
 
-        testInstances = new Object[20];
+        testInstances = new Object[TESTINSTANCES];
         for (int i = 0; i < testInstances.length; i++) {
             testInstances[i] = genClass(interfaces, String.format("Humongous%02d", i))
                 .getConstructor().newInstance();
         }
 
+        System.out.println("testInstance = " + testInstance);
+    }
+
+    private static void test(Object obj, Class<?> cls, boolean expected) {
+        if (cls.isInstance(obj) != expected) {
+            throw new InternalError(obj.getClass() + " " + cls + " " + expected);
+        }
+    }
+
+    @Warmup public void warmup() {
         for (int i = 0; i < 20_000; i++) {
             testInterface = interfaces[i % interfaces.length];
             Class<?> s = getSuper(i);
@@ -322,30 +332,9 @@ public class SecondarySupersLookup {
             test(obj07, s, s.isInstance(obj07));
             test(obj08, s, s.isInstance(obj08));
             test(obj09, s, s.isInstance(obj09));
-            // testPositiveN();
-        }
-
-        System.out.println("testInstance = " + testInstance);
-    }
-
-    private static void test(Object obj, Class<?> cls, boolean expected) {
-        if (cls.isInstance(obj) != expected) {
-            throw new InternalError(obj.getClass() + " " + cls + " " + expected);
         }
     }
 
-    @Benchmark
-    public void instanceOfPositive(Blackhole bh) {
-        for (Object obj : testInstances) {
-            bh.consume(testInstance.instanceOfPositive(obj));
-        }
-    }
-    @Benchmark
-    public void instanceOfNegative(Blackhole bh) {
-        for (Object obj : testInstances) {
-            bh.consume(testInstance.instanceOfNegative(obj));
-        }
-    }
     @Benchmark
     public void testPositive01() {
         test(obj01, I01.class, true);
@@ -487,11 +476,37 @@ public class SecondarySupersLookup {
         test(obj64, J.class, false);
     }
 
+    // Arbitrary-sized tests.
     @Benchmark public void testPositiveN() {
         test(testInstance, interfaces[interfaces.length - 1], true);
     }
     @Benchmark public void testNegativeN() {
         test(testInstance, J.class, false);
+    }
+
+    // These invoke obj instanceof T. We use an array of testInstances
+    // instead of a single instance to prevent C2 from removing our
+    // lookup.
+    @Benchmark
+    @OperationsPerInvocation(TESTINSTANCES)
+    public void checkCast(Blackhole bh) {
+        for (Object obj : testInstances) {
+            bh.consume(testInstance.checkCast(obj));
+        }
+    }
+    @Benchmark
+    @OperationsPerInvocation(TESTINSTANCES)
+    public void instanceOfPositive(Blackhole bh) {
+        for (Object obj : testInstances) {
+            bh.consume(testInstance.instanceOfPositive(obj));
+        }
+    }
+    @Benchmark
+    @OperationsPerInvocation(TESTINSTANCES)
+    public void instanceOfNegative(Blackhole bh) {
+        for (Object obj : testInstances) {
+            bh.consume(testInstance.instanceOfNegative(obj));
+        }
     }
 
 }
