@@ -416,12 +416,16 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
   // the case of an absent interface linear probing would not
   // terminate.
   if (length >= SECONDARY_SUPERS_TABLE_SIZE) {
+    PerfTraceTime ptt(ClassLoader::perf_secondary_hash_time());
+
     if (rewrite) {
+      // Sort the interfaces by hash code.
       QuickSort::sort(secondaries->adr_at(0), length,
         [](auto a, auto b) {
            return a->hash_code() - b->hash_code();
         });
       int shift = 0, delta = 0;
+      // Find the longest probe length for any lookup.
       for (int i = 0; i < length; i++) {
         Klass* secondary_super = secondaries->at(i);
         int cslot = (secondary_super->hash_code() * length) >> 16;
@@ -444,8 +448,8 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
 
         if (probe_length != nullptr)  *probe_length = probe;
       }
-      asm("nop");
     }
+
     return SECONDARY_SUPERS_BITMAP_FULL;
   }
 
