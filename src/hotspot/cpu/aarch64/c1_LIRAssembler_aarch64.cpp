@@ -1247,12 +1247,12 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src) {
 
 void LIR_Assembler::type_profile_helper(Register mdo,
                                         ciMethodData *md, ciProfileData *data,
-                                        Register recv) {
+                                        Register recv, Register tmp) {
   int mdp_offset = md->byte_offset_of_slot(data, in_ByteSize(0));
   if (ProfileCaptureRatio > 1) {
-    __ profile_receiver_type(recv, mdo, mdp_offset, &increment_mdo);
+    __ profile_receiver_type(recv, mdo, mdp_offset, tmp, &increment_mdo);
   } else {
-    __ profile_receiver_type(recv, mdo, mdp_offset);
+    __ profile_receiver_type(recv, mdo, mdp_offset, tmp);
   }
 }
 
@@ -1313,7 +1313,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
     Address data_addr
       = __ form_address(rscratch2, mdo,
                         md->byte_offset_of_slot(data, DataLayout::flags_offset()),
-                        0);
+                        LogBytesPerWord);
     __ ldrb(rscratch1, data_addr);
     __ orr(rscratch1, rscratch1, BitData::null_seen_byte_constant());
     __ strb(rscratch1, data_addr);
@@ -1322,7 +1322,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
 
     Register recv = k_RInfo;
     __ load_klass(recv, obj);
-    type_profile_helper(mdo, md, data, recv);
+    type_profile_helper(mdo, md, data, recv, Rtmp1);
   } else {
     __ cbz(obj, *obj_is_null);
   }
@@ -1422,7 +1422,8 @@ void LIR_Assembler::emit_opTypeCheck(LIR_OpTypeCheck* op) {
       // Object is null; update MDO and exit
       Address data_addr
         = __ form_address(rscratch2, mdo,
-                          md->byte_offset_of_slot(data, DataLayout::flags_offset()), 0);
+                          md->byte_offset_of_slot(data, DataLayout::flags_offset()),
+                          LogBytesPerWord);
       __ ldrb(rscratch1, data_addr);
       __ orr(rscratch1, rscratch1, BitData::null_seen_byte_constant());
       __ strb(rscratch1, data_addr);
@@ -1431,7 +1432,7 @@ void LIR_Assembler::emit_opTypeCheck(LIR_OpTypeCheck* op) {
 
       Register recv = k_RInfo;
       __ load_klass(recv, value);
-      type_profile_helper(mdo, md, data, recv);
+      type_profile_helper(mdo, md, data, recv, Rtmp1);
     } else {
       __ cbz(value, done);
     }
@@ -2644,6 +2645,7 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   ciMethod* method = op->profiled_method();
   int bci          = op->profiled_bci();
   ciMethod* callee = op->profiled_callee();
+  Register tmp1    = as_reg(op->tmp1());
 
 #ifndef PRODUCT
   if (CommentedAssembly) {
@@ -2659,7 +2661,6 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   assert(op->mdo()->is_single_cpu(),  "mdo must be allocated");
   Register mdo  = op->mdo()->as_register();
   __ mov_metadata(mdo, md->constant_encoding());
-  Address counter_addr(mdo, md->byte_offset_of_slot(data, CounterData::count_offset()));
   // Perform additional virtual call profiling for invokevirtual and
   // invokeinterface bytecodes
   if (op->should_profile_receiver_type()) {
@@ -2676,7 +2677,10 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
       for (uint i = 0; i < VirtualCallData::row_limit(); i++) {
         ciKlass* receiver = vc_data->receiver(i);
         if (known_klass->equals(receiver)) {
-          Address data_addr(mdo, md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)));
+          Address data_addr
+            = __ form_address(tmp1, mdo,
+                           md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)),
+                           LogBytesPerWord);
           increment_mdo(_masm, data_addr, DataLayout::counter_increment);
           return;
         }
@@ -2687,9 +2691,13 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
     } else {
       __ load_klass(recv, recv);
     }
-    type_profile_helper(mdo, md, data, recv);
+    type_profile_helper(mdo, md, data, recv, tmp1);
   } else {
     // Static call
+    Address counter_addr
+      = __ form_address(tmp1, mdo,
+                        md->byte_offset_of_slot(data, CounterData::count_offset()),
+                        LogBytesPerWord);
     increment_mdo(_masm, counter_addr, DataLayout::counter_increment);
   }
 
