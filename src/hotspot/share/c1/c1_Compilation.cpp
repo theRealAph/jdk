@@ -597,20 +597,6 @@ Compilation::Compilation(AbstractCompiler* compiler, ciEnv* env, ciMethod* metho
 
   CompilationMemoryStatisticMark cmsm(directive);
 
-#ifndef PRODUCT
-  char buf[513];
-  char fullname[513];
-  if (CommentedAssembly) {
-    auto holder = method->holder()->name(),
-      name = method->name();
-    (void)os::snprintf(fullname , sizeof fullname, "%s.%s",
-             holder->as_utf8(), name->as_utf8());
-    compilation_name = fullname;
-    (void)os::snprintf(buf, sizeof buf, "profile_call %s {",
-             fullname);
-  }
-#endif
-
   compile_method();
   if (bailed_out()) {
     _env->record_method_not_compilable(bailout_msg());

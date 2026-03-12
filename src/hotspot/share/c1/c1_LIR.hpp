@@ -31,8 +31,6 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
-extern THREAD_LOCAL const char *compilation_name;
-
 class BlockBegin;
 class BlockList;
 class LIR_Assembler;

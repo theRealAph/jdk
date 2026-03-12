@@ -2542,21 +2542,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
                  md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
     auto masm = [ce]() { return ce->masm(); };
-    auto zzasm = masm();
     Address counter_address;
-
-#ifndef PRODUCT
-    if (CommentedAssembly) {
-      __ block_comment("increment_event_counter (inner) {");
-      char buf[513];
-      (void)os::snprintf(buf, sizeof buf, "%s (inner) {", compilation_name);
-      __ block_comment(buf);
-    }
-#endif
-
-    if (!compilation_name) {
-      asm("nop");
-    }
 
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
@@ -2568,20 +2554,11 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         __ mov(md_reg->as_pointer_register(),
                md_opr->as_constant_ptr()->as_pointer());
       }
-      int zofs = -1;
-      if (md_offset_opr->is_constant()) {
-        zofs = md_offset_opr->as_constant_ptr()->as_jint();
-      }
       RegisterOrConstant offset =
         md_offset_opr->is_constant()
         ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
         : as_reg(md_offset_opr);
       counter_address = Address(md_reg->as_pointer_register(), offset);
-      if (compilation_name && strstr(compilation_name, "differentSigns3")
-          && zofs == 0x9c) {
-        asm("nop");
-      }
-
     }
     if (step->is_register()) {
       Address dest_adr = __ legitimize_address(counter_address, sizeof (jint), rscratch2);
@@ -2634,21 +2611,8 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
           __ csel(dest, dest, rscratch1, __ NE);
         }
         juint mask = freq_opr->as_jint();
-        Label around;
         __ andw(dest, dest,  mask);
-        __ cbnzw(dest, around);
-        if (compilation_name && strstr(compilation_name, "differentSigns3")) {
-          fprintf(stderr, "################################################ %s\n",
-                  compilation_name);
-
-          __ lea(rscratch1, ExternalAddress((address)&arse));
-          __ ldr(rscratch2, Address(rscratch1));
-          __ add(rscratch2, rscratch2, 1);
-          __ str(rscratch2, Address(rscratch1));
-        }
-        // __ cbzw(rscratch1, *overflow_stub->entry());
-        __ b(*overflow_stub->entry());
-        __ bind(around);
+        __ cbzw(rscratch1, *overflow_stub->entry());
       }
     }
 
@@ -2687,8 +2651,11 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   ciMethod* callee = op->profiled_callee();
   Register tmp1    = as_reg(op->tmp1());
 
-  char buf[513];
-  char fullname[513];
+#ifndef PRODUCT
+  if (CommentedAssembly) {
+    __ block_comment("profile_call {");
+  }
+#endif
 
   // Update counter for all call types
   ciMethodData* md = method->method_data_or_null();
