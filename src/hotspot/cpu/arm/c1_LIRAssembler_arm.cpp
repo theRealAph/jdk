@@ -2526,6 +2526,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
 
           break;
         }
+        // On 32-bit platforms, 64-bit profile counters are never used
         // case T_LONG: {
         //   Address dest_adr = counter_address;
         //   inc *= ProfileCaptureRatio;
@@ -2536,27 +2537,28 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         default:
           ShouldNotReachHere();
       }
+    }
 
-      if (step->is_valid() && overflow_stub) {
-        if (!freq_opr->is_valid()) {
-          if (!step->is_constant()) {
-            __ cbz(step->as_register(), *overflow_stub->entry());
-          } else {
-            __ b(*overflow_stub->entry());
-            return;
-          }
+    if (overflow_stub) {
+      guarantee(step_opr->is_valid(), "must be");
+      if (!freq_opr->is_valid()) {
+        if (!step->is_constant()) {
+          __ cbz(step->as_register(), *overflow_stub->entry());
         } else {
-          if (!step->is_constant()) {
-            // If step is 0, make sure the stub check below always fails
-            __ cmp(step->as_register(), (u1)0);
-            __ mov(Rtemp, InvocationCounter::count_increment * ProfileCaptureRatio);
-            __ mov(dest, Rtemp, eq);
-          }
-          juint mask = freq_opr->as_jint();
-          __ mov_slow(Rtemp, mask);
-          __ tst(dest, Rtemp);
-          __ b(*overflow_stub->entry(), eq);
+          __ b(*overflow_stub->entry());
+          return;
         }
+      } else {
+        if (!step->is_constant()) {
+          // If step is 0, make sure the stub check below always fails
+          __ cmp(step->as_register(), (u1)0);
+          __ mov(Rtemp, InvocationCounter::count_increment * ProfileCaptureRatio);
+          __ mov(dest, Rtemp, eq);
+        }
+        juint mask = freq_opr->as_jint();
+        __ mov_slow(Rtemp, mask);
+        __ tst(dest, Rtemp);
+        __ b(*overflow_stub->entry(), eq);
       }
     }
 

@@ -2125,7 +2125,6 @@ Address MacroAssembler::argument_address(RegisterOrConstant arg_slot,
 // counter updates are not atomic.
 //
 void MacroAssembler::profile_receiver_type(Register recv, Register mdp, int mdp_offset,
-                                           Register tmp,
                                            increment_mdo_insn_t inc) {
   assert_different_registers(recv, mdp, rscratch1, rscratch2);
 
@@ -2164,7 +2163,7 @@ void MacroAssembler::profile_receiver_type(Register recv, Register mdp, int mdp_
     return;
   }
 
-  Register offset = tmp;
+  Register offset = rscratch2;
 
   Label L_loop_search_receiver, L_loop_search_empty;
   Label L_restart, L_found_recv, L_found_empty, L_polymorphic, L_count_update;

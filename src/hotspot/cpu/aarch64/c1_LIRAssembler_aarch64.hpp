@@ -51,7 +51,7 @@ friend class ArrayCopyStub;
 
   // Record the type of the receiver in ReceiverTypeData
   void type_profile_helper(Register mdo, ciMethodData *md,
-                           ciProfileData *data, Register recv, Register tmp);
+                           ciProfileData *data, Register recv);
   void add_debug_info_for_branch(address adr, CodeEmitInfo* info);
 
   void casw(Register addr, Register newval, Register cmpval);

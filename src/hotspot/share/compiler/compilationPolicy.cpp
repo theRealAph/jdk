@@ -458,6 +458,17 @@ void CompilationPolicy::print_training_data_on(outputStream* st,  const char* pr
 void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method* m, Method* im, int bci, CompLevel level) {
   bool inlinee_event = m != im;
 
+  ResourceMark rm;
+  char *method_name = m->name_and_sig_as_C_string();
+  {
+    char *method_name = m->name_and_sig_as_C_string();
+    if (strstr(method_name, "differentSigns3")) {
+      asm("nop");
+    } else {
+      return;
+    }
+  }
+
   st->print("%lf: [", os::elapsedTime());
 
   switch(type) {
@@ -491,8 +502,6 @@ void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method*
 
   st->print(" level=%d ", level);
 
-  ResourceMark rm;
-  char *method_name = m->name_and_sig_as_C_string();
   st->print("[%s", method_name);
   if (inlinee_event) {
     char *inlinee_name = im->name_and_sig_as_C_string();
@@ -851,7 +860,9 @@ void CompilationPolicy::reprofile(ScopeDesc* trap_scope, bool is_osr) {
 
 nmethod* CompilationPolicy::event(const methodHandle& method, const methodHandle& inlinee,
                                       int branch_bci, int bci, CompLevel comp_level, nmethod* nm, TRAPS) {
-  if (PrintTieredEvents) {
+  if (comp_level >= CompLevel_full_profile && PrintTieredEvents) {
+    print_event(bci == InvocationEntryBci ? CALL : LOOP, method(), inlinee(), bci, comp_level);
+    asm("nop");
     print_event(bci == InvocationEntryBci ? CALL : LOOP, method(), inlinee(), bci, comp_level);
   }
 

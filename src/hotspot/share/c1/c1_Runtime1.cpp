@@ -478,6 +478,14 @@ static nmethod* counter_overflow_helper(JavaThread* current, int branch_bci, Met
   assert(nm!= nullptr && nm->is_nmethod(), "Sanity check");
   methodHandle enclosing_method(current, nm->method());
 
+    ResourceMark rm;
+    char *s = method->name_and_sig_as_C_string();
+    asm("nop");
+
+    if (strstr(s, "TestEor3_differentSigns3_jmhTest")) {
+      fprintf(stderr, "########################### %s\n", s);
+    }
+
   CompLevel level = (CompLevel)nm->comp_level();
   int bci = InvocationEntryBci;
   if (branch_bci != InvocationEntryBci) {

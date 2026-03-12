@@ -2886,27 +2886,28 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
         default:
           ShouldNotReachHere();
       }
+    }
 
-      if (step_opr->is_valid() && overflow_stub) {
-        if (!freq_opr->is_valid()) {
-          if (!step_opr->is_constant()) {
-            __ cmpl(step_opr->as_register(), 0);
-            __ jcc(Assembler::equal, *overflow_stub->entry());
-          } else {
-            __ jmp(*overflow_stub->entry());
-            goto exit;
-          }
-        } else {
-          if (!step_opr->is_constant()) {
-            guarantee(dest != step_opr->as_register(), "must be");
-            // If step_opr is 0, make sure the stub check below always fails
-            __ cmpl(step_opr->as_register(), 0);
-            __ movl(step_opr->as_register(), InvocationCounter::count_increment * ProfileCaptureRatio);
-            __ cmovl(Assembler::notEqual, dest, step_opr->as_register());
-          }
-          __ andl(dest, freq_opr->as_jint());
+    if (overflow_stub) {
+      guarantee(step_opr->is_valid(), "must be");
+      if (!freq_opr->is_valid()) {
+        if (!step_opr->is_constant()) {
+          __ cmpl(step_opr->as_register(), 0);
           __ jcc(Assembler::equal, *overflow_stub->entry());
+        } else {
+          __ jmp(*overflow_stub->entry());
+          goto exit;
         }
+      } else {
+        if (!step_opr->is_constant()) {
+          guarantee(dest != step_opr->as_register(), "must be");
+          // If step_opr is 0, make sure the stub check below always fails
+          __ cmpl(step_opr->as_register(), 0);
+          __ movl(step_opr->as_register(), InvocationCounter::count_increment * ProfileCaptureRatio);
+          __ cmovl(Assembler::notEqual, dest, step_opr->as_register());
+        }
+        __ andl(dest, freq_opr->as_jint());
+        __ jcc(Assembler::equal, *overflow_stub->entry());
       }
     }
 
