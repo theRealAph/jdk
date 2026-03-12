@@ -491,6 +491,8 @@ void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method*
 
   st->print(" level=%d ", level);
 
+  ResourceMark rm;
+  char *method_name = m->name_and_sig_as_C_string();
   st->print("[%s", method_name);
   if (inlinee_event) {
     char *inlinee_name = im->name_and_sig_as_C_string();
