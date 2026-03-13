@@ -2609,7 +2609,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         }
         juint mask = freq_opr->as_jint();
         __ andw(dest, dest,  mask);
-        __ cbzw(rscratch1, *overflow_stub->entry());
+        __ cbzw(dest, *overflow_stub->entry());
       }
     }
 
