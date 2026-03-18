@@ -1664,23 +1664,29 @@ private:
   // instruction.
   // For scalar types, 4- and 8-byte accesses are supported.
   // For SIMD types, 16-byte accesses are additionally supported.
-  bool can_form_ldst_pair(size_t size_in_bytes, bool is_simd) const {
+  bool can_form_ldst_pair(unsigned size_in_bytes, bool is_simd) const {
     return size_in_bytes == 4 || size_in_bytes == 8 || (is_simd && size_in_bytes == 16);
   }
 
   // Check whether two loads/stores can be merged into ldp/stp.
-  bool ldst_can_merge(int rx, const Address& adr, size_t cur_size_in_bytes,
+  bool ldst_can_merge(int rx, const Address& adr, unsigned cur_size_in_bytes,
                       bool is_store, bool is_simd) const;
 
   // Merge current load/store with previous load/store into ldp/stp.
-  void merge_ldst(int rx, const Address& adr, size_t cur_size_in_bytes,
+  void merge_ldst(int rx, const Address& adr, unsigned cur_size_in_bytes,
                   bool is_store, bool is_simd);
 
   // Try to merge two loads/stores into ldp/stp. If success, returns true else false.
-  bool try_merge_ldst(Register rt, const Address& adr, size_t cur_size_in_bytes, bool is_store);
-  bool try_merge_ldst(FloatRegister rt, const Address& adr,
-                      size_t cur_size_in_bytes, bool is_store);
-  bool try_merge_ldst_impl(int rt, const Address& adr, size_t cur_size_in_bytes,
+  template <typename T>
+  bool try_merge_ldst(T rt, const Address& adr, unsigned cur_size_in_bytes, bool is_store) {
+    constexpr bool is_simd = std::is_same<T, FloatRegister>::value;
+    static_assert(is_simd || std::is_same<T, Register>::value, "unsupported register parameter type");
+    if (!can_form_ldst_pair(cur_size_in_bytes, is_simd)) {
+      return false;
+    }
+    return try_merge_ldst_impl(rt->raw_encoding(), adr, cur_size_in_bytes, is_store, is_simd);
+  }
+  bool try_merge_ldst_impl(int rt, const Address& adr, unsigned cur_size_in_bytes,
                            bool is_store, bool is_simd);
 
 

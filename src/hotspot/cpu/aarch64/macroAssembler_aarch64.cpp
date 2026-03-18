@@ -2703,22 +2703,7 @@ void MacroAssembler::membar(Membar_mask_bits order_constraint) {
   dmb(Assembler::barrier(order_constraint));
 }
 
-bool MacroAssembler::try_merge_ldst(Register rt, const Address& adr,
-                                    size_t cur_size_in_bytes, bool is_store) {
-  assert(can_form_ldst_pair(cur_size_in_bytes, false),
-         "Only 4- and 8-byte scalar accesses are supported.");
-  return try_merge_ldst_impl(rt->raw_encoding(), adr, cur_size_in_bytes, is_store, false);
-}
-
-bool MacroAssembler::try_merge_ldst(FloatRegister rt, const Address& adr,
-                                    size_t cur_size_in_bytes, bool is_store) {
-  if (!can_form_ldst_pair(cur_size_in_bytes, true)) {
-    return false;
-  }
-  return try_merge_ldst_impl(rt->raw_encoding(), adr, cur_size_in_bytes, is_store, true);
-}
-
-bool MacroAssembler::try_merge_ldst_impl(int rt, const Address& adr, size_t size_in_bytes,
+bool MacroAssembler::try_merge_ldst_impl(int rt, const Address& adr, unsigned size_in_bytes,
                                          bool is_store, bool is_simd) {
   if (ldst_can_merge(rt, adr, size_in_bytes, is_store, is_simd)) {
     merge_ldst(rt, adr, size_in_bytes, is_store, is_simd);
@@ -3902,7 +3887,7 @@ bool MacroAssembler::merge_alignment_check(Register base,
 // Returns true if it can be merged, else false.
 bool MacroAssembler::ldst_can_merge(int rt,
                                     const Address& adr,
-                                    size_t cur_size_in_bytes,
+                                    unsigned cur_size_in_bytes,
                                     bool is_store, bool is_simd) const {
   assert(can_form_ldst_pair(cur_size_in_bytes, is_simd),
          "only supports 32/64-bit for integers and additionally 128-bit for FP/SIMD merging.");
@@ -3976,7 +3961,7 @@ bool MacroAssembler::ldst_can_merge(int rt,
 // Merge current load/store with previous load/store into ldp/stp.
 void MacroAssembler::merge_ldst(int rt,
                                 const Address& adr,
-                                size_t cur_size_in_bytes,
+                                unsigned cur_size_in_bytes,
                                 bool is_store, bool is_simd) {
 
   assert(ldst_can_merge(rt, adr, cur_size_in_bytes, is_store, is_simd) == true, "cur and prev must be able to be merged.");
