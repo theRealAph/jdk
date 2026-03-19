@@ -290,9 +290,9 @@ void C1_MacroAssembler::step_random(Register state, Register temp, Register data
     crc32h(state, state, data);
   } else {
     /* LCG from glibc. */
-    mov(temp, 1103515245);
+    mov(temp, 69069);
     mulw(state, state, temp);
-    addw(state, state, 12345);
+    addw(state, state, 1);
   }
 }
 

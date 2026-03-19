@@ -293,10 +293,11 @@ void C1_MacroAssembler::step_random(Register state, Register temp) {
     movl(temp, 0);
     crc32(state, temp, /*sizeInBytes*/2);
   } else {
-    /* LCG from glibc. */
-    movl(temp, 1103515245);
+    /* LCG from Marsaglia. From Karl Entacher,
+       https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
+    movl(temp, 69069);
     imull(state, temp);
-    addl(state, 12345);
+    addl(state, 1);
   }
 }
 
