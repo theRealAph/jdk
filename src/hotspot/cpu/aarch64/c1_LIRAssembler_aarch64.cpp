@@ -2526,7 +2526,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
 
   int profile_capture_ratio = ProfileCaptureRatio;
   int ratio_shift = exact_log2(profile_capture_ratio);
-  unsigned long threshold = (UCONST64(1) << 32) >> ratio_shift;
+  uint64_t threshold = (UCONST64(1) << 32) >> ratio_shift;
 
   assert(threshold > 0, "must be");
 
