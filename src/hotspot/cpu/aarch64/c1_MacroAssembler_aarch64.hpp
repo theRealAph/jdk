@@ -118,4 +118,5 @@ using MacroAssembler::null_check;
   void save_profile_rng();
   void restore_profile_rng();
 
+void adjust_mdo_address(Address *a, BasicType type);
 #endif // CPU_AARCH64_C1_MACROASSEMBLER_AARCH64_HPP

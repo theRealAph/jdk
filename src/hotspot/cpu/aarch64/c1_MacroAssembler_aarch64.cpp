@@ -308,6 +308,18 @@ void C1_MacroAssembler::restore_profile_rng() {
   }
 }
 
+void C1_MacroAssembler::adjust_mdo_address(Address* a, BasicType t) {
+  int size = type2aelembytes(t);
+  if (legitimize_address_requires_lea(*a, size)) {
+    int64_t offset = a->offset();
+    int64_t offset_lo = offset & right_n_bits(12);
+    int64_t offset_hi = offset - offset_lo;
+    lea(a->base(), Address(a->base(), offset_hi));
+    *a = Address(a->base(), offset_lo);
+    assert(!legitimize_address_requires_lea(*a, size), "must not");
+  }
+}
+
 #ifndef PRODUCT
 
 void C1_MacroAssembler::verify_stack_oop(int stack_offset) {
