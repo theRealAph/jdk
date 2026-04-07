@@ -3222,7 +3222,7 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     // The bci for info can point to cmp for if's we want the if bci
     CodeStub* overflow = new CounterOverflowStub (info, bci, meth);
     // Zero the low-order bits of the frequency, otherwise we'll miss
-    // overflows when usind randomized profile counters.
+    // overflows when using randomized profile counters.
     unsigned int freq = (unsigned int)frequency
                          >> ratio_shift << ratio_shift
                          << InvocationCounter::count_shift;
