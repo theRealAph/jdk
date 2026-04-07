@@ -1738,7 +1738,7 @@ private:
 inline bool AbstractAssembler::pd_check_instruction_mark() { return false; }
 #endif
 
- struct tableswitch {
+struct tableswitch {
   Register _reg;
   int _insn_index; jint _first_key; jint _last_key;
   Label _after;
