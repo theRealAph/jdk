@@ -286,26 +286,25 @@ void C1_MacroAssembler::step_random(Register state, Register temp) {
   // sall(temp, 5);
   // xorl(state, temp);
 
-  if (0 && VM_Version::supports_sse4_2()) {
+  if (!UseVregsForProfileCapture && VM_Version::supports_sse4_2()) {
     /* CRC used as a psuedo-random-number generator */
     // In effect, the CRC instruction is being used here for its
     // linear feedback shift register.
     movl(temp, 0);
     crc32(state, temp, /*sizeInBytes*/2);
   } else {
-    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+    if (UseVregsForProfileCapture) {
       vpmulld(xmm15, xmm15, xmm14, Assembler::AVX_128bit);
     } else {
       movl(temp, 69069);
       imull(state, temp);
-      // incl(state);
     }
   }
 }
 
 void C1_MacroAssembler::save_profile_rng() {
   if (ProfileCaptureRatio != 1) {
-    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+    if (UseVregsForProfileCapture) {
       movsd(Address(r15_thread, JavaThread::profile_rng_offset()), xmm15);
     } else {
       movl(Address(r15_thread, JavaThread::profile_rng_offset()), r_profile_rng);
@@ -315,7 +314,7 @@ void C1_MacroAssembler::save_profile_rng() {
 
 void C1_MacroAssembler::restore_profile_rng() {
   if (ProfileCaptureRatio != 1) {
-    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+    if (UseVregsForProfileCapture) {
       movl(rscratch1, 69069);
       movdq(xmm14, rscratch1);
       movddup(xmm15, Address(r15_thread, JavaThread::profile_rng_offset()));

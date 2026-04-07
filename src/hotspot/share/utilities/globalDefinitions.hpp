@@ -1074,12 +1074,8 @@ const intptr_t OneBit     =  1; // only right_most bit set in a word
 
 // get a word with the n.th or the right-most or left-most n bits set
 // (note: #define used only so that they can be used in enum constant definitions)
-// #define nth_bit(n)        (((n) >= BitsPerWord) ? 0 : (OneBit << (n)))
-// #define right_n_bits(n)   (nth_bit(n) - 1)
-template<typename T>
-constexpr intptr_t nth_bit(T n) { return ((n) >= BitsPerWord) ? 0 : (OneBit << (n)); }
-template<typename T>
-constexpr intptr_t right_n_bits(T n) { return nth_bit(n) - 1; }
+#define nth_bit(n)        (((n) >= BitsPerWord) ? 0 : (OneBit << (n)))
+#define right_n_bits(n)   (nth_bit(n) - 1)
 
 // same as nth_bit(n), but allows handing in a type as template parameter. Allows
 // us to use nth_bit with 64-bit types on 32-bit platforms

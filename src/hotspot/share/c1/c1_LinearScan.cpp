@@ -615,7 +615,7 @@ void LinearScan::compute_local_live_sets() {
           local_has_fpu_registers = local_has_fpu_registers || opr->is_virtual_fpu();
         }
 
-#ifdef ASSERTz
+#ifdef ASSERT
         // fixed intervals are never live at block boundaries, so
         // they need not be processed in live sets.
         // this is checked by these assertions to be sure about it.
@@ -693,7 +693,7 @@ void LinearScan::compute_local_live_sets() {
           local_has_fpu_registers = local_has_fpu_registers || opr->is_virtual_fpu();
         }
 
-#ifdef ASSERTa
+#ifdef ASSERT
         // fixed intervals are never live at block boundaries, so
         // they need not be processed in live sets
         // process them only in debug mode so that this can be checked

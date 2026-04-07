@@ -186,10 +186,6 @@ CodeBlob::CodeBlob(const char* name, CodeBlobKind kind, int size, uint16_t heade
   assert(is_aligned(size,            oopSize), "unaligned size");
   assert(is_aligned(header_size,     oopSize), "unaligned size");
   assert(_mutable_data == blob_end(), "sanity");
-  if (getenv("APH_CODE_CACHE_EXPANSION")) {
-    print();
-    CodeCache::print();
-  }
 }
 
 void CodeBlob::restore_mutable_data(address reloc_data) {

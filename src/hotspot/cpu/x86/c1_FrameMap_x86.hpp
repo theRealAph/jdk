@@ -127,16 +127,18 @@
   }
 
   static int adjust_reg_range(int range) {
+    int result = range;
     // Reduce the number of available regs (to free r12 or r14) in
     // case of compressed oops and randomized profile captures.
-    if (UseCompressedOops && ProfileCaptureRatio > 1) return range - 2;
-    if (UseCompressedOops || ProfileCaptureRatio > 1) return range - 1;
-    return range;
+    if (UseCompressedOops)  result -= 1;
+    if (ProfileCaptureRatio > 1 && !UseVregsForProfileCapture)  result -= 1;
+    return result;
   }
 
   static int adjust_fpreg_range(int range) {
     // Reduce the number of available regs
-    return range - ProfileCaptureRatio > 1;
+    return (ProfileCaptureRatio > 1 && UseVregsForProfileCapture)
+      ? range - 2 : range;
   }
 
   static int get_num_caller_save_xmms() {

@@ -1275,16 +1275,16 @@ void LIR_Assembler::emit_alloc_array(LIR_OpAllocArray* op) {
 
 
 static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Register temp) {
-  assert(!dst.uses(temp), "feck!");
   auto masm = [C1_masm]() { return (C1_MacroAssembler*)C1_masm; };
+  __ block_comment("increment_mdo {");
   assert(masm()->is_C1_MacroAssembler(), "must be");
   int ratio_shift = exact_log2(ProfileCaptureRatio);
   Label nope;
   if (ProfileCaptureRatio > 1) {
+    assert(!dst.uses(temp), "fix register allocation");
     auto threshold = (1ull << 32) >> ratio_shift;
-    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+    if (UseVregsForProfileCapture) {
       __ movdl(temp, xmm15);
-      __ step_random(noreg, noreg);
       __ cmpl(temp, threshold);
       __ jccb(Assembler::aboveEqual, nope);
     } else {
@@ -1295,8 +1295,9 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Reg
   __ addptr(dst, src << ratio_shift);
   if (ProfileCaptureRatio > 1) {
     __ bind(nope);
-    if (!getenv("APH_USE_XMM_FOR_RANDOM"))  __ step_random(r_profile_rng, temp);
+    __ step_random(r_profile_rng, temp);
   }
+  __ block_comment("} increment_mdo");
 }
 
 void LIR_Assembler::type_profile_helper(Register mdo,
@@ -1388,7 +1389,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
     };
 
     if (stub != nullptr) {
-      if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+      if (UseVregsForProfileCapture) {
         __ movdl(rscratch1, xmm15);
         __ step_random(noreg, noreg);
         __ cmpl(rscratch1, threshold);
@@ -2935,7 +2936,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
   };
 
   if (counter_stub != nullptr) {
-    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+    if (UseVregsForProfileCapture) {
       __ movdl(dest, xmm15);
       __ step_random(noreg, noreg);
       __ cmpl(dest, threshold);
@@ -3003,10 +3004,8 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
         ciKlass* receiver = vc_data->receiver(i);
         if (known_klass->equals(receiver)) {
           Address data_addr(mdo, md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)));
-          __ block_comment("addptr {");
           increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
                         op->tmp1()->as_register_lo());
-          __ block_comment("} addptr");
           goto exit;
         }
       }
@@ -3022,15 +3021,13 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
     increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
                   op->tmp1()->as_register_lo());
   }
+ exit: {}
 
- exit:
-  {
 #ifndef PRODUCT
-    if (CommentedAssembly) {
-      __ block_comment("} profile_call");
-    }
-#endif
+  if (CommentedAssembly) {
+    __ block_comment("} profile_call");
   }
+#endif
 }
 
 void LIR_Assembler::emit_profile_type(LIR_OpProfileType* op) {

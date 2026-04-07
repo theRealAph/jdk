@@ -2573,6 +2573,7 @@ void AdapterHandlerLibrary::initialize() {
     _buffer = BufferBlob::create("adapters", AdapterHandlerLibrary_size);
 
   if (_adapter_handler_table == nullptr || _buffer == nullptr) {
+    // Out of memory
     return;
   }
 
