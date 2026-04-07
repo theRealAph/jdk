@@ -2526,7 +2526,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
 
   int profile_capture_ratio = ProfileCaptureRatio;
   int ratio_shift = exact_log2(profile_capture_ratio);
-  unsigned long threshold = (UCONST64(1) << 32) >> ratio_shift;
+  uint64_t threshold = (UCONST64(1) << 32) >> ratio_shift;
 
   assert(threshold > 0, "must be");
 
@@ -2556,16 +2556,18 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
         : as_reg(md_offset_opr);
       counter_address = Address(md_reg->as_pointer_register(), offset);
+
+      // Fix up any out-of-range offsets.
+      __ adjust_mdo_address(&counter_address, dest_opr->type());
     }
     if (step->is_register()) {
-      Address dest_adr = __ legitimize_address(counter_address, sizeof (jint), rscratch2);
       Register inc = step->as_register();
-      __ ldrw(dest, dest_adr);
+      __ ldrw(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
         __ lsl(inc, inc, ratio_shift);
       }
       __ addw(dest, dest, inc);
-      __ strw(dest, dest_adr);
+      __ strw(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
         __ lsr(inc, inc, ratio_shift);
       }
@@ -2573,16 +2575,14 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
       jint inc = step->as_constant_ptr()->as_jint_bits();
       switch (dest_opr->type()) {
         case T_INT: {
-          Address dest_adr = __ legitimize_address(counter_address, sizeof (jint), rscratch2);
           inc *= ProfileCaptureRatio;
-          __ incrementw(dest_adr, inc, dest);
+          __ incrementw(counter_address, inc, dest);
 
           break;
         }
         case T_LONG: {
-          Address dest_adr = __ legitimize_address(counter_address, sizeof (jlong), rscratch2);
           inc *= ProfileCaptureRatio;
-          __ increment(dest_adr, inc, dest);
+          __ increment(counter_address, inc, dest);
 
           break;
         }
@@ -2608,7 +2608,12 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
           __ csel(dest, dest, rscratch1, __ NE);
         }
         juint mask = freq_opr->as_jint();
-        __ andw(dest, dest,  mask);
+        if (__ operand_valid_for_logical_immediate(/*is32*/true, mask)) {
+          __ andw(dest, dest, mask);
+        } else {
+          __ movw(rscratch1, mask);
+          __ andw(dest, dest, rscratch1);
+        }
         __ cbzw(dest, *overflow_stub->entry());
       }
     }

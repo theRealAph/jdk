@@ -274,18 +274,6 @@ void C1_MacroAssembler::load_parameter(int offset_in_words, Register reg) {
 void C1_MacroAssembler::step_random(Register state, Register temp) {
   // One of these will be the best for a particular CPU.
 
-  /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
-
-  // movl(temp, state);
-  // sall(temp, 13);
-  // xorl(state, temp);
-  // movl(temp, state);
-  // shrl(temp, 7);
-  // xorl(state, temp);
-  // movl(temp, state);
-  // sall(temp, 5);
-  // xorl(state, temp);
-
   if (!UseVregsForProfileCapture && VM_Version::supports_sse4_2()) {
     /* CRC used as a psuedo-random-number generator */
     // In effect, the CRC instruction is being used here for its
@@ -296,6 +284,8 @@ void C1_MacroAssembler::step_random(Register state, Register temp) {
     if (UseVregsForProfileCapture) {
       vpmulld(xmm15, xmm15, xmm14, Assembler::AVX_128bit);
     } else {
+      /* LCG by Marsaglia. From Karl Entacher,
+       https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
       movl(temp, 69069);
       imull(state, temp);
     }

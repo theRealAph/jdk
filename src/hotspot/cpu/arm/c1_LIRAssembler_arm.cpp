@@ -40,7 +40,7 @@
 #include "utilities/powerOfTwo.hpp"
 #include "vmreg_arm.inline.hpp"
 
-#define __ _masm->
+#define __ masm()->
 
 // Note: Rtemp usage is this file should not impact C2 and should be
 // correct as long as it is not implicitly used in lower layers (the
@@ -1095,6 +1095,7 @@ void LIR_Assembler::typecheck_profile_helper2(ciMethodData* md, ciProfileData* d
 
 // Sets `res` to true, if `cond` holds.
 static void set_instanceof_result(MacroAssembler* _masm, Register res, AsmCondition cond) {
+  auto masm = [_masm]() { return _masm; };
   __ mov(res, 1, cond);
 }
 
@@ -2484,10 +2485,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
   auto lambda = [counter_stub, overflow_stub, freq_opr, dest_opr, dest, ratio_shift, step,
                  md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
-#undef __
-#define __ masm->
-
-    auto masm = ce->masm();
+    auto masm = [ce]() { return ce->masm(); };
     Address counter_address;
 
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
@@ -2540,7 +2538,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
     }
 
     if (overflow_stub) {
-      guarantee(step_opr->is_valid(), "must be");
+      guarantee(step->is_valid(), "must be");
       if (!freq_opr->is_valid()) {
         if (!step->is_constant()) {
           __ cbz(step->as_register(), *overflow_stub->entry());
@@ -2565,14 +2563,10 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
     if (counter_stub != nullptr) {
       __ b(*counter_stub->continuation());
     }
-
-#undef __
-#define __ _masm->
   };
 
   if (counter_stub != nullptr) {
-    __ mov(Rtemp, AsmOperand(r_profile_rng, lsr, 32 - ratio_shift));
-    __ cmp(Rtemp, 0);
+    __ movs(Rtemp, AsmOperand(r_profile_rng, lsr, 32 - ratio_shift));
     __ b(*counter_stub->entry(), eq);
     __ bind(*counter_stub->continuation());
     __ step_random(r_profile_rng, Rtemp);

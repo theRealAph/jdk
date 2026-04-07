@@ -290,9 +290,9 @@ void C1_MacroAssembler::step_random(Register state, Register temp, Register data
     crc32h(state, state, data);
   } else {
     /* LCG from glibc. */
-    mov(temp, 1103515245);
+    mov(temp, 69069);
     mulw(state, state, temp);
-    addw(state, state, 12345);
+    addw(state, state, 1);
   }
 }
 
@@ -305,6 +305,18 @@ void C1_MacroAssembler::save_profile_rng() {
 void C1_MacroAssembler::restore_profile_rng() {
   if (ProfileCaptureRatio != 1) {
     ldrw(r_profile_rng, Address(rthread, JavaThread::profile_rng_offset()));
+  }
+}
+
+void C1_MacroAssembler::adjust_mdo_address(Address* a, BasicType t) {
+  int size = type2aelembytes(t);
+  if (legitimize_address_requires_lea(*a, size)) {
+    int64_t offset = a->offset();
+    int64_t offset_lo = offset & right_n_bits(12);
+    int64_t offset_hi = offset - offset_lo;
+    lea(a->base(), Address(a->base(), offset_hi));
+    *a = Address(a->base(), offset_lo);
+    assert(!legitimize_address_requires_lea(*a, size), "must not");
   }
 }
 
