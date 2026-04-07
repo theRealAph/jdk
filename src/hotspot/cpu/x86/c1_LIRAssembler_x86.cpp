@@ -1275,19 +1275,27 @@ void LIR_Assembler::emit_alloc_array(LIR_OpAllocArray* op) {
 
 
 static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Register temp) {
+  assert(!dst.uses(temp), "feck!");
   auto masm = [C1_masm]() { return (C1_MacroAssembler*)C1_masm; };
   assert(masm()->is_C1_MacroAssembler(), "must be");
   int ratio_shift = exact_log2(ProfileCaptureRatio);
   Label nope;
   if (ProfileCaptureRatio > 1) {
     auto threshold = (1ull << 32) >> ratio_shift;
-    __ cmpl(r_profile_rng, threshold);
-    __ jcc(Assembler::aboveEqual, nope);
+    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+      __ movdl(temp, xmm15);
+      __ step_random(noreg, noreg);
+      __ cmpl(temp, threshold);
+      __ jccb(Assembler::aboveEqual, nope);
+    } else {
+      __ cmpl(r_profile_rng, threshold);
+      __ jccb(Assembler::aboveEqual, nope);
+    }
   }
   __ addptr(dst, src << ratio_shift);
   if (ProfileCaptureRatio > 1) {
     __ bind(nope);
-    __ step_random(r_profile_rng, temp);
+    if (!getenv("APH_USE_XMM_FOR_RANDOM"))  __ step_random(r_profile_rng, temp);
   }
 }
 
@@ -1367,23 +1375,31 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
     ProfileStub *stub
       = profile_capture_ratio > 1 ? new ProfileStub() : nullptr;
 
-    auto lambda = [stub, md, mdo, data, k_RInfo, obj, tmp_load_klass]
+    auto lambda = [stub, md, mdo, data, k_RInfo, obj, Rtmp1, tmp_load_klass]
         (LIR_Assembler* ce, LIR_Op* base_op) {
       auto masm = [=]() { return ce->masm(); };
       if (stub != nullptr)  __ bind(*stub->entry());
 
       Register recv = k_RInfo;
       __ load_klass(recv, obj, tmp_load_klass);
-      ce->type_profile_helper(mdo, md, data, recv, rscratch1);
+      ce->type_profile_helper(mdo, md, data, recv, Rtmp1);
 
       if (stub != nullptr)  __ jmp(*stub->continuation());
     };
 
     if (stub != nullptr) {
-      __ cmpl(r_profile_rng, threshold);
-      __ jcc(Assembler::below, *stub->entry());
-      __ bind(*stub->continuation());
-      __ step_random(r_profile_rng, rscratch1);
+      if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+        __ movdl(rscratch1, xmm15);
+        __ step_random(noreg, noreg);
+        __ cmpl(rscratch1, threshold);
+        __ jcc(Assembler::below, *stub->entry());
+        __ bind(*stub->continuation());
+      } else {
+        __ cmpl(r_profile_rng, threshold);
+        __ jcc(Assembler::below, *stub->entry());
+        __ bind(*stub->continuation());
+        __ step_random(r_profile_rng, rscratch1);
+      }
 
       stub->set_action(lambda, op);
       stub->set_name("Typecheck stub");
@@ -2919,11 +2935,18 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
   };
 
   if (counter_stub != nullptr) {
-    __ cmpl(r_profile_rng, threshold);
-    __ jcc(Assembler::below, *counter_stub->entry());
-    __ bind(*counter_stub->continuation());
-    __ step_random(r_profile_rng, dest);
-
+    if (getenv("APH_USE_XMM_FOR_RANDOM")) {
+      __ movdl(dest, xmm15);
+      __ step_random(noreg, noreg);
+      __ cmpl(dest, threshold);
+      __ jcc(Assembler::below, *counter_stub->entry());
+      __ bind(*counter_stub->continuation());
+    } else {
+      __ cmpl(r_profile_rng, threshold);
+      __ jcc(Assembler::below, *counter_stub->entry());
+      __ bind(*counter_stub->continuation());
+      __ step_random(r_profile_rng, dest);
+    }
     counter_stub->set_action(lambda, nullptr);
     counter_stub->set_name("IncrementProfileCtr");
     append_code_stub(counter_stub);
@@ -2980,8 +3003,11 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
         ciKlass* receiver = vc_data->receiver(i);
         if (known_klass->equals(receiver)) {
           Address data_addr(mdo, md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)));
-          __ addptr(data_addr, DataLayout::counter_increment);
-          return;
+          __ block_comment("addptr {");
+          increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
+                        op->tmp1()->as_register_lo());
+          __ block_comment("} addptr");
+          goto exit;
         }
       }
       // Receiver type is not found in profile data.
@@ -2993,14 +3019,18 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
     type_profile_helper(mdo, md, data, recv, op->tmp1()->as_register_lo());
   } else {
     // Static call
-    __ addptr(counter_addr, DataLayout::counter_increment);
+    increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
+                  op->tmp1()->as_register_lo());
   }
 
+ exit:
+  {
 #ifndef PRODUCT
-  if (CommentedAssembly) {
-    __ block_comment("} profile_call");
-  }
+    if (CommentedAssembly) {
+      __ block_comment("} profile_call");
+    }
 #endif
+  }
 }
 
 void LIR_Assembler::emit_profile_type(LIR_OpProfileType* op) {

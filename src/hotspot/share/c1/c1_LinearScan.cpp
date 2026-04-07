@@ -615,7 +615,7 @@ void LinearScan::compute_local_live_sets() {
           local_has_fpu_registers = local_has_fpu_registers || opr->is_virtual_fpu();
         }
 
-#ifdef ASSERT
+#ifdef ASSERTz
         // fixed intervals are never live at block boundaries, so
         // they need not be processed in live sets.
         // this is checked by these assertions to be sure about it.
@@ -693,7 +693,7 @@ void LinearScan::compute_local_live_sets() {
           local_has_fpu_registers = local_has_fpu_registers || opr->is_virtual_fpu();
         }
 
-#ifdef ASSERT
+#ifdef ASSERTa
         // fixed intervals are never live at block boundaries, so
         // they need not be processed in live sets
         // process them only in debug mode so that this can be checked
@@ -5703,7 +5703,7 @@ void LinearScanWalker::init_vars_for_alloc(Interval* cur) {
     // the appropriate register range was selected.
   } else if (type == T_FLOAT || type == T_DOUBLE) {
     _first_reg = pd_first_fpu_reg;
-    _last_reg = pd_last_fpu_reg;
+    _last_reg = FrameMap::last_fpu_reg();
   } else {
     _first_reg = pd_first_cpu_reg;
     _last_reg = FrameMap::last_cpu_reg();

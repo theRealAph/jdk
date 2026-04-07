@@ -134,6 +134,11 @@
     return range;
   }
 
+  static int adjust_fpreg_range(int range) {
+    // Reduce the number of available regs
+    return range - ProfileCaptureRatio > 1;
+  }
+
   static int get_num_caller_save_xmms() {
     return XMMRegister::available_xmm_registers();
   }
@@ -141,5 +146,6 @@
   static int nof_caller_save_cpu_regs() { return adjust_reg_range(pd_nof_caller_save_cpu_regs_frame_map); }
   static int last_cpu_reg()             { return adjust_reg_range(pd_last_cpu_reg);  }
   static int last_byte_reg()            { return adjust_reg_range(pd_last_byte_reg); }
+  static int last_fpu_reg()             { return adjust_fpreg_range(pd_last_fpu_reg);  }
 
 #endif // CPU_X86_C1_FRAMEMAP_X86_HPP

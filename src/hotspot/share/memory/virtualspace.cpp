@@ -231,6 +231,12 @@ bool VirtualSpace::expand_by(size_t bytes, bool pre_touch) {
     return true;
   }
 
+#ifndef PRODUCT
+  if (getenv("APH_CODE_CACHE_EXPANSION")) {
+    print();
+  }
+#endif
+
   char* previous_high = high();
   char* unaligned_new_high = high() + bytes;
   assert(unaligned_new_high <= high_boundary(), "cannot expand by more than upper boundary");
