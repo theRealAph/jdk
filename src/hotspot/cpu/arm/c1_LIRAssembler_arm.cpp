@@ -1897,9 +1897,11 @@ void LIR_Assembler::comp_fl2i(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Op
 
 
 void LIR_Assembler::align_call(LIR_Code code) {
-  __ save_profile_rng();
 }
 
+void LIR_Assembler::save_profile_rng() {
+  __ save_profile_rng();
+}
 
 void LIR_Assembler::call(LIR_OpJavaCall *op, relocInfo::relocType rtype) {
   int ret_addr_offset = __ patchable_call(op->addr(), rtype);
