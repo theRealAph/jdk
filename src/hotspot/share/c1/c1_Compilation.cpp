@@ -363,8 +363,6 @@ int Compilation::emit_code_body() {
   return frame_map()->framesize();
 }
 
-THREAD_LOCAL const char *compilation_name;
-
 int Compilation::compile_java_method() {
   assert(!method()->is_native(), "should not reach here");
 

@@ -284,7 +284,7 @@ void C1_MacroAssembler::load_parameter(int offset_in_words, Register reg) {
 
 void C1_MacroAssembler::step_random(Register state, Register temp, Register data) {
   if (VM_Version::supports_crc32()) {
-    /* CRC used as a psuedo-random-number generator */
+    /* CRC used as a pseudo-random-number generator */
     // In effect, the CRC instruction is being used here for its
     // linear feedback shift register.
     crc32h(state, state, data);

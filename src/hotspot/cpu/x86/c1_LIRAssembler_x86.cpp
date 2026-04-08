@@ -1305,8 +1305,7 @@ void LIR_Assembler::type_profile_helper(Register mdo,
                                         Register recv, Register temp) {
   int mdp_offset = md->byte_offset_of_slot(data, in_ByteSize(0));
   if (ProfileCaptureRatio > 1) {
-    __ profile_receiver_type
-      (recv, mdo, mdp_offset, temp, &increment_mdo);
+    __ profile_receiver_type(recv, mdo, mdp_offset, temp, &increment_mdo);
   } else {
     __ profile_receiver_type(recv, mdo, mdp_offset, temp);
   }
