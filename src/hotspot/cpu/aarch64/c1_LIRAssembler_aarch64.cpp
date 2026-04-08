@@ -1268,8 +1268,6 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
 
   int profile_capture_ratio = ProfileCaptureRatio;
   int ratio_shift = exact_log2(profile_capture_ratio);
-  auto threshold = (1ull << 32) >> ratio_shift;
-  assert(threshold > 0, "must be");
 
   // check if it needs to be profiled
   ciMethodData* md;
@@ -1313,7 +1311,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
     Address data_addr
       = __ form_address(rscratch2, mdo,
                         md->byte_offset_of_slot(data, DataLayout::flags_offset()),
-                        LogBytesPerWord);
+                        0);
     __ ldrb(rscratch1, data_addr);
     __ orr(rscratch1, rscratch1, BitData::null_seen_byte_constant());
     __ strb(rscratch1, data_addr);
