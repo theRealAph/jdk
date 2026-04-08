@@ -253,19 +253,10 @@ void C1_MacroAssembler::increment_mdp_data_at(Address data,
 // Randomized profile capture.
 
 void C1_MacroAssembler::step_random(Register state, Register temp, Register data) {
-  // if (VM_Version::supports_crc32()) {
-  //   /* CRC used as a psuedo-random-number generator */
-  //   // In effect, the CRC instruction is being used here for its
-  //   // linear feedback shift register. It's unbeatably fast, and
-  //   // plenty good enough for what we need.
-  //   crc32h(state, state, data);
-  // } else
-  {
-    /* LCG from Marsaglia. From Karl Entacher,
-       https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
+  /* LCG by Marsaglia. From Karl Entacher,
+     https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
     mov_slow(temp, 69069);
     mul(state, state, temp);
-    add(state, state, 1);
   }
 }
 

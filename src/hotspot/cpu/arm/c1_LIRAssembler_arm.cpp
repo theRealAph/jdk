@@ -2524,14 +2524,10 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
 
           break;
         }
-        // On 32-bit platforms, 64-bit profile counters are never used
-        // case T_LONG: {
-        //   Address dest_adr = counter_address;
-        //   inc *= ProfileCaptureRatio;
-        //   __ increment(dest_adr, inc, dest);
-
-        //   break;
-        // }
+        case T_LONG:
+          assert(false, "On 32-bit platforms, 64-bit profile counters "
+                 "are never used");
+          // fallthrough
         default:
           ShouldNotReachHere();
       }
