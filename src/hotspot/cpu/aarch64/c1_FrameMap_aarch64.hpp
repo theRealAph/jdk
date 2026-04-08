@@ -167,5 +167,6 @@
   static int nof_caller_save_cpu_regs() { return adjust_reg_range(pd_nof_caller_save_cpu_regs_frame_map);  }
   static int last_cpu_reg()             { return adjust_reg_range(pd_last_cpu_reg, PreserveFramePointer);  }
   static int last_byte_reg()            { return adjust_reg_range(pd_last_byte_reg, PreserveFramePointer); }
+  static int last_fpu_reg()             { return pd_last_fpu_reg; }
 
 #endif // CPU_AARCH64_C1_FRAMEMAP_AARCH64_HPP
