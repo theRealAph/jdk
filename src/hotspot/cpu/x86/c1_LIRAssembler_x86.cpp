@@ -2229,6 +2229,11 @@ void LIR_Assembler::align_call(LIR_Code code) {
 }
 
 
+void LIR_Assembler::save_profile_rng() {
+  __ save_profile_rng();
+}
+
+
 void LIR_Assembler::call(LIR_OpJavaCall* op, relocInfo::relocType rtype) {
   assert((__ offset() + NativeCall::displacement_offset) % BytesPerWord == 0,
          "must be aligned");
