@@ -255,9 +255,8 @@ void C1_MacroAssembler::increment_mdp_data_at(Address data,
 void C1_MacroAssembler::step_random(Register state, Register temp, Register data) {
   /* LCG by Marsaglia. From Karl Entacher,
      https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
-    mov_slow(temp, 69069);
-    mul(state, state, temp);
-  }
+  mov_slow(temp, 69069);
+  mul(state, state, temp);
 }
 
 void C1_MacroAssembler::save_profile_rng() {
