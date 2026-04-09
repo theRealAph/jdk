@@ -1282,7 +1282,7 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Reg
   Label nope;
   if (ProfileCaptureRatio > 1) {
     assert(!dst.uses(temp), "fix register allocation");
-    auto threshold = (1ull << 32) >> ratio_shift;
+    auto threshold = (UCONST64(1) << 32) >> ratio_shift;
     if (UseVregsForProfileCapture) {
       __ movdl(temp, xmm15);
       __ cmpl(temp, threshold);
@@ -1358,7 +1358,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
   if (op->should_profile()) {
     int profile_capture_ratio = ProfileCaptureRatio;
     int ratio_shift = exact_log2(profile_capture_ratio);
-    auto threshold = (1ull << 32) >> ratio_shift;
+    auto threshold = (UCONST64(1) << 32) >> ratio_shift;
     assert(threshold > 0, "must be");
 
     Label not_null;
