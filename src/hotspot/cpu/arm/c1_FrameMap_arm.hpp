@@ -107,4 +107,8 @@
     return pd_last_cpu_reg;
   }
 
+  static int last_fpu_reg() {
+    return pd_last_fpu_reg;
+  }
+
 #endif // CPU_ARM_C1_FRAMEMAP_ARM_HPP
