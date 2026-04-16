@@ -283,6 +283,16 @@ void C1_MacroAssembler::load_parameter(int offset_in_words, Register reg) {
 // Randomized profile capture.
 
 void C1_MacroAssembler::step_random(Register state, Register temp, Register data) {
+  if (getenv("APH_TIMER_RANDOM")) {
+    // mrs(0b011, 0b1110, 0b0000, 0b001, temp);
+    // mrs(0b100, 0b1110, 0b0100, 0b010, temp);
+    mrs(0b011, 0b1110, 0b0000, 0b010, temp);
+    eorw(temp, temp, rthread, LSL, 8); // Mix it up a bit
+    // mov(rscratch1, 2654435769); // (uint)(((u8)1 << 32) / ((1 + sqrt(5)) / 2 ))
+    // mulw(temp, temp, rscratch1);
+    crc32h(temp, temp, zr);
+    return;
+  }
   if (VM_Version::supports_crc32()) {
     /* CRC used as a pseudo-random-number generator */
     // In effect, the CRC instruction is being used here for its

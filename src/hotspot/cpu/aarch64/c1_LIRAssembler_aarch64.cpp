@@ -1235,13 +1235,18 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src) {
   Label nope;
   int ratio_shift = exact_log2(ProfileCaptureRatio);
   if (ProfileCaptureRatio > 1) {
-    __ ubfx(rscratch1, r_profile_rng, 32-ratio_shift, ratio_shift);
+    if (getenv("APH_TIMER_RANDOM")) {
+      __ step_random(r_profile_rng, rscratch1);
+      __ ubfx(rscratch1, rscratch1, 32-ratio_shift, ratio_shift);
+    } else {
+      __ ubfx(rscratch1, r_profile_rng, 32-ratio_shift, ratio_shift);
+    }
     __ cbnz(rscratch1, nope);
   }
   __ increment(dst, src << ratio_shift);
   if (ProfileCaptureRatio > 1) {
     __ bind(nope);
-    __ step_random(r_profile_rng, rscratch2);
+    if (!getenv("APH_TIMER_RANDOM")) __ step_random(r_profile_rng, rscratch1);
   }
 }
 
@@ -2624,11 +2629,17 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
   };
 
   if (counter_stub != nullptr) {
-    __ ubfx(rscratch1, r_profile_rng, 32 - ratio_shift, ratio_shift);
-    __ cbz(rscratch1, *counter_stub->entry());
-    __ bind(*counter_stub->continuation());
-    __ step_random(r_profile_rng, rscratch2);
-
+    if (getenv("APH_TIMER_RANDOM")) {
+      __ step_random(r_profile_rng, rscratch2);
+      __ ubfx(rscratch2, r_profile_rng, 32 - ratio_shift, ratio_shift);
+      __ cbz(rscratch2, *counter_stub->entry());
+      __ bind(*counter_stub->continuation());
+    } else {
+      __ ubfx(rscratch1, r_profile_rng, 32 - ratio_shift, ratio_shift);
+      __ cbz(rscratch1, *counter_stub->entry());
+      __ bind(*counter_stub->continuation());
+      __ step_random(r_profile_rng, rscratch2);
+    }
     counter_stub->set_action(lambda, nullptr);
     counter_stub->set_name("IncrementEventCounter");
     append_code_stub(counter_stub);
