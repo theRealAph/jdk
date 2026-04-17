@@ -760,7 +760,7 @@ public:
   // n.b. increment/decrement calls with an Address destination will
   // need to use a scratch register to load the value to be
   // incremented. increment/decrement calls which add or subtract a
-  // constant value greater than 2^12 will need to use a 2nd scratch
+  // constant value greater than 2^24 will need to use a 2nd scratch
   // register to hold the constant. so, a register increment/decrement
   // may trash rscratch2 and an address increment/decrement trash
   // rscratch and rscratch2
