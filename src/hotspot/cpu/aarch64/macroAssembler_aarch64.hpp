@@ -178,12 +178,6 @@ class MacroAssembler: public Assembler {
   using Assembler::str;
   using Assembler::ldrw;
   using Assembler::strw;
-  using Assembler::ldrq;
-  using Assembler::strq;
-  using Assembler::ldrd;
-  using Assembler::strd;
-  using Assembler::ldrs;
-  using Assembler::strs;
 
   void ldr(Register Rx, const Address &adr);
   void ldrw(Register Rw, const Address &adr);
@@ -191,12 +185,21 @@ class MacroAssembler: public Assembler {
   void strw(Register Rx, const Address &adr);
   void ldr(FloatRegister Rt, SIMD_RegVariant T, const Address& adr);
   void str(FloatRegister Rt, SIMD_RegVariant T, const Address& adr);
-  void ldrq(FloatRegister Rt, const Address& adr);
-  void strq(FloatRegister Rt, const Address& adr);
-  void ldrd(FloatRegister Rt, const Address& adr);
-  void strd(FloatRegister Rt, const Address& adr);
-  void ldrs(FloatRegister Rt, const Address& adr);
-  void strs(FloatRegister Rt, const Address& adr);
+
+#define DEFINE_LDR_STR_FUNCS(suffix, elem_kind)              \
+  void ldr##suffix(FloatRegister Rq, const Address& adr) {   \
+    MacroAssembler::ldr(Rq, elem_kind, adr);                 \
+  }                                                          \
+                                                             \
+  void str##suffix(FloatRegister Rq, const Address& adr) {   \
+    MacroAssembler::str(Rq, elem_kind, adr);                 \
+  }
+
+  DEFINE_LDR_STR_FUNCS(q, Q)
+  DEFINE_LDR_STR_FUNCS(d, D)
+  DEFINE_LDR_STR_FUNCS(s, S)
+
+#undef DEFINE_LDR_STR_FUNCS
 
   // Frame creation and destruction shared between JITs.
   void build_frame(int framesize);
@@ -1659,31 +1662,21 @@ private:
   // instruction.
   // For scalar types, 4- and 8-byte accesses are supported.
   // For SIMD types, 16-byte accesses are additionally supported.
-  bool can_form_ldst_pair(unsigned size_in_bytes, bool is_simd) const {
+  bool can_form_ldst_pair(size_t size_in_bytes, bool is_simd) const {
     return size_in_bytes == 4 || size_in_bytes == 8 || (is_simd && size_in_bytes == 16);
   }
 
   // Check whether two loads/stores can be merged into ldp/stp.
-  bool ldst_can_merge(int rx, const Address& adr, unsigned cur_size_in_bytes,
-                      bool is_store, bool is_simd) const;
+  template <typename T>
+  bool ldst_can_merge(T rx, const Address& adr, unsigned cur_size_in_bytes, bool is_store) const;
 
   // Merge current load/store with previous load/store into ldp/stp.
-  void merge_ldst(int rx, const Address& adr, unsigned cur_size_in_bytes,
-                  bool is_store, bool is_simd);
+  template <typename T>
+  void merge_ldst(T rx, const Address& adr, unsigned cur_size_in_bytes, bool is_store);
 
   // Try to merge two loads/stores into ldp/stp. If success, returns true else false.
   template <typename T>
-  bool try_merge_ldst(T rt, const Address& adr, unsigned cur_size_in_bytes, bool is_store) {
-    constexpr bool is_simd = std::is_same<T, FloatRegister>::value;
-    static_assert(is_simd || std::is_same<T, Register>::value, "unsupported register parameter type");
-    if (!can_form_ldst_pair(cur_size_in_bytes, is_simd)) {
-      return false;
-    }
-    return try_merge_ldst_impl(rt->raw_encoding(), adr, cur_size_in_bytes, is_store, is_simd);
-  }
-  bool try_merge_ldst_impl(int rt, const Address& adr, unsigned cur_size_in_bytes,
-                           bool is_store, bool is_simd);
-
+  bool try_merge_ldst(T rt, const Address& adr, unsigned cur_size_in_bytes, bool is_store);
 
 public:
   void spill(Register Rx, bool is64, int offset) {
