@@ -24,7 +24,7 @@
 
 /*
  * @test
- * @bug 8254790
+ * @bug 8359166
  * @requires os.arch=="amd64" | os.arch=="x86_64"
  * @requires vm.debug
  *
