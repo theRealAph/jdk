@@ -2874,7 +2874,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
 
     if (step_opr->is_register()) {
       Register inc = step_opr->as_register();
-      __ lea(dest, counter_address);
+      __ movl(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
         __ shll(inc, ratio_shift);
       }
@@ -3005,8 +3005,11 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
       for (uint i = 0; i < VirtualCallData::row_limit(); i++) {
         ciKlass* receiver = vc_data->receiver(i);
         if (known_klass->equals(receiver)) {
+#ifndef PRODUCT
+          __ block_comment("known_klass->equals(receiver)");
+#endif // PRODUCT
           Address data_addr(mdo, md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)));
-          increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
+          increment_mdo(masm(), data_addr, DataLayout::counter_increment,
                         op->tmp1()->as_register_lo());
           goto exit;
         }
@@ -3269,11 +3272,8 @@ void LIR_Assembler::leal(LIR_Opr src, LIR_Opr dest, LIR_PatchCode patch_code, Co
 
 void LIR_Assembler::rt_call(LIR_Opr result, address dest, const LIR_OprList* args, LIR_Opr tmp, CodeEmitInfo* info) {
   assert(!tmp->is_valid(), "don't need temporary");
-  __ call(RuntimeAddress(dest));
-  if (info != nullptr) {
-    add_call_info_here(info);
-  }
-  __ post_call_nop();
+  __ call(RuntimeAddress(dest),
+          [=]() { if (info)  add_call_info_here(info); });
 }
 
 

@@ -292,7 +292,7 @@ void C1_MacroAssembler::step_random(Register state, Register temp) {
 void C1_MacroAssembler::save_profile_rng() {
   if (ProfileCaptureRatio != 1) {
     if (UseVregsForProfileCapture) {
-      movsd(Address(r15_thread, JavaThread::profile_rng_offset()), xmm15);
+      movflt(Address(r15_thread, JavaThread::profile_rng_offset()), xmm15);
     } else {
       movl(Address(r15_thread, JavaThread::profile_rng_offset()), r_profile_rng);
     }
@@ -303,8 +303,8 @@ void C1_MacroAssembler::restore_profile_rng() {
   if (ProfileCaptureRatio != 1) {
     if (UseVregsForProfileCapture) {
       movl(rscratch1, 69069);
-      movdq(xmm14, rscratch1);
-      movddup(xmm15, Address(r15_thread, JavaThread::profile_rng_offset()));
+      movdl(xmm14, rscratch1);
+      movflt(xmm15, Address(r15_thread, JavaThread::profile_rng_offset()));
     } else {
       movl(r_profile_rng, Address(r15_thread, JavaThread::profile_rng_offset()));
     }

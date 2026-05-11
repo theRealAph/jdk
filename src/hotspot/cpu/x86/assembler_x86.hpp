@@ -382,6 +382,7 @@ class AddressLiteral {
 
   friend class Assembler;
   friend class MacroAssembler;
+  friend class C1_MacroAssembler;
   friend class Address;
   friend class LIR_Assembler;
 };
