@@ -133,38 +133,4 @@
   void save_profile_rng();
   void restore_profile_rng();
 
-  void save_profile_rng_at_rtcall() {
-    if (ProfileCaptureRatio > 1 && UseVregsForProfileCapture) {
-      // block_comment("save_profile_rng_at_rtcall()");
-      save_profile_rng();
-    }
-  }
-  void restore_profile_rng_at_rtcall() {
-    if (ProfileCaptureRatio > 1 && UseVregsForProfileCapture) {
-      restore_profile_rng();
-      // block_comment("save_profile_rng_at_rtcall()");
-    }
-
-  }
-  using MacroAssembler::call;
-  template<typename T>
-  void call(AddressLiteral entry, T add_call_info_here) {
-    if (entry.reloc() == relocInfo::runtime_call_type) {
-      block_comment("save_profile_rng_at_rtcall(); {" );
-      save_profile_rng_at_rtcall();
-      block_comment("} save_profile_rng_at_rtcall();");
-      MacroAssembler::call(entry);
-      add_call_info_here();
-      post_call_nop();
-      restore_profile_rng_at_rtcall();
-    } else {
-      MacroAssembler::call(entry);
-      add_call_info_here();
-      post_call_nop();
-    }
-  }
-  void call(AddressLiteral entry) {
-    call(entry, []() {});
-  }
-
 #endif // CPU_X86_C1_MACROASSEMBLER_X86_HPP

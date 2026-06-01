@@ -130,15 +130,13 @@
     int result = range;
     // Reduce the number of available regs (to free r12 or r14) in
     // case of compressed oops and randomized profile captures.
-    if (UseCompressedOops)  result -= 1;
-    if (ProfileCaptureRatio > 1 && !UseVregsForProfileCapture)  result -= 1;
+    if (UseCompressedOops)        result -= 1;
+    if (ProfileCaptureRatio > 1)  result -= 1;
     return result;
   }
 
   static int adjust_fpreg_range(int range) {
-    // Reduce the number of available regs
-    return (ProfileCaptureRatio > 1 && UseVregsForProfileCapture)
-      ? range - 2 : range;
+    return range;
   }
 
   static int get_num_caller_save_xmms() {

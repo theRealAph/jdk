@@ -271,43 +271,30 @@ void C1_MacroAssembler::load_parameter(int offset_in_words, Register reg) {
 void C1_MacroAssembler::step_random(Register state, Register temp) {
   // One of these will be the best for a particular CPU.
 
-  if (!UseVregsForProfileCapture && VM_Version::supports_sse4_2()) {
-    /* CRC used as a psuedo-random-number generator */
+  if (VM_Version::supports_sse4_2()) {
+    /* CRC used as a pseudo-random-number generator */
     // In effect, the CRC instruction is being used here for its
     // linear feedback shift register.
     movl(temp, 0);
     crc32(state, temp, /*sizeInBytes*/2);
   } else {
-    if (UseVregsForProfileCapture) {
-      vpmulld(xmm15, xmm15, xmm14, Assembler::AVX_128bit);
-    } else {
-      /* LCG by Marsaglia. From Karl Entacher,
+    /* LCG by Marsaglia. From Karl Entacher,
        https://www.researchgate.net/publication/2683298_A_Collection_of_Selected_Pseudorandom_Number_Generators_With_Linear_Structures */
-      movl(temp, 69069);
-      imull(state, temp);
-    }
+    movl(temp, 69069);
+    imull(state, temp);
+    incl(state);
   }
 }
 
 void C1_MacroAssembler::save_profile_rng() {
   if (ProfileCaptureRatio != 1) {
-    if (UseVregsForProfileCapture) {
-      movflt(Address(r15_thread, JavaThread::profile_rng_offset()), xmm15);
-    } else {
-      movl(Address(r15_thread, JavaThread::profile_rng_offset()), r_profile_rng);
-    }
+    movl(Address(r15_thread, JavaThread::profile_rng_offset()), r_profile_rng);
   }
 }
 
 void C1_MacroAssembler::restore_profile_rng() {
   if (ProfileCaptureRatio != 1) {
-    if (UseVregsForProfileCapture) {
-      movl(rscratch1, 69069);
-      movdl(xmm14, rscratch1);
-      movflt(xmm15, Address(r15_thread, JavaThread::profile_rng_offset()));
-    } else {
-      movl(r_profile_rng, Address(r15_thread, JavaThread::profile_rng_offset()));
-    }
+    movl(r_profile_rng, Address(r15_thread, JavaThread::profile_rng_offset()));
   }
 }
 

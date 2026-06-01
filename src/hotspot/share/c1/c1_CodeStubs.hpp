@@ -148,7 +148,7 @@ struct LambdaWrapper : public AbstractLambdaWrapper {
 
 class ProfileStub: public CodeStub {
 private:
-  AbstractLambdaWrapper *_action;
+  AbstractLambdaWrapper *_action = nullptr;
   const char* _name;
 
 public:
