@@ -964,8 +964,6 @@ void LIRGenerator::profile_branch(If* if_instr, If::Condition cond) {
              LIR_OprFact::intptrConst(not_taken_count_offset),
              data_offset_reg, as_BasicType(if_instr->x()->type()));
 
-    // MDO cells are intptr_t, so the data_reg width is arch-dependent.
-    LIR_Opr data_reg = new_pointer_register();
     LIR_Opr tmp = new_register(T_INT);
     LIR_Opr step = LIR_OprFact::intConst(DataLayout::counter_increment);
     __ increment_counter(step, tmp, md_reg, md->constant_encoding(), data_offset_reg);
@@ -3211,9 +3209,8 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
   } else {
     ShouldNotReachHere();
   }
-  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
-  LIR_Opr tmp = new_register(T_INT);
 
+  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
   if (notify && (!backedge || UseOnStackReplacement)) {
     int ratio_shift = exact_log2(ProfileCaptureRatio);
     LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
