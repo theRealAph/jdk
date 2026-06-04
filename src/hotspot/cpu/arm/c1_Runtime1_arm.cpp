@@ -726,6 +726,10 @@ OopMapSet* Runtime1::generate_code_for(StubId id, StubAssembler* sasm) {
 
 const char *Runtime1::pd_name_for_address(address entry) {
 
+  if (entry == StubRoutines::Arm::atomic_compareAndSet_long_entry()) {
+    return "StubRoutines::atomic_compareAndSet_long";
+  }
+
 #ifdef __SOFTFP__
 #define FUNCTION_CASE(a, f) \
   if ((intptr_t)a == CAST_FROM_FN_PTR(intptr_t, f))  return #f
@@ -775,13 +779,10 @@ const char *Runtime1::pd_name_for_address(address entry) {
   FUNCTION_CASE(entry, __aeabi_dcmple);
   FUNCTION_CASE(entry, __aeabi_dcmpge);
   FUNCTION_CASE(entry, __aeabi_dcmpgt);
-#undef FUNCTION_CASE
   return "";
-}
+#undef FUNCTION_CASE
+
 #else  // __SOFTFP__
-if (entry == StubRoutines::Arm::atomic_compareAndSet_long_entry()) {
-    return "StubRoutines::atomic_compareAndSet_long";
-  }
   return "<unknown function>";
 #endif // __SOFTFP__
 }
