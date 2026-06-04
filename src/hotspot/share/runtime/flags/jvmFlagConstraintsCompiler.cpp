@@ -415,9 +415,9 @@ JVMFlag::Error ProfileCaptureRatioConstraintFunc(int value, bool verbose) {
     return JVMFlag::VIOLATES_CONSTRAINT;
   }
 #else
-  {
+  if (value != 1) {
     JVMFlag::printError(verbose,
-                        "ProfileCaptureRatio is not supported on this target\n");
+                        "ProfileCaptureRatio != 1 is not supported on this target\n");
     return JVMFlag::INVALID_FLAG;
   }
 #endif
