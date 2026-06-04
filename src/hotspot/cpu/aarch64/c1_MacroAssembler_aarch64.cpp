@@ -293,13 +293,13 @@ void C1_MacroAssembler::step_random(Register state, Register temp, Register data
 }
 
 void C1_MacroAssembler::save_profile_rng() {
-  if (ProfileCaptureRatio != 1) {
+  if (ProfileCaptureRatio > 1) {
     strw(r_profile_rng, Address(rthread, JavaThread::profile_rng_offset()));
   }
 }
 
 void C1_MacroAssembler::restore_profile_rng() {
-  if (ProfileCaptureRatio != 1) {
+  if (ProfileCaptureRatio > 1) {
     ldrw(r_profile_rng, Address(rthread, JavaThread::profile_rng_offset()));
   }
 }
