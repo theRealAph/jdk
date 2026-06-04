@@ -316,6 +316,18 @@ void C1_MacroAssembler::adjust_mdo_address(Address* a, BasicType t) {
   }
 }
 
+void C1_MacroAssembler::increment(Address adr, int incr, Register dst) {
+  ldr(dst, adr);
+  add(dst, dst, incr);
+  str(dst, adr);
+}
+
+void C1_MacroAssembler::incrementw(Address adr, int incr, Register dst) {
+  ldrw(dst, adr);
+  addw(dst, dst, incr);
+  strw(dst, adr);
+}
+
 #ifndef PRODUCT
 
 void C1_MacroAssembler::verify_stack_oop(int stack_offset) {
