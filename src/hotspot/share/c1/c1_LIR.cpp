@@ -894,6 +894,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       break;
     }
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
     case lir_increment_counter: {
       LIR_OpIncrementCounter* opr = op->as_OpIncrementCounter();
       assert(opr != nullptr, "must be");
@@ -911,6 +912,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       }
       break;
     }
+#endif
 
     default:
     op->visit(this);
@@ -1074,18 +1076,16 @@ void LIR_OpAssert::emit_code(LIR_Assembler* masm) {
 }
 #endif
 
-void LIR_OpIncrementCounter::emit_code(LIR_Assembler* masm) {
 #ifdef RANDOMIZED_PROFILE_CAPTURE
+void LIR_OpIncrementCounter::emit_code(LIR_Assembler* masm) {
   masm->increment_profile_ctr
     (_step, _result, _freq_op,
      _md_reg, _md_op, _md_offset_op, _overflow_stub);
   if (overflow_stub() != nullptr) {
     masm->append_code_stub(overflow_stub());
   }
-#else
-  ShouldNotReachHere();
-#endif
 }
+#endif
 
 void LIR_OpProfileCall::emit_code(LIR_Assembler* masm) {
   masm->emit_profile_call(this);
@@ -1292,11 +1292,12 @@ void LIR_List::volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offs
 }
 
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
 void LIR_List::increment_counter(LIR_Opr step, LIR_Opr dest,
                                  LIR_Opr freq,
                                  LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset_op,
                                  CodeStub* overflow, CodeEmitInfo* info) {
-    append(new LIR_OpIncrementCounter (
+  append(new LIR_OpIncrementCounter (
             step,
             dest,
             freq,
@@ -1306,7 +1307,7 @@ void LIR_List::increment_counter(LIR_Opr step, LIR_Opr dest,
             overflow,
             info));
 }
-
+#endif
 
 void LIR_List::idiv(LIR_Opr left, LIR_Opr right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info) {
   append(new LIR_Op3(
@@ -2104,6 +2105,7 @@ void LIR_OpProfileType::print_instr(outputStream* out) const {
   tmp()->print(out);          out->print(" ");
 }
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
 void LIR_OpIncrementCounter::print_instr(outputStream* out) const {
   step()->print(out);          out->print(" ");
   dest()->print(out);          out->print(" ");
@@ -2112,6 +2114,7 @@ void LIR_OpIncrementCounter::print_instr(outputStream* out) const {
   md_op()->print(out);         out->print(" ");
   md_offset_op()->print(out);  out->print(" ");
 }
+#endif // RANDOMIZED_PROFILE_CAPTURE
 
 #endif // PRODUCT
 

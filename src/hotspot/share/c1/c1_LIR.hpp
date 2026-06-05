@@ -1933,6 +1933,7 @@ class LIR_OpCompareAndSwap : public LIR_Op {
   virtual void print_instr(outputStream* out) const PRODUCT_RETURN;
 };
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
 // LIR_OpIncrementCounter
 class LIR_OpIncrementCounter : public LIR_Op {
  friend class LIR_OpVisitState;
@@ -1971,6 +1972,7 @@ class LIR_OpIncrementCounter : public LIR_Op {
   virtual LIR_OpIncrementCounter* as_OpIncrementCounter() { return this; }
   virtual void print_instr(outputStream* out) const PRODUCT_RETURN;
 };
+#endif
 
 // LIR_OpProfileCall
 class LIR_OpProfileCall : public LIR_Op {
@@ -2274,6 +2276,7 @@ class LIR_List: public CompilationResourceObj {
   void volatile_store_mem_reg(LIR_Opr src, LIR_Address* address, CodeEmitInfo* info, LIR_PatchCode patch_code = lir_patch_none);
   void volatile_store_unsafe_reg(LIR_Opr src, LIR_Opr base, LIR_Opr offset, BasicType type, CodeEmitInfo* info, LIR_PatchCode patch_code);
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
   void increment_counter(LIR_Opr src, LIR_Opr res,
                          LIR_Opr freq, LIR_Opr md_reg, LIR_Opr md_op, LIR_Opr md_offset,
                          CodeStub* overflow, CodeEmitInfo* info);
@@ -2299,6 +2302,7 @@ class LIR_List: public CompilationResourceObj {
                       md_reg, md, LIR_OprFact::intConst(offset),
                       overflow, info);
   }
+#endif
 
   void idiv(LIR_Opr left, LIR_Opr right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);
   void idiv(LIR_Opr left, int   right, LIR_Opr res, LIR_Opr tmp, CodeEmitInfo* info);

@@ -2409,9 +2409,16 @@ void LIRGenerator::do_Goto(Goto* x) {
       offset = md->byte_offset_of_slot(data, JumpData::taken_offset());
     }
     LIR_Opr md_reg = new_register(T_METADATA);
+#ifdef RANDOMIZED_PROFILE_CAPTURE
     LIR_Opr tmp = new_register(T_INT);
     LIR_Opr inc = LIR_OprFact::intConst(DataLayout::counter_increment);
     __ increment_counter(inc, tmp, md_reg, md->constant_encoding(), offset);
+#else
+    __ metadata2reg(md->constant_encoding(), md_reg);
+
+    increment_counter(new LIR_Address(md_reg, offset,
+                                      NOT_LP64(T_INT) LP64_ONLY(T_LONG)), DataLayout::counter_increment);
+#endif
   }
 
   // emit phi-instruction move after safepoint since this simplifies
@@ -3179,6 +3186,8 @@ void LIRGenerator::increment_event_counter(CodeEmitInfo* info, LIR_Opr step, int
   increment_event_counter_impl(info, info->scope()->method(), step, right_n_bits(freq_log), bci, backedge, true);
 }
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
+
 void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
                                                 ciMethod *method, LIR_Opr step, int frequency,
                                                 int bci, bool backedge, bool notify) {
@@ -3232,6 +3241,71 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
                          /*overflow*/nullptr, info);
   }
 }
+
+#else // RANDOMIZED_PROFILE_CAPTURE
+
+void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
+                                                ciMethod *method, LIR_Opr step, int frequency,
+                                                int bci, bool backedge, bool notify) {
+  assert(frequency == 0 || is_power_of_2(frequency + 1), "Frequency must be x^2 - 1 or 0");
+  int level = _compilation->env()->comp_level();
+  assert(level > CompLevel_simple, "Shouldn't be here");
+
+  int offset = -1;
+  LIR_Opr counter_holder;
+  if (level == CompLevel_limited_profile) {
+    MethodCounters* counters_adr = method->ensure_method_counters();
+    if (counters_adr == nullptr) {
+      bailout("method counters allocation failed");
+      return;
+    }
+    counter_holder = new_pointer_register();
+    __ move(LIR_OprFact::intptrConst(counters_adr), counter_holder);
+    offset = in_bytes(backedge ? MethodCounters::backedge_counter_offset() :
+                                 MethodCounters::invocation_counter_offset());
+  } else if (level == CompLevel_full_profile) {
+    counter_holder = new_register(T_METADATA);
+    offset = in_bytes(backedge ? MethodData::backedge_counter_offset() :
+                                 MethodData::invocation_counter_offset());
+    ciMethodData* md = method->method_data_or_null();
+    assert(md != nullptr, "Sanity");
+    __ metadata2reg(md->constant_encoding(), counter_holder);
+  } else {
+    ShouldNotReachHere();
+  }
+  LIR_Address* counter = new LIR_Address(counter_holder, offset, T_INT);
+  LIR_Opr result = new_register(T_INT);
+  __ load(counter, result);
+  __ add(result, step, result);
+  __ store(result, counter);
+  if (notify && (!backedge || UseOnStackReplacement)) {
+    LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
+    // The bci for info can point to cmp for if's we want the if bci
+    CodeStub* overflow = new CounterOverflowStub(info, bci, meth);
+    int freq = frequency << InvocationCounter::count_shift;
+    if (freq == 0) {
+      if (!step->is_constant()) {
+        __ cmp(lir_cond_notEqual, step, LIR_OprFact::intConst(0));
+        __ branch(lir_cond_notEqual, overflow);
+      } else {
+        __ branch(lir_cond_always, overflow);
+      }
+    } else {
+      LIR_Opr mask = load_immediate(freq, T_INT);
+      if (!step->is_constant()) {
+        // If step is 0, make sure the overflow check below always fails
+        __ cmp(lir_cond_notEqual, step, LIR_OprFact::intConst(0));
+        __ cmove(lir_cond_notEqual, result, LIR_OprFact::intConst(InvocationCounter::count_increment), result, T_INT);
+      }
+      __ logical_and(result, mask, result);
+      __ cmp(lir_cond_equal, result, LIR_OprFact::intConst(0));
+      __ branch(lir_cond_equal, overflow);
+    }
+    __ branch_destination(overflow->continuation());
+  }
+}
+
+#endif // RANDOMIZED_PROFILE_CAPTURE
 
 void LIRGenerator::do_RuntimeCall(RuntimeCall* x) {
   LIR_OprList* args = new LIR_OprList(x->number_of_arguments());
