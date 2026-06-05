@@ -411,7 +411,7 @@ JavaThread::JavaThread(MemTag mem_tag) :
   _lock_stack(this),
   _om_cache(this),
 
-  _profile_rng(-1) {
+  _profile_rng(-1u) {
   set_jni_functions(jni_functions());
 
   // Setup safepoint state info for this thread
