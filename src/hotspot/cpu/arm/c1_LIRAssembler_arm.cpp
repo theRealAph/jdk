@@ -2504,7 +2504,6 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         // Fix up any out-of-range offsets.
         auto offset = md_offset_opr->as_constant_ptr()->as_jint();
         bool is_memoryI =  offset < 4096 && offset > -4096;
-        // bool is_memoryI =  offset < 40 && offset > -40;
         if (!is_memoryI) {
           __ block_comment("out-of-range offset");
           __ add_slow(md_reg->as_pointer_register(), md_reg->as_pointer_register(),

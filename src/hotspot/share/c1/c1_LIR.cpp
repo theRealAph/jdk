@@ -1082,6 +1082,8 @@ void LIR_OpIncrementCounter::emit_code(LIR_Assembler* masm) {
   if (overflow_stub() != nullptr) {
     masm->append_code_stub(overflow_stub());
   }
+#else
+  ShouldNotReachHere();
 #endif
 }
 

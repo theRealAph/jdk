@@ -61,8 +61,6 @@ class CodeStub: public CompilationResourceObj {
 #ifndef PRODUCT
   virtual void print_name(outputStream* out) const = 0;
 #endif
-  Address as_Address(LIR_Assembler* ce, LIR_Address* addr, Register tmp);
-  Address as_Address(LIR_Assembler* ce, LIR_Address* addr);
 
   // label access
   Label* entry()                                 { return &_entry; }
