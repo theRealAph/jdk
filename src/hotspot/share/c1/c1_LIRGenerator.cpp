@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -478,7 +478,7 @@ void LIRGenerator::klass2reg_with_patching(LIR_Opr r, ciMetadata* obj, CodeEmitI
   /* C2 relies on constant pool entries being resolved (ciTypeFlow), so if tiered compilation
    * is active and the class hasn't yet been resolved we need to emit a patch that resolves
    * the class. */
-  if ((!CompilerConfig::is_c1_only_no_jvmci() && need_resolve) || !obj->is_loaded() || PatchALot) {
+  if ((!CompilerConfig::is_c1_only() && need_resolve) || !obj->is_loaded() || PatchALot) {
     assert(info != nullptr, "info must be set if class is not loaded");
     __ klass2reg_patch(nullptr, r, info);
   } else {
@@ -644,7 +644,7 @@ void LIRGenerator::monitor_exit(LIR_Opr object, LIR_Opr lock, LIR_Opr new_hdr, L
 void LIRGenerator::print_if_not_loaded(const NewInstance* new_instance) {
   if (PrintNotLoaded && !new_instance->klass()->is_loaded()) {
     tty->print_cr("   ###class not loaded at new bci %d", new_instance->printable_bci());
-  } else if (PrintNotLoaded && (!CompilerConfig::is_c1_only_no_jvmci() && new_instance->is_unresolved())) {
+  } else if (PrintNotLoaded && (!CompilerConfig::is_c1_only() && new_instance->is_unresolved())) {
     tty->print_cr("   ###class not resolved at new bci %d", new_instance->printable_bci());
   }
 }
@@ -964,8 +964,6 @@ void LIRGenerator::profile_branch(If* if_instr, If::Condition cond) {
              LIR_OprFact::intptrConst(not_taken_count_offset),
              data_offset_reg, as_BasicType(if_instr->x()->type()));
 
-    // MDO cells are intptr_t, so the data_reg width is arch-dependent.
-    LIR_Opr data_reg = new_pointer_register();
     LIR_Opr tmp = new_register(T_INT);
     LIR_Opr step = LIR_OprFact::intConst(DataLayout::counter_increment);
     __ increment_counter(step, tmp, md_reg, md->constant_encoding(), data_offset_reg);
@@ -2411,9 +2409,16 @@ void LIRGenerator::do_Goto(Goto* x) {
       offset = md->byte_offset_of_slot(data, JumpData::taken_offset());
     }
     LIR_Opr md_reg = new_register(T_METADATA);
+#ifdef RANDOMIZED_PROFILE_CAPTURE
     LIR_Opr tmp = new_register(T_INT);
     LIR_Opr inc = LIR_OprFact::intConst(DataLayout::counter_increment);
     __ increment_counter(inc, tmp, md_reg, md->constant_encoding(), offset);
+#else
+    __ metadata2reg(md->constant_encoding(), md_reg);
+
+    increment_counter(new LIR_Address(md_reg, offset,
+                                      NOT_LP64(T_INT) LP64_ONLY(T_LONG)), DataLayout::counter_increment);
+#endif
   }
 
   // emit phi-instruction move after safepoint since this simplifies
@@ -3181,6 +3186,8 @@ void LIRGenerator::increment_event_counter(CodeEmitInfo* info, LIR_Opr step, int
   increment_event_counter_impl(info, info->scope()->method(), step, right_n_bits(freq_log), bci, backedge, true);
 }
 
+#ifdef RANDOMIZED_PROFILE_CAPTURE
+
 void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
                                                 ciMethod *method, LIR_Opr step, int frequency,
                                                 int bci, bool backedge, bool notify) {
@@ -3211,9 +3218,8 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
   } else {
     ShouldNotReachHere();
   }
-  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
-  LIR_Opr tmp = new_register(T_INT);
 
+  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
   if (notify && (!backedge || UseOnStackReplacement)) {
     int ratio_shift = exact_log2(ProfileCaptureRatio);
     LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
@@ -3235,6 +3241,71 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
                          /*overflow*/nullptr, info);
   }
 }
+
+#else // RANDOMIZED_PROFILE_CAPTURE
+
+void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
+                                                ciMethod *method, LIR_Opr step, int frequency,
+                                                int bci, bool backedge, bool notify) {
+  assert(frequency == 0 || is_power_of_2(frequency + 1), "Frequency must be x^2 - 1 or 0");
+  int level = _compilation->env()->comp_level();
+  assert(level > CompLevel_simple, "Shouldn't be here");
+
+  int offset = -1;
+  LIR_Opr counter_holder;
+  if (level == CompLevel_limited_profile) {
+    MethodCounters* counters_adr = method->ensure_method_counters();
+    if (counters_adr == nullptr) {
+      bailout("method counters allocation failed");
+      return;
+    }
+    counter_holder = new_pointer_register();
+    __ move(LIR_OprFact::intptrConst(counters_adr), counter_holder);
+    offset = in_bytes(backedge ? MethodCounters::backedge_counter_offset() :
+                                 MethodCounters::invocation_counter_offset());
+  } else if (level == CompLevel_full_profile) {
+    counter_holder = new_register(T_METADATA);
+    offset = in_bytes(backedge ? MethodData::backedge_counter_offset() :
+                                 MethodData::invocation_counter_offset());
+    ciMethodData* md = method->method_data_or_null();
+    assert(md != nullptr, "Sanity");
+    __ metadata2reg(md->constant_encoding(), counter_holder);
+  } else {
+    ShouldNotReachHere();
+  }
+  LIR_Address* counter = new LIR_Address(counter_holder, offset, T_INT);
+  LIR_Opr result = new_register(T_INT);
+  __ load(counter, result);
+  __ add(result, step, result);
+  __ store(result, counter);
+  if (notify && (!backedge || UseOnStackReplacement)) {
+    LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
+    // The bci for info can point to cmp for if's we want the if bci
+    CodeStub* overflow = new CounterOverflowStub(info, bci, meth);
+    int freq = frequency << InvocationCounter::count_shift;
+    if (freq == 0) {
+      if (!step->is_constant()) {
+        __ cmp(lir_cond_notEqual, step, LIR_OprFact::intConst(0));
+        __ branch(lir_cond_notEqual, overflow);
+      } else {
+        __ branch(lir_cond_always, overflow);
+      }
+    } else {
+      LIR_Opr mask = load_immediate(freq, T_INT);
+      if (!step->is_constant()) {
+        // If step is 0, make sure the overflow check below always fails
+        __ cmp(lir_cond_notEqual, step, LIR_OprFact::intConst(0));
+        __ cmove(lir_cond_notEqual, result, LIR_OprFact::intConst(InvocationCounter::count_increment), result, T_INT);
+      }
+      __ logical_and(result, mask, result);
+      __ cmp(lir_cond_equal, result, LIR_OprFact::intConst(0));
+      __ branch(lir_cond_equal, overflow);
+    }
+    __ branch_destination(overflow->continuation());
+  }
+}
+
+#endif // RANDOMIZED_PROFILE_CAPTURE
 
 void LIRGenerator::do_RuntimeCall(RuntimeCall* x) {
   LIR_OprList* args = new LIR_OprList(x->number_of_arguments());

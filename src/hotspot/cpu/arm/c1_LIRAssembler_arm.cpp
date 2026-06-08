@@ -2500,19 +2500,30 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         __ lea(md_reg->as_pointer_register(),
                ExternalAddress(md_opr->as_constant_ptr()->as_pointer()));
       }
-      RegisterOrConstant offset =
-        md_offset_opr->is_constant()
-        ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
-        : md_offset_opr->as_register();
-      counter_address = Address(md_reg->as_pointer_register(), offset);
+      if (md_offset_opr->is_constant()) {
+        // Fix up any out-of-range offsets.
+        auto offset = md_offset_opr->as_constant_ptr()->as_jint();
+        bool is_memoryI =  offset < 4096 && offset > -4096;
+        if (!is_memoryI) {
+          __ block_comment("out-of-range offset");
+          __ add_slow(md_reg->as_pointer_register(), md_reg->as_pointer_register(),
+                      offset);
+          offset = 0;
+        }
+        counter_address = Address(md_reg->as_pointer_register(), offset);
+      } else {
+        counter_address = Address(md_reg->as_pointer_register(),
+                                  md_offset_opr->as_register());
+      }
+    } else {
+      ShouldNotReachHere();
     }
     if (step->is_register()) {
-      Address dest_adr = counter_address;
       Register inc = step->as_register();
       if (ProfileCaptureRatio > 1) {
         __ mov(inc, AsmOperand(inc, lsl, ratio_shift));
       }
-      __ increment_mdp_data_at(dest_adr, dest, 1);
+      __ increment_mdp_data_at(counter_address, dest, inc);
       if (ProfileCaptureRatio > 1) {
         __ mov(inc, AsmOperand(inc, lsr, ratio_shift));
       }
@@ -2520,10 +2531,8 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
       jint inc = step->as_constant_ptr()->as_jint_bits();
       switch (dest_opr->type()) {
         case T_INT: {
-          Address dest_adr = counter_address;
           inc *= ProfileCaptureRatio;
-          __ increment_mdp_data_at(dest_adr, dest, 1);
-
+          __ increment_mdp_data_at(counter_address, dest, inc);
           break;
         }
         case T_LONG:

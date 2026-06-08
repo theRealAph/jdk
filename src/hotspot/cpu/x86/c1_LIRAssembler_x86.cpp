@@ -1291,14 +1291,8 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Reg
   if (ProfileCaptureRatio > 1) {
     assert(!dst.uses(temp), "fix register allocation");
     auto threshold = (UCONST64(1) << 32) >> ratio_shift;
-    if (UseVregsForProfileCapture) {
-      __ movdl(temp, xmm15);
-      __ cmpl(temp, threshold);
-      __ jccb(Assembler::aboveEqual, nope);
-    } else {
-      __ cmpl(r_profile_rng, threshold);
-      __ jccb(Assembler::aboveEqual, nope);
-    }
+    __ cmpl(r_profile_rng, threshold);
+    __ jccb(Assembler::aboveEqual, nope);
   }
   __ addptr(dst, src << ratio_shift);
   if (ProfileCaptureRatio > 1) {
@@ -1392,18 +1386,10 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
     };
 
     if (stub != nullptr) {
-      if (UseVregsForProfileCapture) {
-        __ movdl(rscratch1, xmm15);
-        __ step_random(noreg, noreg);
-        __ cmpl(rscratch1, threshold);
-        __ jcc(Assembler::below, *stub->entry());
-        __ bind(*stub->continuation());
-      } else {
-        __ cmpl(r_profile_rng, threshold);
-        __ jcc(Assembler::below, *stub->entry());
-        __ bind(*stub->continuation());
-        __ step_random(r_profile_rng, rscratch1);
-      }
+      __ cmpl(r_profile_rng, threshold);
+      __ jcc(Assembler::below, *stub->entry());
+      __ bind(*stub->continuation());
+      __ step_random(r_profile_rng, rscratch1);
 
       stub->set_action(lambda, op);
       stub->set_name("Typecheck stub");
@@ -1490,8 +1476,6 @@ void LIR_Assembler::emit_opTypeCheck(LIR_OpTypeCheck* op) {
     // check if it needs to be profiled
     ciMethodData* md = nullptr;
     ciProfileData* data = nullptr;
-
-    __ block_comment("void LIR_Assembler::emit_opTypeCheck(LIR_OpTypeCheck* op) {");
 
     if (op->should_profile()) {
       ciMethod* method = op->profiled_method();
@@ -2210,8 +2194,6 @@ void LIR_Assembler::comp_fl2i(LIR_Code code, LIR_Opr left, LIR_Opr right, LIR_Op
 
 
 void LIR_Assembler::align_call(LIR_Code code) {
-  // We do this here in order not to affect call site alignment.
-  __ save_profile_rng();
   // make sure that the displacement word of the call ends up word aligned
   int offset = __ offset();
   switch (code) {
@@ -2874,7 +2856,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
 
     if (step_opr->is_register()) {
       Register inc = step_opr->as_register();
-      __ lea(dest, counter_address);
+      __ movl(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
         __ shll(inc, ratio_shift);
       }
@@ -2915,7 +2897,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
           __ jcc(Assembler::equal, *overflow_stub->entry());
         } else {
           __ jmp(*overflow_stub->entry());
-          goto exit;
+          return;
         }
       } else {
         if (!step_opr->is_constant()) {
@@ -2923,7 +2905,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
           // If step_opr is 0, make sure the stub check below always fails
           __ cmpl(step_opr->as_register(), 0);
           __ movl(step_opr->as_register(), InvocationCounter::count_increment * ProfileCaptureRatio);
-          __ cmovl(Assembler::notEqual, dest, step_opr->as_register());
+          __ cmovl(Assembler::equal, dest, step_opr->as_register());
         }
         __ andl(dest, freq_opr->as_jint());
         __ jcc(Assembler::equal, *overflow_stub->entry());
@@ -2933,23 +2915,14 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
     if (counter_stub != nullptr) {
       __ jmp(*counter_stub->continuation());
     }
-
-  exit: { }
   };
 
   if (counter_stub != nullptr) {
-    if (UseVregsForProfileCapture) {
-      __ movdl(dest, xmm15);
-      __ step_random(noreg, noreg);
-      __ cmpl(dest, threshold);
-      __ jcc(Assembler::below, *counter_stub->entry());
-      __ bind(*counter_stub->continuation());
-    } else {
-      __ cmpl(r_profile_rng, threshold);
-      __ jcc(Assembler::below, *counter_stub->entry());
-      __ bind(*counter_stub->continuation());
-      __ step_random(r_profile_rng, dest);
-    }
+    __ cmpl(r_profile_rng, threshold);
+    __ jcc(Assembler::below, *counter_stub->entry());
+    __ bind(*counter_stub->continuation());
+    __ step_random(r_profile_rng, dest);
+
     counter_stub->set_action(lambda, nullptr);
     counter_stub->set_name("IncrementProfileCtr");
     append_code_stub(counter_stub);
@@ -3005,8 +2978,11 @@ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
       for (uint i = 0; i < VirtualCallData::row_limit(); i++) {
         ciKlass* receiver = vc_data->receiver(i);
         if (known_klass->equals(receiver)) {
+#ifndef PRODUCT
+          __ block_comment("known_klass->equals(receiver)");
+#endif // PRODUCT
           Address data_addr(mdo, md->byte_offset_of_slot(data, VirtualCallData::receiver_count_offset(i)));
-          increment_mdo(masm(), counter_addr, DataLayout::counter_increment,
+          increment_mdo(masm(), data_addr, DataLayout::counter_increment,
                         op->tmp1()->as_register_lo());
           goto exit;
         }

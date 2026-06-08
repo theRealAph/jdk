@@ -382,6 +382,7 @@ class AddressLiteral {
 
   friend class Assembler;
   friend class MacroAssembler;
+  friend class C1_MacroAssembler;
   friend class Address;
   friend class LIR_Assembler;
 };
@@ -1616,6 +1617,7 @@ private:
   // Move Aligned Double Quadword
   void movdqa(XMMRegister dst, XMMRegister src);
   void movdqa(XMMRegister dst, Address src);
+  void movdqa(Address     dst, XMMRegister src);
 
   // Move Unaligned Double Quadword
   void movdqu(Address     dst, XMMRegister src);
@@ -1665,8 +1667,10 @@ private:
   void evmovdquq(Address dst, KRegister mask, XMMRegister src, bool merge, int vector_len);
 
   // Move Aligned 512bit Vector
-  void evmovdqaq(XMMRegister dst, Address src, int vector_len);
-  void evmovdqaq(XMMRegister dst, KRegister mask, Address src, bool merge, int vector_len);
+  void evmovdqaq(XMMRegister dst, Address     src, int vector_len);
+  void evmovdqaq(Address     dst, XMMRegister src, int vector_len);
+  void evmovdqaq(XMMRegister dst, KRegister mask, Address     src, bool merge, int vector_len);
+  void evmovdqaq(Address     dst, KRegister mask, XMMRegister src, bool merge, int vector_len);
 
   void vmovsldup(XMMRegister dst, XMMRegister src, int vector_len);
   void vmovshdup(XMMRegister dst, XMMRegister src, int vector_len);
@@ -2864,6 +2868,7 @@ private:
   void vpsllw(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpslld(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsllq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpsllq(XMMRegister dst, XMMRegister src, Address shift, int vector_len);
   void vpslldq(XMMRegister dst, XMMRegister src, int shift, int vector_len);
 
   // Logical shift right packed integers
@@ -2879,6 +2884,7 @@ private:
   void vpsrlw(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsrld(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsrlq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpsrlq(XMMRegister dst, XMMRegister src, Address shift, int vector_len);
   void vpsrldq(XMMRegister dst, XMMRegister src, int shift, int vector_len);
   void evpsrlvw(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
   void evpsllvw(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len);
@@ -2899,10 +2905,12 @@ private:
   // Variable shift left packed integers
   void vpsllvd(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsllvq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpsllvq(XMMRegister dst, XMMRegister src, Address shift, int vector_len);
 
   // Variable shift right packed integers
   void vpsrlvd(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
   void vpsrlvq(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
+  void vpsrlvq(XMMRegister dst, XMMRegister src, Address shift, int vector_len);
 
   // Variable shift right arithmetic packed integers
   void vpsravd(XMMRegister dst, XMMRegister src, XMMRegister shift, int vector_len);
