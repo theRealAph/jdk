@@ -2576,27 +2576,29 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
                  md_reg, md_opr, md_offset_opr] (LIR_Assembler* ce, LIR_Op* op) {
 
     auto masm = [ce]() { return ce->masm(); };
-    Address counter_address;
 
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
-    if (md_opr->is_valid()) {
-      if (md_opr->type() == T_METADATA) {
-        __ mov_metadata(md_reg->as_register(),
-                          md_opr->as_constant_ptr()->as_metadata());
-      } else {
-        __ mov(md_reg->as_pointer_register(),
-               md_opr->as_constant_ptr()->as_pointer());
-      }
-      RegisterOrConstant offset =
-        md_offset_opr->is_constant()
-        ? RegisterOrConstant(md_offset_opr->as_constant_ptr()->as_jint())
-        : as_reg(md_offset_opr);
-      counter_address = Address(md_reg->as_pointer_register(), offset);
+    assert(md_opr->is_valid(), "must be");
 
-      // Fix up any out-of-range offsets.
-      __ adjust_mdo_address(&counter_address, dest_opr->type());
+    if (md_opr->type() == T_METADATA) {
+      __ mov_metadata(md_reg->as_register(),
+                      md_opr->as_constant_ptr()->as_metadata());
+    } else {
+      __ mov(md_reg->as_pointer_register(),
+             md_opr->as_constant_ptr()->as_pointer());
     }
+
+    Address counter_address
+      = (md_offset_opr->is_constant()
+         ? Address(md_reg->as_pointer_register(),
+                   md_offset_opr->as_constant_ptr()->as_jint())
+         : Address(md_reg->as_pointer_register(),
+                   as_reg(md_offset_opr)));
+
+    // Fix up any out-of-range offsets.
+    __ adjust_mdo_address(&counter_address, dest_opr->type());
+
     if (step->is_register()) {
       Register inc = step->as_register();
       __ ldrw(dest, counter_address);
