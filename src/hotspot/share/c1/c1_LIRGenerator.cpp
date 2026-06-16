@@ -3213,13 +3213,12 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     offset = in_bytes(backedge ? MethodData::backedge_counter_offset() :
                                  MethodData::invocation_counter_offset());
     counters_base = LIR_OprFact::metadataConst
-                     (method ->method_data_or_null()
-                      ->constant_encoding());
+                     (method->method_data()->constant_encoding());
   } else {
     ShouldNotReachHere();
   }
 
-  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
+  LIR_Opr result = new_register(T_INT);
   if (notify && (!backedge || UseOnStackReplacement)) {
     int ratio_shift = exact_log2(ProfileCaptureRatio);
     LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
