@@ -2580,14 +2580,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
     assert(md_opr->is_valid(), "must be");
-
-    if (md_opr->type() == T_METADATA) {
-      __ mov_metadata(md_reg->as_register(),
-                      md_opr->as_constant_ptr()->as_metadata());
-    } else {
-      __ mov(md_reg->as_pointer_register(),
-             md_opr->as_constant_ptr()->as_pointer());
-    }
+    ce->const2reg(md_opr, md_reg, lir_patch_none, nullptr);
 
     Address counter_address
       = (md_offset_opr->is_constant()
