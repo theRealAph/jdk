@@ -156,6 +156,9 @@ LIR_Opr FrameMap::fpu0_double_opr;
 LIR_Opr FrameMap::_caller_save_cpu_regs[] = {};
 LIR_Opr FrameMap::_caller_save_fpu_regs[] = {};
 
+// LIR_Opr FrameMap::r_profile_rng_opr;
+LIR_Opr FrameMap::profile_rng_opr;
+
 //--------------------------------------------------------
 //               FrameMap
 //--------------------------------------------------------
@@ -226,6 +229,10 @@ void FrameMap::initialize() {
   map_register(i, r31_sp); sp_opr = LIR_OprFact::single_cpu(i); i++; // sp
   map_register(i, r8); r8_opr = LIR_OprFact::single_cpu(i); i++;   // rscratch1
   map_register(i, r9); r9_opr = LIR_OprFact::single_cpu(i); i++;   // rscratch2
+  if (ProfileCaptureRatio > 1) {
+    map_register(i, r_profile_rng); // r_profile_rng_opr = LIR_OprFact::single_cpu(i); 
+    i++;
+  }
 
 #ifdef R18_RESERVED
   // See comment in register_aarch64.hpp
@@ -325,6 +332,10 @@ void FrameMap::initialize() {
 
   sp_opr = as_pointer_opr(r31_sp);
   rfp_opr = as_pointer_opr(rfp);
+
+  if (ProfileCaptureRatio > 1) {
+    profile_rng_opr = LIR_OprFact::single_cpu(cpu_reg2rnr(r_profile_rng));
+  }
 
   VMRegPair regs;
   BasicType sig_bt = T_OBJECT;
