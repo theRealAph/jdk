@@ -3231,7 +3231,6 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     // Zero the low-order bits of the frequency, otherwise we'll miss
     // overflows when using randomized profile counters.
     unsigned int freq = (unsigned int)frequency
-                         >> ratio_shift << ratio_shift
                          << InvocationCounter::count_shift;
     __ increment_counter(step, result,
                          LIR_OprFact::intConst(freq),

@@ -2558,18 +2558,12 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj);
 }
 
-#ifndef PRODUCT
-uint64_t r_counts [2];
-uint64_t r_steps [2];
-constexpr uint64_t *r_counts2 = r_counts + 1;
-uint64_t zeroes;
-#endif // PRODUCT
+long tier3_overflows;
 
 void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Opr freq_opr,
                                           LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
                                           CodeStub* overflow_stub) {
 #ifndef PRODUCT
-  (void)r_counts2;
   if (CommentedAssembly) {
     __ block_comment("increment_event_counter {");
   }
@@ -2612,11 +2606,6 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
       if (ProfileCaptureRatio > 1) {
         __ lsl(inc, inc, ratio_shift);
       }
-#ifndef PRODUCT
-      __ lea(rscratch2, Address((address)r_counts + wordSize));
-      __ mov(rscratch1, inc);
-      __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-#endif // PRODUCT
 
       __ ldrw(dest, counter_address);
       __ addw(dest, dest, inc);
@@ -2627,12 +2616,6 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
     } else {
       jint inc = step->as_constant_ptr()->as_jint_bits();
       inc *= ProfileCaptureRatio;
-
-#ifndef PRODUCT
-      __ lea(rscratch2, Address((address)r_counts + wordSize));
-      __ mov(rscratch1, inc);
-      __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-#endif // PRODUCT
 
       switch (dest_opr->type()) {
 
@@ -2674,7 +2657,23 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
           __ movw(rscratch1, mask);
           __ andw(dest, dest, rscratch1);
         }
-        __ cbzw(dest, *overflow_stub->entry());
+
+        if (step->is_register()) {
+          __ subsw(zr, dest, as_reg(step), __ LSL, ratio_shift);
+        } else {
+          __ mov(rscratch1, step->as_constant_ptr()->as_jint_bits() << ratio_shift);
+          __ subsw(zr, dest, rscratch1);
+        }
+#ifndef PRODUCT
+        Label nope;
+        __ br(~ __ LO, nope);
+        __ lea(rscratch2, Address((address)&tier3_overflows));
+        __ mov(rscratch1, 1);
+        __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
+        __ nop();
+        __ bind(nope);
+#endif
+        __ br(__ LO, *overflow_stub->entry());
       }
     }
 
@@ -2688,51 +2687,11 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
   } else {
     __ mov(rscratch1, step->as_constant_ptr()->as_jint_bits());
   }
-#ifndef PRODUCT
-  __ lea(rscratch2, Address((address)r_counts));
-  __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-#endif // PRODUCT
 
   if (counter_stub != nullptr) {
-#ifndef PRODUCT
-    __ lea(rscratch2, Address((address)r_steps));
-    __ mov(rscratch1, 1);
-    __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-#endif // PRODUCT
-    Label nope, nonzero;
-
-    {
-#ifndef PRODUCT
-      // Check r_profile_rng isn't zero
-      __ cbnzw(r_profile_rng, nonzero);
-      __ lea(rscratch2, Address((address)&zeroes));
-      __ mov(rscratch1, 1);
-      __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-      __ bind(nonzero);
-#endif // PRODUCT
-    }
-    {
-#ifndef PRODUCT
-      Label nope;
-      // Check r_profile_rng is clean
-      __ lsr(rscratch1, r_profile_rng, 32);
-      __ cbz(rscratch1, nope);
-      __ stop("Urrgg");
-      __ bind(nope);
-#endif // PRODUCT
-    }
     __ ubfx(rscratch1, r_profile_rng, 28 - ratio_shift, ratio_shift);
-    __ cbnz(rscratch1, nope);
-    {
-#ifndef PRODUCT
-      __ lea(rscratch2, Address((address)&r_steps[1]));
-      __ mov(rscratch1, ProfileCaptureRatio);
-      __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
-#endif // PRODUCT
-      __ b(*counter_stub->entry());
-      __ bind(*counter_stub->continuation());
-    }
-    __ bind(nope);
+    __ cbz(rscratch1, *counter_stub->entry());
+    __ bind(*counter_stub->continuation());
     __ step_random(r_profile_rng, rscratch2);
 
     counter_stub->set_action(lambda, nullptr);
