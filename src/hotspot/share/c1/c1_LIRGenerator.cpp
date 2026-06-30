@@ -1133,6 +1133,10 @@ void LIRGenerator::do_ExceptionObject(ExceptionObject* x) {
   __ move_wide(LIR_OprFact::oopConst(nullptr),
                new LIR_Address(thread_reg, in_bytes(JavaThread::exception_pc_offset()), T_OBJECT));
 
+  if (ProfileCaptureRatio > 1) {
+    __ move(new LIR_Address(thread_reg, in_bytes(JavaThread::profile_rng_offset()), T_INT),
+            profile_rng_opr());
+  }
   LIR_Opr result = new_register(T_OBJECT);
   __ move(exceptionOopOpr(), result);
   set_result(x, result);
@@ -3213,13 +3217,12 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     offset = in_bytes(backedge ? MethodData::backedge_counter_offset() :
                                  MethodData::invocation_counter_offset());
     counters_base = LIR_OprFact::metadataConst
-                     (method ->method_data_or_null()
-                      ->constant_encoding());
+                     (method->method_data()->constant_encoding());
   } else {
     ShouldNotReachHere();
   }
 
-  LIR_Opr result = notify ? new_register(T_INT) : LIR_OprFact::intConst(0);
+  LIR_Opr result = new_register(T_INT);
   if (notify && (!backedge || UseOnStackReplacement)) {
     int ratio_shift = exact_log2(ProfileCaptureRatio);
     LIR_Opr meth = LIR_OprFact::metadataConst(method->constant_encoding());
@@ -3228,7 +3231,6 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     // Zero the low-order bits of the frequency, otherwise we'll miss
     // overflows when using randomized profile counters.
     unsigned int freq = (unsigned int)frequency
-                         >> ratio_shift << ratio_shift
                          << InvocationCounter::count_shift;
     __ increment_counter(step, result,
                          LIR_OprFact::intConst(freq),

@@ -353,6 +353,8 @@ int LIR_Assembler::emit_exception_handler() {
 
   int offset = code_offset();
 
+  __ block_comment("Emit exception handler");
+
   // the exception oop and pc are in r0, and r3
   // no other registers need to be preserved, so invalidate them
   __ invalidate_registers(false, true, true, false, true, true);
@@ -381,6 +383,8 @@ int LIR_Assembler::emit_unwind_handler() {
 
   int offset = code_offset();
 
+  __ block_comment("Emit unwind handler");
+
   // Fetch the exception from TLS and clear out exception related thread state
   __ ldr(r0, Address(rthread, JavaThread::exception_oop_offset()));
   __ str(zr, Address(rthread, JavaThread::exception_oop_offset()));
@@ -391,6 +395,8 @@ int LIR_Assembler::emit_unwind_handler() {
   if (method()->is_synchronized() || compilation()->env()->dtrace_method_probes()) {
     __ mov(r19, r0);  // Preserve the exception
   }
+
+  __ restore_profile_rng();
 
   // Perform needed unlocking
   MonitorExitStub* stub = nullptr;
@@ -2552,6 +2558,8 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj);
 }
 
+long tier3_overflows;
+
 void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Opr freq_opr,
                                           LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
                                           CodeStub* overflow_stub) {
@@ -2580,14 +2588,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
     if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
 
     assert(md_opr->is_valid(), "must be");
-
-    if (md_opr->type() == T_METADATA) {
-      __ mov_metadata(md_reg->as_register(),
-                      md_opr->as_constant_ptr()->as_metadata());
-    } else {
-      __ mov(md_reg->as_pointer_register(),
-             md_opr->as_constant_ptr()->as_pointer());
-    }
+    ce->const2reg(md_opr, md_reg, lir_patch_none, nullptr);
 
     Address counter_address
       = (md_offset_opr->is_constant()
@@ -2601,10 +2602,12 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
 
     if (step->is_register()) {
       Register inc = step->as_register();
-      __ ldrw(dest, counter_address);
+
       if (ProfileCaptureRatio > 1) {
         __ lsl(inc, inc, ratio_shift);
       }
+
+      __ ldrw(dest, counter_address);
       __ addw(dest, dest, inc);
       __ strw(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
@@ -2612,11 +2615,12 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
       }
     } else {
       jint inc = step->as_constant_ptr()->as_jint_bits();
-      switch (dest_opr->type()) {
-        case T_INT: {
-          inc *= ProfileCaptureRatio;
-          __ incrementw(counter_address, inc, dest);
+      inc *= ProfileCaptureRatio;
 
+      switch (dest_opr->type()) {
+
+        case T_INT: {
+          __ incrementw(counter_address, inc, dest);
           break;
         }
         case T_LONG: {
@@ -2653,7 +2657,23 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
           __ movw(rscratch1, mask);
           __ andw(dest, dest, rscratch1);
         }
-        __ cbzw(dest, *overflow_stub->entry());
+
+        if (step->is_register()) {
+          __ subsw(zr, dest, as_reg(step), __ LSL, ratio_shift);
+        } else {
+          __ mov(rscratch1, step->as_constant_ptr()->as_jint_bits() << ratio_shift);
+          __ subsw(zr, dest, rscratch1);
+        }
+#ifndef PRODUCT
+        Label nope;
+        __ br(~ __ LO, nope);
+        __ lea(rscratch2, Address((address)&tier3_overflows));
+        __ mov(rscratch1, 1);
+        __ ldadd(Assembler::xword, rscratch1, rscratch1, rscratch2);
+        __ nop();
+        __ bind(nope);
+#endif
+        __ br(__ LO, *overflow_stub->entry());
       }
     }
 
@@ -2662,8 +2682,14 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Op
     }
   };
 
+  if (step->is_register()) {
+    __ mov(rscratch1, step->as_register());
+  } else {
+    __ mov(rscratch1, step->as_constant_ptr()->as_jint_bits());
+  }
+
   if (counter_stub != nullptr) {
-    __ ubfx(rscratch1, r_profile_rng, 32 - ratio_shift, ratio_shift);
+    __ ubfx(rscratch1, r_profile_rng, 28 - ratio_shift, ratio_shift);
     __ cbz(rscratch1, *counter_stub->entry());
     __ bind(*counter_stub->continuation());
     __ step_random(r_profile_rng, rscratch2);
