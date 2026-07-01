@@ -101,6 +101,8 @@
   static LIR_Opr r13_metadata_opr;
   static LIR_Opr r14_metadata_opr;
 
+  static LIR_Opr profile_rng_opr;
+
   static LIR_Opr long0_opr;
   static LIR_Opr long1_opr;
   static LIR_Opr xmm0_float_opr;

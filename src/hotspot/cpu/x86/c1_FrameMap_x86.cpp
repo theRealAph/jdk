@@ -129,6 +129,8 @@ LIR_Opr FrameMap::r12_metadata_opr;
 LIR_Opr FrameMap::r13_metadata_opr;
 LIR_Opr FrameMap::r14_metadata_opr;
 
+LIR_Opr FrameMap::profile_rng_opr;
+
 LIR_Opr FrameMap::_caller_save_cpu_regs[] = {};
 LIR_Opr FrameMap::_caller_save_fpu_regs[] = {};
 LIR_Opr FrameMap::_caller_save_xmm_regs[] = {};
@@ -266,6 +268,10 @@ void FrameMap::initialize() {
   r12_metadata_opr = as_metadata_opr(r12);
   r13_metadata_opr = as_metadata_opr(r13);
   r14_metadata_opr = as_metadata_opr(r14);
+
+  if (ProfileCaptureRatio > 1) {
+    profile_rng_opr = LIR_OprFact::single_cpu(cpu_reg2rnr(r_profile_rng));
+  }
 
   VMRegPair regs;
   BasicType sig_bt = T_OBJECT;

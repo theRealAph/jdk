@@ -2820,14 +2820,13 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
   }
 #endif
 
-  int profile_capture_ratio = ProfileCaptureRatio;
-  int ratio_shift = exact_log2(profile_capture_ratio);
+  int ratio_shift = exact_log2(ProfileCaptureRatio);
   auto threshold = (UCONST64(1) << 32) >> ratio_shift;
 
   assert(threshold > 0, "must be");
 
   ProfileStub *counter_stub
-    = profile_capture_ratio > 1 ? new ProfileStub() : nullptr;
+    = ProfileCaptureRatio > 1 ? new ProfileStub() : nullptr;
 
   Register dest = dest_opr->as_register();
 
@@ -2866,10 +2865,9 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
         __ shrl(inc, ratio_shift);
       }
     } else {
-      jint inc = step_opr->as_constant_ptr()->as_jint_bits();
+      jint inc = step_opr->as_constant_ptr()->as_jint_bits() * ProfileCaptureRatio;
       switch (dest_opr->type()) {
         case T_INT: {
-          inc *= ProfileCaptureRatio;
           __ movl(dest, counter_address);
           // Use lea instead of add to avoid destroying condition codes on x86
           __ lea(dest, Address(dest, inc, Address::times_1));
@@ -2877,7 +2875,6 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
           break;
         }
         case T_LONG: {
-          inc *= ProfileCaptureRatio;
           __ movq(dest, counter_address);
           // Use lea instead of add to avoid destroying condition codes on x86
           __ lea(dest, Address(dest, inc, Address::times_1));
@@ -2889,7 +2886,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
       }
     }
 
-    if (overflow_stub) {
+    if (overflow_stub != nullptr) {
       guarantee(step_opr->is_valid(), "must be");
       if (!freq_opr->is_valid()) {
         if (!step_opr->is_constant()) {
@@ -2904,11 +2901,27 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
           guarantee(dest != step_opr->as_register(), "must be");
           // If step_opr is 0, make sure the stub check below always fails
           __ cmpl(step_opr->as_register(), 0);
-          __ movl(step_opr->as_register(), InvocationCounter::count_increment * ProfileCaptureRatio);
+          __ movl(step_opr->as_register(),
+                  InvocationCounter::count_increment * ProfileCaptureRatio);
           __ cmovl(Assembler::equal, dest, step_opr->as_register());
         }
+        // If (dest & mask) < step, we just overflowed.
         __ andl(dest, freq_opr->as_jint());
-        __ jcc(Assembler::equal, *overflow_stub->entry());
+        switch (ProfileCaptureRatio) {
+          case 1:
+            __ jcc(Assembler::equal, *overflow_stub->entry());
+            break;
+          default:
+            if (step_opr->is_register()) {
+              __ mov(rscratch1, step_opr->as_register());
+              __ shll(rscratch1, ratio_shift);
+              __ cmpl(dest, rscratch1);
+            } else {
+              __ cmpl(dest, step_opr->as_constant_ptr()->as_jint_bits() << ratio_shift);
+            }
+            __ jcc(Assembler::below, *overflow_stub->entry());
+            break;
+        }
       }
     }
 
