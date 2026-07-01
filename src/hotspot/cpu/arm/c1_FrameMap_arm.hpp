@@ -54,6 +54,7 @@
   static LIR_Opr R4_metadata_opr;
   static LIR_Opr R5_metadata_opr;
 
+  static LIR_Opr profile_rng_opr;
 
   static LIR_Opr LR_opr;
   static LIR_Opr LR_oop_opr;

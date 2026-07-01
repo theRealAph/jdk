@@ -2473,14 +2473,13 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
   }
 #endif
 
-  int profile_capture_ratio = ProfileCaptureRatio;
-  int ratio_shift = exact_log2(profile_capture_ratio);
+  int ratio_shift = exact_log2(ProfileCaptureRatio);
   uint64_t threshold = (UCONST64(1) << 32) >> ratio_shift;
 
   assert(threshold > 0, "must be");
 
   ProfileStub *counter_stub
-    = profile_capture_ratio > 1 ? new ProfileStub() : nullptr;
+    = ProfileCaptureRatio > 1 ? new ProfileStub() : nullptr;
 
   Register dest = dest_opr->as_register();
 
@@ -2544,7 +2543,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
       }
     }
 
-    if (overflow_stub) {
+    if (overflow_stub != nullptr) {
       guarantee(step->is_valid(), "must be");
       if (!freq_opr->is_valid()) {
         if (!step->is_constant()) {
@@ -2562,9 +2561,16 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr,
         }
         juint mask = freq_opr->as_jint();
         __ mov_slow(Rtemp, mask);
-        __ tst(dest, Rtemp);
-        __ b(*overflow_stub->entry(), eq);
+        __ andr(dest, dest, Rtemp);
+
+        if (step->is_register()) {
+          __ cmp(dest, AsmOperand(step->as_register(), lsl, ratio_shift));
+        } else {
+          __ mov(Rtemp, step->as_constant_ptr()->as_jint_bits() << ratio_shift);
+          __ cmp(dest, Rtemp);
+        }
       }
+      __ b(*overflow_stub->entry(), lo);
     }
 
     if (counter_stub != nullptr) {

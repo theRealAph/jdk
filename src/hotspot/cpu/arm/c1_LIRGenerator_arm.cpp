@@ -93,6 +93,10 @@ LIR_Opr LIRGenerator::atomicLockOpr() {
   return LIR_OprFact::illegalOpr;
 }
 
+LIR_Opr LIRGenerator::profile_rng_opr() {
+  return FrameMap::profile_rng_opr;
+}
+
 LIR_Opr LIRGenerator::result_register_for(ValueType* type, bool callee) {
   LIR_Opr opr;
   switch (type->tag()) {
