@@ -156,7 +156,6 @@ LIR_Opr FrameMap::fpu0_double_opr;
 LIR_Opr FrameMap::_caller_save_cpu_regs[] = {};
 LIR_Opr FrameMap::_caller_save_fpu_regs[] = {};
 
-// LIR_Opr FrameMap::r_profile_rng_opr;
 LIR_Opr FrameMap::profile_rng_opr;
 
 //--------------------------------------------------------

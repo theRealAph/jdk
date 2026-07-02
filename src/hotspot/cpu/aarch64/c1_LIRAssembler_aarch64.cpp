@@ -2558,7 +2558,9 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj);
 }
 
+#ifndef PRODUCT
 long tier3_overflows;
+#endif
 
 void LIR_Assembler::increment_profile_ctr(LIR_Opr step, LIR_Opr dest_opr, LIR_Opr freq_opr,
                                           LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
