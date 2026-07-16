@@ -363,7 +363,7 @@ void Klass::set_secondary_supers(Array<Klass*>* secondaries, uintx bitmap) {
   _secondary_supers_bitmap = bitmap;
   _secondary_supers = secondaries;
 
-  if (secondaries != nullptr) {
+  if (secondaries != nullptr && secondaries->length() > 50) {
     LogMessage(class, load) msg;
     NonInterleavingLogStream log {LogLevel::Debug, msg};
     if (log.is_enabled()) {
@@ -416,40 +416,9 @@ uintx Klass::hash_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
   // the case of an absent interface linear probing would not
   // terminate.
   if (length >= SECONDARY_SUPERS_TABLE_SIZE) {
-    PerfTraceTime ptt(ClassLoader::perf_secondary_hash_time());
-
     if (rewrite) {
-      // Sort the interfaces by hash code.
-      QuickSort::sort(secondaries->adr_at(0), length,
-        [](auto a, auto b) {
-           return a->hash_code() - b->hash_code();
-        });
-      int shift = 0, delta = 0;
-      // Find the longest probe length for any lookup.
-      for (int i = 0; i < length; i++) {
-        Klass* secondary_super = secondaries->at(i);
-        int cslot = (secondary_super->hash_code() * length) >> 16;
-        shift = MAX(shift, cslot - i);
-        delta = MIN(delta, cslot - i);
-      }
-      if ((shift | delta) != 0) {
-        Klass** a = secondaries->adr_at(0);
-        // The `+1` here is because the probe limit in the Klass is
-        // *inclusive*, but probing takes a half-open interval. For
-        // example, if our probe limit is 3, we must probe the
-        // interval [0, 4).
-        int probe = shift - delta + 1;
-
-        // Rotate the array so that every secondary is in the search
-        // after its home slot.
-        reverse_array(a, a + length);
-        reverse_array(a, a + shift);
-        reverse_array(a + shift, a + length);
-
-        if (probe_length != nullptr)  *probe_length = probe;
-      }
+      sort_secondary_supers(secondaries_p, rewrite, probe_length);
     }
-
     return SECONDARY_SUPERS_BITMAP_FULL;
   }
 
@@ -534,6 +503,51 @@ Klass::hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitm
   }
 }
 
+// Sort the interfaces by hash code.
+// This is a fallback that is only used when there are more than
+// SECONDARY_SUPERS_TABLE_SIZE entries.
+void Klass::sort_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
+                                   uint16_t *probe_length) {
+  PerfTraceTime ptt(ClassLoader::perf_secondary_hash_time());
+
+  auto secondaries = *secondaries_p;
+  const int length = secondaries->length();
+
+  // First, simply sort the array.
+  QuickSort::sort(secondaries->adr_at(0), length,
+                  [](auto a, auto b) {
+                    return a->hash_code() - b->hash_code();
+                  });
+  int shift = 0, delta = 0;
+  // Find the longest probe length for any lookup.
+  for (int i = 0; i < length; i++) {
+    Klass* secondary_super = secondaries->at(i);
+    int cslot = (secondary_super->hash_code() * length) >> 16;
+    shift = MAX(shift, cslot - i);
+    delta = MIN(delta, cslot - i);
+  }
+  // Rotate the array of secondaries such that, for all Klasses in the
+  // array, the Klass appears after its home slot. This is a property
+  // guaranteed by creating a Robin Hood hash table, and we rely on it
+  // in the runtime search.
+  if ((shift | delta) != 0) {
+    Klass** a = secondaries->adr_at(0);
+    // The `+1` here is because the probe limit in the Klass is
+    // *inclusive*, but probing takes a half-open interval. For
+    // example, if our probe limit is 3, we must probe the
+    // interval [0, 4).
+    int probe = shift - delta + 1;
+
+    // Rotate the array so that every secondary is in the search
+    // after its home slot.
+    reverse_array(a, a + length);
+    reverse_array(a, a + shift);
+    reverse_array(a + shift, a + length);
+
+    if (probe_length != nullptr)  *probe_length = probe;
+  }
+}
+
 Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
                                             GrowableArray<Klass*>* primaries,
                                             GrowableArray<Klass*>* secondaries,
@@ -557,8 +571,7 @@ Array<Klass*>* Klass::pack_secondary_supers(ClassLoaderData* loader_data,
   }
 #endif
 
-  // rewrites freshly allocated array
-  bitmap = hash_secondary_supers(&secondary_supers, /*rewrite=*/true, probe_length);
+  bitmap = hash_secondary_supers(&secondary_supers, /*rewrite=*/true, probe_length); // rewrites freshly allocated array
   return secondary_supers;
 }
 
@@ -566,7 +579,10 @@ uintx Klass::compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers) {
   return hash_secondary_supers(secondary_supers, /*rewrite=*/false, /*probe_length*/nullptr); // no rewrites allowed
 }
 
-uint8_t Klass::compute_home_slot(Klass* k, uintx bitmap) {
+uint Klass::compute_home_slot(Klass* k, uintx bitmap) const {
+  if (secondary_supers()->length() > Klass::SECONDARY_SUPERS_TABLE_SIZE * 3 / 4) {
+    return (uint)k->_full_hash * secondary_supers()->length() >> 16;
+  }
   uint8_t hash = k->hash_slot();
   if (hash > 0) {
     return population_count(bitmap << (SECONDARY_SUPERS_TABLE_SIZE - hash));
@@ -1370,14 +1386,15 @@ class LookupStats : StackObj {
   }
 };
 
-static void print_positive_lookup_stats(Array<Klass*>* secondary_supers, uintx bitmap, outputStream* st) {
+static void print_positive_lookup_stats(const Klass *k, Array<Klass*>* secondary_supers, uintx bitmap, outputStream* st) {
   int num_of_supers = secondary_supers->length();
 
   LookupStats s;
   for (int i = 0; i < num_of_supers; i++) {
     Klass* secondary_super = secondary_supers->at(i);
-    int home_slot = Klass::compute_home_slot(secondary_super, bitmap);
-    uint score = 1 + ((i - home_slot) & Klass::SECONDARY_SUPERS_TABLE_MASK);
+    int home_slot = k->compute_home_slot(secondary_super, bitmap);
+    intx probe_length = i - home_slot + (num_of_supers << 16);
+    auto score = 1 + (probe_length % num_of_supers);
     s.sample(score);
   }
   st->print("positive_lookup: "); s.print_on(st);
@@ -1402,11 +1419,14 @@ void Klass::print_secondary_supers_on(outputStream* st) const {
   if (secondary_supers() != nullptr) {
     st->print("  - "); st->print("%d elements;", _secondary_supers->length());
     st->print_cr(" bitmap: " UINTX_FORMAT_X_0, _secondary_supers_bitmap);
-    if (_secondary_supers_bitmap != SECONDARY_SUPERS_BITMAP_EMPTY &&
-        _secondary_supers_bitmap != SECONDARY_SUPERS_BITMAP_FULL) {
-      st->print("  - "); print_positive_lookup_stats(secondary_supers(),
+    if (_secondary_supers_bitmap != SECONDARY_SUPERS_BITMAP_EMPTY) {
+      st->print("  - "); print_positive_lookup_stats(this, secondary_supers(),
                                                      _secondary_supers_bitmap, st); st->cr();
-      st->print("  - "); print_negative_lookup_stats(_secondary_supers_bitmap, st); st->cr();
+      if (_secondary_supers_bitmap != SECONDARY_SUPERS_BITMAP_FULL) {
+        st->print("  - "); print_negative_lookup_stats(_secondary_supers_bitmap, st); st->cr();
+      } else {
+        st->print("negative_lookup: %d", _probe_length);
+      }
     }
   } else {
     st->print("null");

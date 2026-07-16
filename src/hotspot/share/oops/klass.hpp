@@ -423,6 +423,8 @@ protected:
   static void  hash_insert(Klass* klass, GrowableArray<Klass*>* secondaries, uintx& bitmap, int *probe_length);
   static uintx hash_secondary_supers(Array<Klass*>** secondaries, bool rewrite,
                                      uint16_t *probe_length);
+  static void sort_secondary_supers(Array<Klass*>** secondaries_p, bool rewrite,
+                                   uint16_t *probe_length);
 
   bool search_secondary_supers(Klass* k) const;
   bool lookup_secondary_supers_table(Klass *k) const;
@@ -438,7 +440,7 @@ protected:
                                               TRAPS);
 
   static uintx   compute_secondary_supers_bitmap(Array<Klass*>** secondary_supers);
-  static uint8_t compute_home_slot(Klass* k, uintx bitmap);
+  uint compute_home_slot(Klass* k, uintx bitmap) const;
 
   static constexpr int SECONDARY_SUPERS_TABLE_SIZE = sizeof(_secondary_supers_bitmap) * 8;
   static constexpr int SECONDARY_SUPERS_TABLE_MASK = SECONDARY_SUPERS_TABLE_SIZE - 1;

@@ -3771,7 +3771,7 @@ void InstanceKlass::print_on(outputStream* st) const {
   st->print(BULLET"local interfaces:  "); local_interfaces()->print_value_on(st);      st->cr();
   st->print(BULLET"trans. interfaces: "); transitive_interfaces()->print_value_on(st); st->cr();
 
-  st->print(BULLET"secondary supers: %p : ", secondary_supers()); secondary_supers()->print_value_on(st); st->cr();
+  st->print(BULLET"secondary supers: "); secondary_supers()->print_value_on(st); st->cr();
   st->print(BULLET"probe length    :  %d", _probe_length);      st->cr();
 
   st->print(BULLET"hash_slot:         %d", hash_slot()); st->cr();
@@ -3787,13 +3787,11 @@ void InstanceKlass::print_on(outputStream* st) const {
         ResourceMark rm; // for external_name()
         Klass* secondary_super = _secondary_supers->at(i);
         st->print(BULLET"%2d:", i);
+        int home_slot = compute_home_slot(secondary_super, _secondary_supers_bitmap);
         if (is_hashed) {
-          int home_slot = compute_home_slot(secondary_super, _secondary_supers_bitmap);
           int distance = (i - home_slot) & SECONDARY_SUPERS_TABLE_MASK;
         } else {
-          int home_slot = (secondary_super->hash_code() * length) >> 16;
           int distance = (i - home_slot + length) % length;
-          st->print(" dist:%02d:", distance);
         }
         st->print_cr(" %p %s", secondary_super, secondary_super->external_name());
       }

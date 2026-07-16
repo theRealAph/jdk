@@ -4634,6 +4634,11 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     cmpq(r_super_klass, Address(r_array_base, r_array_index, Address::times_8));
     jcc(Assembler::equal, *L_success);
 
+#ifndef PRODUCT
+    lea(temp2, RuntimeAddress((address)&bloop));
+    addptr(Address(temp2), 1);
+#endif
+
     // If the hash table is more than three quarters full, we might
     // have to wait a long time before hitting a zero in the bitmap.
     // Scan up to the probe limit instead.
@@ -4680,11 +4685,6 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     Label no_wrap;
 
     bind(L_large);
-
-#ifndef PRODUCT
-    lea(temp2, RuntimeAddress((address)&bloop));
-    addptr(Address(temp2), 1);
-#endif
 
     // Check for array wraparound.
     movzwl(temp2, Address(r_sub_klass, Klass::probe_length_offset()));

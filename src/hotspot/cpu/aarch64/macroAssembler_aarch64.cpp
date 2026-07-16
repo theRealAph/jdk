@@ -1859,7 +1859,7 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
                                                              Register temp1,
                                                              Register result,
                                                              bool is_stub) {
-  assert_different_registers(r_super_klass, r_array_base, r_array_index, r_bitmap, temp1, result, rscratch1);
+  assert_different_registers(r_super_klass, r_array_base, r_array_index, r_bitmap, temp1, result, rscratch1, rscratch2);
 
   const Register
     r_array_length = temp1,
@@ -1869,7 +1869,7 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     LOOKUP_SECONDARY_SUPERS_TABLE_REGISTERS;
   }
 
-  Label L_fallthrough, L_huge;
+  Label L_fallthrough, L_large, L_huge;
 
   // Load the array length.
   ldrw(r_array_length, Address(r_array_base, Array<Klass*>::length_offset_in_bytes()));
@@ -1881,7 +1881,7 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
   // The bitmap is full to bursting.
   // Implicit invariant: BITMAP_FULL implies (length > 0)
   assert(Klass::SECONDARY_SUPERS_BITMAP_FULL == ~uintx(0), "");
-  cmpw(r_array_length, (u1)(Klass::SECONDARY_SUPERS_TABLE_SIZE - 2));
+  cmpw(r_array_length, (u1)(Klass::SECONDARY_SUPERS_TABLE_SIZE));
   br(GT, L_huge);
 
   // NB! Our caller has checked bits 0 and 1 in the bitmap. The
@@ -1896,8 +1896,6 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     // array_length == popcount(bitmap). The array_length check above
     // guarantees there are 0s in the bitmap, so the loop eventually
     // terminates.
-    Label L_loop;
-    bind(L_loop);
 
     // Check for wraparound.
     cmp(r_array_index, r_array_length);
@@ -1907,21 +1905,62 @@ void MacroAssembler::lookup_secondary_supers_table_slow_path(Register r_super_kl
     eor(result, rscratch1, r_super_klass);
     cbz(result, L_fallthrough);
 
+    // If the hash table is more than three quarters full, we might
+    // have to wait a long time before hitting a zero in the bitmap.
+    // Scan up to the probe limit instead.
+    cmpw(r_array_length, Klass::SECONDARY_SUPERS_TABLE_SIZE * 3 / 4);
+    bt(Assembler::GT, L_large);
+
+    Label L_loop;
+    bind(L_loop);
+
     tbz(r_bitmap, 2, L_fallthrough); // look-ahead check (Bit 2); result is non-zero
+
+    ldr(rscratch1, Address(r_array_base, r_array_index, Address::lsl(LogBytesPerWord)));
+    eor(result, rscratch1, r_super_klass);
+    cbz(result, L_fallthrough);
 
     ror(r_bitmap, r_bitmap, 1);
     add(r_array_index, r_array_index, 1);
+
+    // Check for array wraparound.
+    cmp(r_array_index, r_array_length);
+    csel(r_array_index, zr, r_array_index, GE);
+
     b(L_loop);
   }
 
   { // Degenerate case: more than 64 secondary supers.
-    // FIXME: We could do something smarter here, maybe a vectorized
-    // comparison or a binary search, but is that worth any added
-    // complexity?
+
     bind(L_huge);
-    cmp(sp, zr); // Clear Z flag; SP is never zero
-    repne_scan(r_array_base, r_super_klass, r_array_length, rscratch1);
-    cset(result, NE); // result == 0 iff we got a match.
+
+    // Calculate an initial probe in the hash table.
+    ldrw(rscratch1, Address(r_super_klass, Klass::full_hash_offset()));
+    movw(r_array_index, r_array_length);
+    mulw(r_array_index, rscratch1);
+    shrl(r_array_index, r_array_index, 16);
+
+    Label no_wrap;
+
+    bind(L_large);
+
+    // Check for array wraparound.
+    ldrw(rscratch2, Address(r_sub_klass, Klass::probe_length_offset()));
+    addw(rscratch2, rscratch2, r_array_index);     // rscratch2 = limit to scan
+    cmpw(rscratch2, r_array_length);
+    br(LE, no_wrap);
+
+    {
+      repne_scan(r_array_base, r_super_klass, r_array_index, r_array_length);
+      cset(result, NE); // result == 0 iff we got a match.
+      cbz(result, L_fallthrough);
+
+      // Start from the beginning of the array
+      mov(r_array_index, 0);
+    }
+
+    bind(no_wrap);
+    repne_scan(r_array_base, r_super_klass, r_array_index, rscratch2);
   }
 
   bind(L_fallthrough);
