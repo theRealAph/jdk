@@ -91,7 +91,7 @@ public class SecondarySupersLookupLarge {
         for (int n = first; n <= last; n++) {
             interfaces[n] = genInterface(name.apply(n));
         }
-        System.out.println("LENGTH = " + interfaces.length);
+        System.out.println("interfaceCount = " + interfaces.length);
         return interfaces;
     }
 
@@ -215,7 +215,9 @@ public class SecondarySupersLookupLarge {
         }
     }
     @Benchmark public void testNegativeN() {
-        test(testInstance, J.class, false);
+        for (var iFace : interfaces) {
+            test(testInstance, J.class, false);
+        }
     }
 
     // These invoke obj instanceof/checkcast T. We use an array of

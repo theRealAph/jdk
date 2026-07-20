@@ -461,6 +461,7 @@ protected:
                                                  { return byte_offset_of(Klass, _secondary_supers_bitmap); }
   static ByteSize hash_slot_offset()             { return byte_offset_of(Klass, _hash_slot); }
   static ByteSize full_hash_offset()             { return byte_offset_of(Klass, _full_hash); }
+  static size_t full_hash_size()                 { return sizeof _full_hash; }
   static ByteSize probe_length_offset()          { return byte_offset_of(Klass, _probe_length); }
   static ByteSize misc_flags_offset()            { return byte_offset_of(Klass, _misc_flags._flags); }
 
