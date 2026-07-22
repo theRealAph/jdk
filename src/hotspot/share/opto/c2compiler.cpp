@@ -871,6 +871,7 @@ bool C2Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
 #if INCLUDE_JVMTI
   case vmIntrinsics::_notifyJvmtiVThreadDisableSuspend:
 #endif
+  case vmIntrinsics::_writeOpenTelemetryTLS0:
     break;
 
   default:

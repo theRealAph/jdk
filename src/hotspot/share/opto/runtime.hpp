@@ -142,6 +142,7 @@ class OptoRuntime : public AllStatic {
   static const TypeFunc* _l2f_Type;
   static const TypeFunc* _void_long_Type;
   static const TypeFunc* _void_void_Type;
+  static const TypeFunc* _long_long_Type;
   static const TypeFunc* _jfr_write_checkpoint_Type;
   static const TypeFunc* _flush_windows_Type;
   static const TypeFunc* _fast_arraycopy_Type;
@@ -425,6 +426,11 @@ private:
   static inline const TypeFunc* void_void_Type() {
     assert(_void_void_Type != nullptr, "should be initialized");
     return _void_void_Type;
+  }
+
+  static inline const TypeFunc* long_long_Type() {
+    assert(_long_long_Type != nullptr, "should be initialized");
+    return _long_long_Type;
   }
 
   static const TypeFunc* jfr_write_checkpoint_Type() {

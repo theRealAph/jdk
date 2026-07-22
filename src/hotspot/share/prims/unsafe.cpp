@@ -852,6 +852,16 @@ UNSAFE_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleAr
     {CC "get" #Type "Volatile",      CC "(" OBJ "J)" #Desc,       FN_PTR(Unsafe_Get##Type##Volatile)}, \
     {CC "put" #Type "Volatile",      CC "(" OBJ "J" #Desc ")V",   FN_PTR(Unsafe_Put##Type##Volatile)}
 
+THREAD_LOCAL void* otel_thread_ctx_v1 = nullptr; // uint64_t, used to hold address of an off-heap buffer.
+
+// update the above TLS with the given value, return its previous value.
+// TODO intrinsic candidate. Also needs UNSAFE_ENTRY/UNSAFE_LEAF wrapping?
+jlong Unsafe_writeOpenTelemetryTLS0(JNIEnv *env, jobject unsafe, jlong addr) {
+    void* prev_value = otel_thread_ctx_v1;
+    void* address = addr_from_java(addr);
+    otel_thread_ctx_v1 = address;
+    return addr_to_java(prev_value);
+}
 
 static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "getReference",         CC "(" OBJ "J)" OBJ "",   FN_PTR(Unsafe_GetReference)},
@@ -907,6 +917,8 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "shouldBeInitialized0", CC "(" CLS ")Z",         FN_PTR(Unsafe_ShouldBeInitialized0)},
 
     {CC "fullFence",          CC "()V",                  FN_PTR(Unsafe_FullFence)},
+
+    {CC "writeOpenTelemetryTLS0",    CC "(J)" ADR,              FN_PTR(Unsafe_writeOpenTelemetryTLS0)},
 };
 
 #undef CC

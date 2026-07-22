@@ -862,6 +862,9 @@
   do_stub(compiler, bigIntegerLeftShiftWorker)                          \
   do_entry(compiler, bigIntegerLeftShiftWorker,                         \
            bigIntegerLeftShiftWorker, bigIntegerLeftShift)              \
+  do_stub(compiler, writeOpenTelemetryTLS0)                             \
+  do_entry(compiler, writeOpenTelemetryTLS0, writeOpenTelemetryTLS0,    \
+         writeOpenTelemetryTLS0)                                        \
   /* merge in stubs and entries declared in arch header */              \
   STUBGEN_COMPILER_BLOBS_ARCH_DO(do_stub, do_arch_blob,                 \
                                  do_arch_entry, do_arch_entry_init,     \

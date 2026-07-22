@@ -428,6 +428,8 @@ class LibraryCallKit : public GraphKit {
   bool inline_getObjectSize();
 
   bool inline_blackhole();
+
+  bool inline_writeOpenTelemetryTLS0();
 };
 
 #endif // SHARE_OPTO_LIBRARY_CALL_HPP

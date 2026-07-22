@@ -682,4 +682,6 @@ public:
 #endif // INCLUDE_CDS
 };
 
+extern "C" unsigned long writeOpenTelemetryTLS0(unsigned long);
+
 #endif // CPU_X86_STUBGENERATOR_X86_64_HPP

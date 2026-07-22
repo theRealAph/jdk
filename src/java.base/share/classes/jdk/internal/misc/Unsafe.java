@@ -3877,6 +3877,8 @@ public final class Unsafe {
     private native int arrayIndexScale0(Class<?> arrayClass);
     private native int getLoadAverage0(double[] loadavg, int nelems);
 
+    @IntrinsicCandidate
+    public native long writeOpenTelemetryTLS0(long address);
 
     /**
      * Invokes the given direct byte buffer's cleaner, if any.

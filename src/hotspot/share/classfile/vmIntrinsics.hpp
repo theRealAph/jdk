@@ -753,6 +753,7 @@ class methodHandle;
   do_name(getLong_name,"getLong")               do_name(putLong_name,"putLong")                                         \
   do_name(getFloat_name,"getFloat")             do_name(putFloat_name,"putFloat")                                       \
   do_name(getDouble_name,"getDouble")           do_name(putDouble_name,"putDouble")                                     \
+  do_name(writeOpenTelemetryTLS0_name, "writeOpenTelemetryTLS0")                                                        \
                                                                                                                         \
   do_intrinsic(_getReference,       jdk_internal_misc_Unsafe,     getReference_name, getReference_signature,     F_RN)  \
   do_intrinsic(_getBoolean,         jdk_internal_misc_Unsafe,     getBoolean_name, getBoolean_signature,         F_RN)  \
@@ -772,6 +773,9 @@ class methodHandle;
   do_intrinsic(_putLong,            jdk_internal_misc_Unsafe,     putLong_name, putLong_signature,               F_RN)  \
   do_intrinsic(_putFloat,           jdk_internal_misc_Unsafe,     putFloat_name, putFloat_signature,             F_RN)  \
   do_intrinsic(_putDouble,          jdk_internal_misc_Unsafe,     putDouble_name, putDouble_signature,           F_RN)  \
+  do_intrinsic(_writeOpenTelemetryTLS0, jdk_internal_misc_Unsafe,                                                       \
+                                    writeOpenTelemetryTLS0_name,                                                        \
+                                    long_long_signature,           F_RN)                                   \
                                                                                                                         \
   do_name(getReferenceVolatile_name,"getReferenceVolatile")   do_name(putReferenceVolatile_name,"putReferenceVolatile") \
   do_name(getBooleanVolatile_name,"getBooleanVolatile")       do_name(putBooleanVolatile_name,"putBooleanVolatile")     \

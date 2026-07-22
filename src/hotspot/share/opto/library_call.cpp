@@ -788,6 +788,9 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_blackhole:
     return inline_blackhole();
 
+  case vmIntrinsics::_writeOpenTelemetryTLS0:
+    return inline_writeOpenTelemetryTLS0();
+    // return false;
   default:
     // If you get here, it may be that someone has added a new intrinsic
     // to the list in vmIntrinsics.hpp without implementing it here.
@@ -8975,6 +8978,19 @@ bool LibraryCallKit::inline_fma(vmIntrinsics::ID id) {
   default:
     fatal_unexpected_iid(id);  break;
   }
+  set_result(result);
+  return true;
+}
+
+bool LibraryCallKit::inline_writeOpenTelemetryTLS0() {
+  Node *a = argument(0); // Unsafe
+  Node *b = argument(1); // openTelemetryValue
+  Node* result = nullptr;
+  Node* call = make_runtime_call(RC_LEAF, OptoRuntime::long_long_Type(),
+                                 StubRoutines::writeOpenTelemetryTLS0(),
+                                 "writeOpenTelemetryTLS0", TypePtr::BOTTOM,
+                                 b, top());
+  result = _gvn.transform(new ProjNode(call, TypeFunc::Parms));
   set_result(result);
   return true;
 }

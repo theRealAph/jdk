@@ -4871,6 +4871,8 @@ void StubGenerator::generate_compiler_stubs() {
     StubRoutines::x86::_vector_popcount_lut = generate_popcount_avx_lut();
   }
 
+  StubRoutines:: _writeOpenTelemetryTLS0 = CAST_FROM_FN_PTR(address, writeOpenTelemetryTLS0);
+
   generate_aes_stubs();
 
   generate_ghash_stubs();

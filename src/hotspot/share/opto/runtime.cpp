@@ -189,6 +189,7 @@ const TypeFunc* OptoRuntime::_modf_Type                           = nullptr;
 const TypeFunc* OptoRuntime::_l2f_Type                            = nullptr;
 const TypeFunc* OptoRuntime::_void_long_Type                      = nullptr;
 const TypeFunc* OptoRuntime::_void_void_Type                      = nullptr;
+const TypeFunc* OptoRuntime::_long_long_Type                      = nullptr;
 const TypeFunc* OptoRuntime::_jfr_write_checkpoint_Type           = nullptr;
 const TypeFunc* OptoRuntime::_flush_windows_Type                  = nullptr;
 const TypeFunc* OptoRuntime::_fast_arraycopy_Type                 = nullptr;
@@ -832,6 +833,21 @@ static const TypeFunc* make_void_long_Type() {
   // create input type (domain)
   const Type **fields = TypeTuple::fields(0);
   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+0, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(2);
+  fields[TypeFunc::Parms+0] = TypeLong::LONG;
+  fields[TypeFunc::Parms+1] = Type::HALF;
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+2, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+static const TypeFunc* make_long_long_Type() {
+  const Type **fields = TypeTuple::fields(2);
+  fields[TypeFunc::Parms+0] = TypeLong::LONG;
+  fields[TypeFunc::Parms+1] = Type::HALF;
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+2, fields);
 
   // create result type (range)
   fields = TypeTuple::fields(2);
@@ -2343,6 +2359,7 @@ void OptoRuntime::initialize_types() {
   _l2f_Type                           = make_l2f_Type();
   _void_long_Type                     = make_void_long_Type();
   _void_void_Type                     = make_void_void_Type();
+  _long_long_Type                     = make_long_long_Type();
   _jfr_write_checkpoint_Type          = make_jfr_write_checkpoint_Type();
   _flush_windows_Type                 = make_flush_windows_Type();
   _fast_arraycopy_Type                = make_arraycopy_Type(ac_fast);

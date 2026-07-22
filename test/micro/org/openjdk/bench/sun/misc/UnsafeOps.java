@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.misc.Unsafe;
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.infra.Blackhole;
 
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
@@ -85,5 +86,26 @@ public class UnsafeOps {
     @Benchmark
     public long getLongOffHeap() {
         return U.getLong(null, address);
+    }
+
+    long ctr;
+
+    @Benchmark
+    @OperationsPerInvocation(100)
+    public long writeOpenTelemetry0(Blackhole bh) {
+        long result = 0;
+        for (int i = 0; i < 100; i++)
+            result += U.writeOpenTelemetryTLS0(-1);
+        return result;
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(100)
+    public void writeOpenTelemetry1() {
+        long l = 0;
+        U.writeOpenTelemetryTLS0(0);
+        while (U.writeOpenTelemetryTLS0(l) < 99) {
+            l++;
+        }
     }
 }

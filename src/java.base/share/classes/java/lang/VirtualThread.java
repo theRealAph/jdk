@@ -185,6 +185,12 @@ final class VirtualThread extends BaseVirtualThread {
     // true to notifyAll after this virtual thread terminates
     private volatile boolean notifyAllAfterTerminate;
 
+    // when state=mounted, holds the carrier's 'swapped out' TLS value.
+    // when state=unmounted, holds the vthread's own 'swapped out' value.
+    // This is NOT exposed to getter/setter methods, as the above semantics would be confusing to users.
+    // see mount()/unmout() and Unsafe.writeOpenTelemetryTLS()
+    private long openTelemetryValue;
+
     /**
      * Returns the default scheduler.
      */
@@ -512,6 +518,10 @@ final class VirtualThread extends BaseVirtualThread {
 
         // set Thread.currentThread() to return this virtual thread
         carrier.setCurrentThread(this);
+
+        // write the vthread's value to the carrier's TLS,
+        //   preserving carrier's own value for later restoration by unmount.
+        openTelemetryValue = U.writeOpenTelemetryTLS0(openTelemetryValue);
     }
 
     /**
@@ -536,7 +546,12 @@ final class VirtualThread extends BaseVirtualThread {
         // We assume previous volatile accesses provide equivalent
         // of release ordering, otherwise we need U.storeFence() here.
         endTransition(/*mount*/false);
+
+        // restore the carrier's own TLS value from our cached copy,
+        //   then preserve our own vthread value for potential later restoration by a remount.
+        openTelemetryValue = U.writeOpenTelemetryTLS0(0);
     }
+
 
     /**
      * Invokes Continuation.yield, notifying JVMTI (if enabled) to hide frames until
