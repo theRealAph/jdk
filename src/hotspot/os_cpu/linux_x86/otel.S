@@ -6,20 +6,17 @@
 writeOpenTelemetryTLS0:
 .LFB0:
 	.cfi_startproc
-	push	rbx
+	sub	rsp, 8
 	.cfi_def_cfa_offset 16
-	.cfi_offset 3, -16
-	mov	rbx, rdi
-	.byte	0x66
-	lea	rdi, otel_thread_ctx_v1@tlsgd[rip]
-	.value	0x6666
-	rex64
-	call	__tls_get_addr@PLT
-	mov	rcx, rax
-	mov	rax, QWORD PTR [rax]
-	mov	QWORD PTR [rcx], rbx
-	pop	rbx
+	lea	rax, otel_thread_ctx_v1@TLSDESC[rip]
+	mov	rcx, rdi
+	call	[QWORD PTR [rax+otel_thread_ctx_v1@TLSCALL]]
+	add	rax, QWORD PTR fs:0
+	mov	rdx, QWORD PTR [rax]
+	mov	QWORD PTR [rax], rcx
+	add	rsp, 8
 	.cfi_def_cfa_offset 8
+	mov	rax, rdx
 	ret
 	.cfi_endproc
 .LFE0:
