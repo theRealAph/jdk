@@ -862,6 +862,14 @@ void ArchDesc::syntax_err(int lineno, const char *fmt, ...) {
   _no_output = 1;
 }
 
+void ArchDesc::warn(int lineno, const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  emit_msg(0, WARN, lineno, fmt, args);
+  va_end(args);
+}
+
 //------------------------------emit_msg---------------------------------------
 // Emit a user message, typically a warning or error
 int ArchDesc::emit_msg(int quiet, int flag, int line, const char *fmt,

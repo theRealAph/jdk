@@ -15749,10 +15749,10 @@ instruct stringL_indexof_char(rdi_RegP str1, rdx_RegI cnt1, rax_RegI ch,
 %}
 
 // fast string equals
-instruct string_equals(rdi_RegP str1, rsi_RegP str2, rcx_RegI cnt, rax_RegI result,
+instruct string_equals(rRegP str1, rRegP str2, rRegI cnt, rax_RegI result,
                        legRegD tmp1, legRegD tmp2, rbx_RegI tmp3, rFlagsReg cr)
 %{
-  predicate(!VM_Version::supports_avx512vlbw());
+  predicate(true || !VM_Version::supports_avx512vlbw());
   match(Set result (StrEquals (Binary str1 str2) cnt));
   effect(TEMP tmp1, TEMP tmp2, USE_KILL str1, USE_KILL str2, USE_KILL cnt, KILL tmp3, KILL cr);
 
@@ -15768,7 +15768,7 @@ instruct string_equals(rdi_RegP str1, rsi_RegP str2, rcx_RegI cnt, rax_RegI resu
 instruct string_equals_evex(rdi_RegP str1, rsi_RegP str2, rcx_RegI cnt, rax_RegI result,
                            legRegD tmp1, legRegD tmp2, kReg ktmp, rbx_RegI tmp3, rFlagsReg cr)
 %{
-  predicate(VM_Version::supports_avx512vlbw());
+  predicate(false && VM_Version::supports_avx512vlbw());
   match(Set result (StrEquals (Binary str1 str2) cnt));
   effect(TEMP tmp1, TEMP tmp2, TEMP ktmp, USE_KILL str1, USE_KILL str2, USE_KILL cnt, KILL tmp3, KILL cr);
 

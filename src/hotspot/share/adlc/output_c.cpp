@@ -1712,7 +1712,7 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
     // Skip the first component, if already handled as (SET dst (...))
     Component *comp = nullptr;
     // For kills, the choice of projection numbers is arbitrary
-    int proj_no = 1;
+    int proj_no = node->_parameters.count();
     bool declared_def  = false;
     bool declared_kill = false;
 
@@ -1721,6 +1721,7 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
       Form *form = (Form*)_globalNames[comp->_type];
       assert(form, "component type must be a defined form");
       OperandForm *op = form->is_operand();
+
 
       if (comp->is(Component::TEMP) ||
           comp->is(Component::TEMP_DEF)) {
@@ -1756,14 +1757,18 @@ void ArchDesc::defineExpand(FILE *fp, InstructForm *node) {
         const char *regmask    = reg_mask(*op);
         const char *ideal_type = op->ideal_type(_globalNames, _register);
 
+        int this_proj_no;
         if (!op->is_bound_register()) {
-          syntax_err(node->_linenum, "In %s only bound registers can be killed: %s %s\n",
-                     node->_ident, comp->_type, comp->_name);
+          printf("In %s only bound registers can be killed: %s %s --- %d/%d\n",
+                 node->_ident, comp->_type, comp->_name, node->_parameters.index(comp->_name), node->_parameters.count());
+          this_proj_no = node->_parameters.index(comp->_name);
+        } else {
+          this_proj_no = proj_no++;
         }
 
         fprintf(fp,"  kill = ");
         fprintf(fp,"new MachProjNode( %s, %d, (%s), Op_%s );\n",
-                machNode, proj_no++, regmask, ideal_type);
+                machNode, this_proj_no, regmask, ideal_type);
         fprintf(fp,"  proj_list.push(kill);\n");
       }
     }
