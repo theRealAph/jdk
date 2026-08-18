@@ -337,6 +337,7 @@ public:
   // Emit an ADLC message
   void internal_err( const char *fmt, ...);
   void syntax_err  ( int lineno, const char *fmt, ...);
+  void warn  ( int lineno, const char *fmt, ...);
   int  emit_msg(int quiet, int flag, int linenum, const char *fmt,
        va_list args);
 
