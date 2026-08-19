@@ -477,11 +477,6 @@ void PhaseAggressiveCoalesce::coalesce( Block *b ) {
       MachNode *mach = n->as_Mach();
       combine_these_two(mach, mach->in(idx));
     }
-    if (n->is_MachProj() && n->in(0)->is_Mach() && n->in(0)->as_Mach()->ideal_Opcode() == Op_StrEquals) {
-      uint in = n->as_MachProj()->_con + 2;
-      tty->print("XXX %d", in); n->dump();
-      combine_these_two(n, n->in(0)->in(in));
-    }
   } // End of for all instructions in block
 }
 
