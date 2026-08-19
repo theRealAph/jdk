@@ -123,7 +123,16 @@ bool InstructForm::needs_projections() {
   _components.reset();
   for( Component *comp; (comp = _components.iter()) != nullptr; ) {
     if (comp->isa(Component::KILL)) {
-      return true;
+      Form *form = (Form*)_globalNames[comp->_type];
+      assert(form, "component type must be a defined form");
+      OperandForm *op = form->is_operand();
+      const char *regmask = reg_mask(*op);
+      assert(op, "Support additional KILLS for base operands");
+      const char *regmask    = reg_mask(*op);
+      const char *ideal_type = op->ideal_type(_globalNames, _register);
+      if (op->is_bound_register()) {
+        return true;
+      }
     }
   }
   return false;
