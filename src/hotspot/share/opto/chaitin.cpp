@@ -758,6 +758,16 @@ void PhaseChaitin::Register_Allocate() {
   _live = nullptr;
   _ifg = nullptr;
   C->set_indexSet_arena(nullptr);  // ResourceArea is at end of scope
+  // for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+  //   Block* block = _cfg.get_block(i);
+  //   for (uint j = 0; j < block->number_of_nodes(); j++) {
+  //     Node* n = block->get_node(j);
+  //     OptoReg::Name reg = C->regalloc()->get_reg_first(n);
+  //     tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
+  //     n->dump("\n", false, tty);
+  //   }
+  // }
+
 }
 
 void PhaseChaitin::de_ssa() {
