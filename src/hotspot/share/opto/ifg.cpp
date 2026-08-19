@@ -410,6 +410,23 @@ void PhaseChaitin::build_ifg_virtual( ) {
           }
         }
       }
+      if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
+        const MachNode* mach = n->as_Mach();
+        for (uint i = 1; i < n->req(); i++) {
+          if (mach->is_killed_input(i)) {
+            uint lidx = _lrg_map.live_range_id(n->in(i));
+            for (uint k = 1; k < n->req(); k++) {
+              uint kidx = _lrg_map.live_range_id(n->in(k));
+              if (kidx != lidx) {
+                _ifg->add_edge(r, kidx);
+                if (C->failing()) {
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
     } // End of forall instructions in block
   } // End of forall blocks
 }
