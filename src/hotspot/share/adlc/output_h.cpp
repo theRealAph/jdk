@@ -1803,7 +1803,7 @@ void ArchDesc::declareClasses(FILE *fp) {
     fprintf(fp, " }\n");
 
     // Virtual methods which are only generated to override base class
-    if( instr->expands() || instr->needs_projections() ||
+    if( instr->expands() || instr->needs_projections(*this) ||
         instr->has_temps() ||
         instr->is_mach_constant() ||
         instr->needs_constant_base() ||
@@ -1889,6 +1889,11 @@ void ArchDesc::declareClasses(FILE *fp) {
         fprintf(fp,"  virtual const TypePtr *adr_type() const;\n");
       }
       fprintf(fp,"  virtual const MachOper *memory_operand() const;\n");
+    }
+
+    if (!instr->expands() && instr->kills_some_inputs(*this)) {
+      fprintf(fp,"  virtual bool has_killed_inputs() const { return true; }\n");
+      fprintf(fp,"  virtual bool is_killed_input(uint i) const;\n");
     }
 
     fprintf(fp, "#ifndef PRODUCT\n");

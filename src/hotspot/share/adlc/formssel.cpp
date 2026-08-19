@@ -119,17 +119,14 @@ bool InstructForm::sets_result() const {
   return (_matrule != nullptr && _matrule->sets_result());
 }
 
-bool InstructForm::needs_projections() {
+bool InstructForm::needs_projections(ArchDesc& AD) {
   _components.reset();
   for( Component *comp; (comp = _components.iter()) != nullptr; ) {
     if (comp->isa(Component::KILL)) {
-      Form *form = (Form*)_globalNames[comp->_type];
+      Form *form = (Form*)AD.globalNames()[comp->_type];
       assert(form, "component type must be a defined form");
       OperandForm *op = form->is_operand();
-      const char *regmask = reg_mask(*op);
       assert(op, "Support additional KILLS for base operands");
-      const char *regmask    = reg_mask(*op);
-      const char *ideal_type = op->ideal_type(_globalNames, _register);
       if (op->is_bound_register()) {
         return true;
       }
@@ -138,6 +135,21 @@ bool InstructForm::needs_projections() {
   return false;
 }
 
+bool InstructForm::kills_some_inputs(ArchDesc& AD) {
+  _components.reset();
+  for( Component *comp; (comp = _components.iter()) != nullptr; ) {
+    if (comp->isa(Component::KILL)) {
+      Form *form = (Form*)AD.globalNames()[comp->_type];
+      assert(form, "component type must be a defined form");
+      OperandForm *op = form->is_operand();
+      assert(op, "Support additional KILLS for base operands");
+      if (!op->is_bound_register()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 bool InstructForm::has_temps() {
   if (_matrule) {
