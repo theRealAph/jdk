@@ -28,12 +28,9 @@
 #include "opto/addnode.hpp"
 #include "opto/block.hpp"
 #include "opto/callnode.hpp"
-#include "opto/cfgnode.hpp"
 #include "opto/chaitin.hpp"
-#include "opto/coalesce.hpp"
 #include "opto/indexSet.hpp"
 #include "opto/machnode.hpp"
-#include "opto/memnode.hpp"
 #include "opto/opcodes.hpp"
 
 #include <fenv.h>
@@ -406,23 +403,6 @@ void PhaseChaitin::build_ifg_virtual( ) {
             _ifg->add_edge(r, kidx);
             if (C->failing()) {
               return;
-            }
-          }
-        }
-      }
-      if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
-        const MachNode* mach = n->as_Mach();
-        for (uint i = 1; i < n->req(); i++) {
-          if (mach->is_killed_input(i)) {
-            uint lidx = _lrg_map.live_range_id(n->in(i));
-            for (uint k = 1; k < n->req(); k++) {
-              uint kidx = _lrg_map.live_range_id(n->in(k));
-              if (kidx != lidx) {
-                _ifg->add_edge(r, kidx);
-                if (C->failing()) {
-                  return;
-                }
-              }
             }
           }
         }
@@ -908,6 +888,19 @@ uint PhaseChaitin::build_ifg_physical( ResourceArea *a ) {
     for (uint location = last_inst; location > 0; location--) {
       Node* n = block->get_node(location);
       uint lid = _lrg_map.live_range_id(n);
+
+      if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
+        const MachNode* mach = n->as_Mach();
+        for (uint i = 1; i < n->req(); i++) {
+          if (mach->is_killed_input(i)) {
+            uint lidx = _lrg_map.live_range_id(n->in(i));
+            LRG &lrg = lrgs(lidx);
+            must_spill++;
+            lrg._must_spill = 1;
+            lrg.set_reg(OptoReg::Name(LRG::SPILL_REG));
+          }
+        }
+      }
 
       if (lid) {
         LRG& lrg = lrgs(lid);
