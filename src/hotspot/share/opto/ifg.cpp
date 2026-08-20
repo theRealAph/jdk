@@ -889,7 +889,7 @@ uint PhaseChaitin::build_ifg_physical( ResourceArea *a ) {
       Node* n = block->get_node(location);
       uint lid = _lrg_map.live_range_id(n);
 
-      if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
+      if (n->is_Mach() && n->as_Mach()->has_killed_inputs() && 0) {
         const MachNode* mach = n->as_Mach();
         for (uint i = 1; i < n->req(); i++) {
           if (mach->is_killed_input(i)) {
