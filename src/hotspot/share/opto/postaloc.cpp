@@ -694,7 +694,7 @@ void PhaseChaitin::post_allocate_copy_removal() {
 
       // Remove copies along input edges
       for (k = 1; k < n->req(); k++) {
-        j -= elide_copy(n, k, block, &value, &regnd, two_adr != k);
+        j -= elide_copy(n, k, block, &value, &regnd, (two_adr != k) && !(n->is_Mach() && n->as_Mach()->has_killed_inputs() && n->as_Mach()->is_killed_input(k)));
       }
 
       // Unallocated Nodes define no registers
