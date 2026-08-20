@@ -1700,7 +1700,7 @@ void ArchDesc::declareClasses(FILE *fp) {
     if ( instr->oper_input_base(_globalNames) != 1 ||
          strcmp("MachNode", instr->mach_base_class(_globalNames)) != 0 ) {
       fprintf(fp,"  virtual uint           oper_input_base() const { return %d; }\n",
-            instr->oper_input_base(_globalNames));
+             instr->oper_input_base(_globalNames));
     }
 
     // Make the constructor and following methods 'public:'
