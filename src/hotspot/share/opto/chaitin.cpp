@@ -354,6 +354,15 @@ void PhaseChaitin::compact() {
 }
 
 void PhaseChaitin::Register_Allocate() {
+  if (C->method() != nullptr && UseNewCode) {
+    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+      Block* block = _cfg.get_block(i);
+      for (uint j = 0; j < block->number_of_nodes(); j++) {
+        Node* n = block->get_node(j);
+        n->dump("\n", false, tty);
+      }
+    }
+  }
 
   // Above the OLD FP (and in registers) are the incoming arguments.  Stack
   // slots in this area are called "arg_slots".  Above the NEW FP (and in
@@ -754,20 +763,56 @@ void PhaseChaitin::Register_Allocate() {
     }
   }
 
+  {
+    live.compute(_lrg_map.max_lrg_id());
+    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+      Block *block = _cfg.get_block(i);
+      IndexSet liveout(live.live(block));
+      uint last_inst = block->end_idx();
+      for (uint location = last_inst; location > 0; location--) {
+        Node *n = block->get_node(location);
+        uint lid = _lrg_map.live_range_id(n);
+
+        if (n->is_Mach() && n->as_Mach()->has_killed_inputs()) {
+          const MachNode* mach = n->as_Mach();
+          for (uint i = 1; i < n->req(); i++) {
+            if (mach->is_killed_input(i)) {
+              uint lidx = _lrg_map.live_range_id(n->in(i));
+              assert(lidx != 0, "");
+              assert(!liveout.member(lidx), "");
+            }
+          }
+        }
+        if (lid) {
+          liveout.remove(lid);
+        }
+        if (!n->is_Phi()) {
+          for (uint k = ((n->Opcode() == Op_SCMemProj) ? 0 : 1); k < n->req(); k++) {
+            Node *def = n->in(k);
+            uint lid = _lrg_map.live_range_id(def);
+            if (lid) {
+              liveout.insert(lid);
+            }
+          }
+        }
+      }
+    }
+  }
   // Done!
   _live = nullptr;
   _ifg = nullptr;
-  C->set_indexSet_arena(nullptr);  // ResourceArea is at end of scope
-  // for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
-  //   Block* block = _cfg.get_block(i);
-  //   for (uint j = 0; j < block->number_of_nodes(); j++) {
-  //     Node* n = block->get_node(j);
-  //     OptoReg::Name reg = C->regalloc()->get_reg_first(n);
-  //     tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
-  //     n->dump("\n", false, tty);
-  //   }
-  // }
-
+  C->set_indexSet_arena(nullptr); // ResourceArea is at end of scope
+  if (C->method() != nullptr && UseNewCode2) {
+    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+      Block* block = _cfg.get_block(i);
+      for (uint j = 0; j < block->number_of_nodes(); j++) {
+        Node* n = block->get_node(j);
+        OptoReg::Name reg = C->regalloc()->get_reg_first(n);
+        tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
+        n->dump("\n", false, tty);
+      }
+    }
+  }
 }
 
 void PhaseChaitin::de_ssa() {
