@@ -4330,7 +4330,7 @@ void C2_MacroAssembler::arrays_equals(bool is_array_equ, Register ary1, Register
     lea(ary2, Address(ary2, limit, Address::times_1));
     negptr(limit);
 
-    if ((AVX3Threshold == 0) && VM_Version::supports_avx512vlbw() && 0) { // trying 64 bytes fast loop
+    if ((AVX3Threshold == 0) && VM_Version::supports_avx512vlbw()) { // trying 64 bytes fast loop
       Label COMPARE_WIDE_VECTORS_LOOP_AVX2, COMPARE_WIDE_VECTORS_LOOP_AVX3;
 
       cmpl(limit, -64);

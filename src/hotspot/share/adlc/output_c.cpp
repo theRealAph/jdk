@@ -1865,20 +1865,28 @@ void ArchDesc::defineIsKilledInput(FILE* fp, InstructForm* node) {
   fprintf(fp, "bool %sNode::is_killed_input(uint idx) const {\n", node->_ident);
   node->_components.reset();
   Component* comp = nullptr;
-  
-  int position = 0;
+
+  int index = node->oper_input_base(_globalNames) - 1;
   while ((comp = node->_components.iter()) != nullptr) {
+    // printf("XXX %d %s\n", index, comp->isa(Component::KILL) ? "kill" : "");
+           
     if (comp->isa(Component::KILL)) {
+      // instr->oper_input_base(_globalNames)
+      //  const char *opcode = machOperEnum(comp->_type);
+      // oper->num_edges(_globalNames);
+
       Form *form = (Form*)_globalNames[comp->_type];
       assert(form, "component type must be a defined form");
       OperandForm *op = form->is_operand();
       assert(op, "Support additional KILLS for base operands");
       if (!op->is_bound_register()) {
+        fprintf(fp, "  assert(operand_index(%d) == %d, \"\");\n", node->_components.operand_position(comp->_name), index);
         fprintf(fp, "  if (operand_index(%d) == (int)idx) {\n", node->_components.operand_position(comp->_name));
         fprintf(fp, "    return true;\n");
         fprintf(fp, "  }\n");
       }
     }
+    index += _globalNames[comp->_type]->is_operand()->num_edges(_globalNames);
   }
 
   fprintf(fp, "  return false;\n");
