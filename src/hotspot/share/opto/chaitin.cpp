@@ -536,7 +536,7 @@ void PhaseChaitin::Register_Allocate() {
     _ifg->SquareUp();
     _ifg->Compute_Effective_Degree();
     // Only do conservative coalescing if requested
-    if (OptoCoalesce && false) {
+    if (OptoCoalesce) {
       Compile::TracePhase tp(_t_chaitinCoalesce2);
       // Conservative (and pessimistic) copy coalescing of those spills
       PhaseConservativeCoalesce coalesce(*this);
@@ -626,7 +626,7 @@ void PhaseChaitin::Register_Allocate() {
     _ifg->Compute_Effective_Degree();
 
     // Only do conservative coalescing if requested
-    if (OptoCoalesce && false) {
+    if (OptoCoalesce) {
       Compile::TracePhase tp(_t_chaitinCoalesce3);
       // Conservative (and pessimistic) copy coalescing
       PhaseConservativeCoalesce coalesce(*this);
@@ -661,6 +661,20 @@ void PhaseChaitin::Register_Allocate() {
   // Count number of Simplify-Select trips per coloring success.
   _allocator_attempts += _trip_cnt + 1;
   _allocator_successes += 1;
+
+  if (C->method() != nullptr && UseNewCode3) {
+    tty->print_cr("XXXXXXXXXXXXXXXXXXXXX");
+    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+      Block* block = _cfg.get_block(i);
+      for (uint j = 0; j < block->number_of_nodes(); j++) {
+        Node* n = block->get_node(j);
+        uint pidx = _lrg_map.live_range_id(n);
+        OptoReg::Name reg = lrgs(pidx).reg();
+        tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
+        n->dump("\n", false, tty);
+      }
+    }
+  }
 
   // Peephole remove copies
   post_allocate_copy_removal();
@@ -764,6 +778,7 @@ void PhaseChaitin::Register_Allocate() {
   }
 
   {
+    bool failed = false;
     live.compute(_lrg_map.max_lrg_id());
     for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
       Block *block = _cfg.get_block(i);
@@ -779,7 +794,11 @@ void PhaseChaitin::Register_Allocate() {
             if (mach->is_killed_input(i)) {
               uint lidx = _lrg_map.live_range_id(n->in(i));
               assert(lidx != 0, "");
-              assert(!liveout.member(lidx), "");
+              if (liveout.member(lidx)) {
+                tty->print("input %d of", i); n->dump();
+                failed = true;
+              }
+              // assert(!liveout.member(lidx), "");
             }
           }
         }
@@ -797,6 +816,18 @@ void PhaseChaitin::Register_Allocate() {
         }
       }
     }
+    if (failed) {
+      for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
+        Block* block = _cfg.get_block(i);
+        for (uint j = 0; j < block->number_of_nodes(); j++) {
+          Node* n = block->get_node(j);
+          OptoReg::Name reg = C->regalloc()->get_reg_first(n);
+          tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
+          n->dump("\n", false, tty);
+        }
+      }
+    }
+    assert(!failed, "");
   }
   // Done!
   _live = nullptr;
