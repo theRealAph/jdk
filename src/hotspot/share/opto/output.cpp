@@ -2582,10 +2582,6 @@ void Scheduling::DoScheduling() {
       AddNodeToBundle(n,bb);
     }
 
-    if (!(_scheduled.size() == _bb_end - _bb_start)) {
-      bb->dump();
-    }
-
     assert( _scheduled.size() == _bb_end - _bb_start, "wrong number of instructions" );
 #ifdef ASSERT
     for( uint l = _bb_start; l < _bb_end; l++ ) {

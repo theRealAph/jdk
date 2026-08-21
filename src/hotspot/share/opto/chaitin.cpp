@@ -354,15 +354,6 @@ void PhaseChaitin::compact() {
 }
 
 void PhaseChaitin::Register_Allocate() {
-  if (C->method() != nullptr && UseNewCode) {
-    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
-      Block* block = _cfg.get_block(i);
-      for (uint j = 0; j < block->number_of_nodes(); j++) {
-        Node* n = block->get_node(j);
-        n->dump("\n", false, tty);
-      }
-    }
-  }
 
   // Above the OLD FP (and in registers) are the incoming arguments.  Stack
   // slots in this area are called "arg_slots".  Above the NEW FP (and in
@@ -662,20 +653,6 @@ void PhaseChaitin::Register_Allocate() {
   _allocator_attempts += _trip_cnt + 1;
   _allocator_successes += 1;
 
-  if (C->method() != nullptr && UseNewCode3) {
-    tty->print_cr("XXXXXXXXXXXXXXXXXXXXX");
-    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
-      Block* block = _cfg.get_block(i);
-      for (uint j = 0; j < block->number_of_nodes(); j++) {
-        Node* n = block->get_node(j);
-        uint pidx = _lrg_map.live_range_id(n);
-        OptoReg::Name reg = lrgs(pidx).reg();
-        tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
-        n->dump("\n", false, tty);
-      }
-    }
-  }
-
   // Peephole remove copies
   post_allocate_copy_removal();
 
@@ -832,18 +809,7 @@ void PhaseChaitin::Register_Allocate() {
   // Done!
   _live = nullptr;
   _ifg = nullptr;
-  C->set_indexSet_arena(nullptr); // ResourceArea is at end of scope
-  if (C->method() != nullptr && UseNewCode2) {
-    for (uint i = 0; i < _cfg.number_of_blocks(); i++) {
-      Block* block = _cfg.get_block(i);
-      for (uint j = 0; j < block->number_of_nodes(); j++) {
-        Node* n = block->get_node(j);
-        OptoReg::Name reg = C->regalloc()->get_reg_first(n);
-        tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
-        n->dump("\n", false, tty);
-      }
-    }
-  }
+  C->set_indexSet_arena(nullptr);  // ResourceArea is at end of scope
 }
 
 void PhaseChaitin::de_ssa() {
