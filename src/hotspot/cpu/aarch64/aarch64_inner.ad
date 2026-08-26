@@ -1,11 +1,11 @@
 // Intrisics for String.compareTo()
 
-instruct string_compareU(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                        iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2, rFlagsReg cr)
+instruct string_compareU(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                        iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2, rFlagsReg cr)
 %{
   predicate((UseSVE == 0) && (((StrCompNode*)n)->encoding() == StrIntrinsicNode::UU));
   match(Set result (StrComp (Binary str1 cnt1) (Binary str2 cnt2)));
-  effect(KILL tmp1, KILL tmp2, USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
+  effect(TEMP tmp1, TEMP tmp2, USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
 
   format %{ "String Compare $str1,$cnt1,$str2,$cnt2 -> $result   # KILL $tmp1" %}
   ins_encode %{
@@ -18,12 +18,12 @@ instruct string_compareU(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 c
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareL(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                        iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2, rFlagsReg cr)
+instruct string_compareL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                        iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2, rFlagsReg cr)
 %{
   predicate((UseSVE == 0) && (((StrCompNode*)n)->encoding() == StrIntrinsicNode::LL));
   match(Set result (StrComp (Binary str1 cnt1) (Binary str2 cnt2)));
-  effect(KILL tmp1, KILL tmp2, USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
+  effect(TEMP tmp1, TEMP tmp2, USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
 
   format %{ "String Compare $str1,$cnt1,$str2,$cnt2 -> $result   # KILL $tmp1" %}
   ins_encode %{
@@ -35,13 +35,13 @@ instruct string_compareL(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 c
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareUL(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                        iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareUL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                        iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                         vRegD_V0 vtmp1, vRegD_V1 vtmp2, vRegD_V2 vtmp3, rFlagsReg cr)
 %{
   predicate((UseSVE == 0) && (((StrCompNode*)n)->encoding() == StrIntrinsicNode::UL));
   match(Set result (StrComp (Binary str1 cnt1) (Binary str2 cnt2)));
-  effect(KILL tmp1, KILL tmp2, KILL vtmp1, KILL vtmp2, KILL vtmp3,
+  effect(TEMP tmp1, TEMP tmp2, KILL vtmp1, KILL vtmp2, KILL vtmp3,
          USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
 
   format %{ "String Compare $str1,$cnt1,$str2,$cnt2 -> $result   # KILL $tmp1, $tmp2, $vtmp1, $vtmp2, $vtmp3" %}
@@ -55,13 +55,13 @@ instruct string_compareUL(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareLU(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                        iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareLU(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                        iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                         vRegD_V0 vtmp1, vRegD_V1 vtmp2, vRegD_V2 vtmp3, rFlagsReg cr)
 %{
   predicate((UseSVE == 0) && (((StrCompNode*)n)->encoding() == StrIntrinsicNode::LU));
   match(Set result (StrComp (Binary str1 cnt1) (Binary str2 cnt2)));
-  effect(KILL tmp1, KILL tmp2, KILL vtmp1, KILL vtmp2, KILL vtmp3,
+  effect(TEMP tmp1, TEMP tmp2, KILL vtmp1, KILL vtmp2, KILL vtmp3,
          USE_KILL str1, USE_KILL str2, USE_KILL cnt1, USE_KILL cnt2, KILL cr);
 
   format %{ "String Compare $str1,$cnt1,$str2,$cnt2 -> $result   # KILL $tmp1, $tmp2, $vtmp1, $vtmp2, $vtmp3" %}
@@ -79,8 +79,8 @@ instruct string_compareLU(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 
 // these string_compare variants as NEON register type for convenience so that the prototype of
 // string_compare can be shared with all variants.
 
-instruct string_compareLL_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                              iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareLL_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                              iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                               vRegD_V0 vtmp1, vRegD_V1 vtmp2, pRegGov_P0 pgtmp1,
                               pRegGov_P1 pgtmp2, rFlagsReg cr)
 %{
@@ -102,8 +102,8 @@ instruct string_compareLL_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareLU_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                              iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareLU_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                              iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                               vRegD_V0 vtmp1, vRegD_V1 vtmp2, pRegGov_P0 pgtmp1,
                               pRegGov_P1 pgtmp2, rFlagsReg cr)
 %{
@@ -125,8 +125,8 @@ instruct string_compareLU_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareUL_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                              iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareUL_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                              iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                               vRegD_V0 vtmp1, vRegD_V1 vtmp2, pRegGov_P0 pgtmp1,
                               pRegGov_P1 pgtmp2, rFlagsReg cr)
 %{
@@ -148,8 +148,8 @@ instruct string_compareUL_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_compareUU_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI_R4 cnt2,
-                              iRegI_R0 result, iRegP_R10 tmp1, iRegL_R11 tmp2,
+instruct string_compareUU_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                              iRegINoSp result, iRegPNoSp tmp1, iRegLNoSp tmp2,
                               vRegD_V0 vtmp1, vRegD_V1 vtmp2, pRegGov_P0 pgtmp1,
                               pRegGov_P1 pgtmp2, rFlagsReg cr)
 %{
@@ -171,8 +171,8 @@ instruct string_compareUU_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegP_R3 str2, iRegI
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexofUU(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 cnt2,
-                          iRegI_R0 result, iRegINoSp tmp1, iRegINoSp tmp2,
+instruct string_indexofUU(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                          iRegINoSp result, iRegINoSp tmp1, iRegINoSp tmp2,
                           iRegINoSp tmp3, iRegINoSp tmp4, iRegINoSp tmp5, iRegINoSp tmp6,
                           vRegD_V0 vtmp0, vRegD_V1 vtmp1, rFlagsReg cr)
 %{
@@ -195,8 +195,8 @@ instruct string_indexofUU(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexofLL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 cnt2,
-                          iRegI_R0 result, iRegINoSp tmp1, iRegINoSp tmp2, iRegINoSp tmp3,
+instruct string_indexofLL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                          iRegINoSp result, iRegINoSp tmp1, iRegINoSp tmp2, iRegINoSp tmp3,
                           iRegINoSp tmp4, iRegINoSp tmp5, iRegINoSp tmp6,
                           vRegD_V0 vtmp0, vRegD_V1 vtmp1, rFlagsReg cr)
 %{
@@ -219,8 +219,8 @@ instruct string_indexofLL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexofUL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 cnt2,
-                          iRegI_R0 result, iRegINoSp tmp1, iRegINoSp tmp2,iRegINoSp tmp3,
+instruct string_indexofUL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2, iRegINoSp cnt2,
+                          iRegINoSp result, iRegINoSp tmp1, iRegINoSp tmp2,iRegINoSp tmp3,
                           iRegINoSp tmp4, iRegINoSp tmp5, iRegINoSp tmp6,
                           vRegD_V0 vtmp0, vRegD_V1 vtmp1, rFlagsReg cr)
 %{
@@ -243,8 +243,8 @@ instruct string_indexofUL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2, iRegI_R2 
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexof_conUU(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
-                              immI_le_4 int_cnt2, iRegI_R0 result, iRegINoSp tmp1,
+instruct string_indexof_conUU(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2,
+                              immI_le_4 int_cnt2, iRegINoSp result, iRegINoSp tmp1,
                               iRegINoSp tmp2, iRegINoSp tmp3, iRegINoSp tmp4, rFlagsReg cr)
 %{
   predicate(((StrIndexOfNode*)n)->encoding() == StrIntrinsicNode::UU);
@@ -265,8 +265,8 @@ instruct string_indexof_conUU(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexof_conLL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
-                              immI_le_4 int_cnt2, iRegI_R0 result, iRegINoSp tmp1,
+instruct string_indexof_conLL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2,
+                              immI_le_4 int_cnt2, iRegINoSp result, iRegINoSp tmp1,
                               iRegINoSp tmp2, iRegINoSp tmp3, iRegINoSp tmp4, rFlagsReg cr)
 %{
   predicate(((StrIndexOfNode*)n)->encoding() == StrIntrinsicNode::LL);
@@ -287,8 +287,8 @@ instruct string_indexof_conLL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexof_conUL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
-                              immI_1 int_cnt2, iRegI_R0 result, iRegINoSp tmp1,
+instruct string_indexof_conUL(iRegPNoSp str1, iRegINoSp cnt1, iRegPNoSp str2,
+                              immI_1 int_cnt2, iRegINoSp result, iRegINoSp tmp1,
                               iRegINoSp tmp2, iRegINoSp tmp3, iRegINoSp tmp4, rFlagsReg cr)
 %{
   predicate(((StrIndexOfNode*)n)->encoding() == StrIntrinsicNode::UL);
@@ -309,8 +309,8 @@ instruct string_indexof_conUL(iRegP_R1 str1, iRegI_R4 cnt1, iRegP_R3 str2,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct string_indexof_char(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
-                             iRegI_R0 result, iRegINoSp tmp1, iRegINoSp tmp2,
+instruct string_indexof_char(iRegPNoSp str1, iRegINoSp cnt1, iRegINoSp ch,
+                             iRegINoSp result, iRegINoSp tmp1, iRegINoSp tmp2,
                              iRegINoSp tmp3, rFlagsReg cr)
 %{
   match(Set result (StrIndexOfChar (Binary str1 cnt1) ch));
@@ -328,8 +328,8 @@ instruct string_indexof_char(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct stringL_indexof_char(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
-                              iRegI_R0 result, iRegINoSp tmp1, iRegINoSp tmp2,
+instruct stringL_indexof_char(iRegPNoSp str1, iRegINoSp cnt1, iRegINoSp ch,
+                              iRegINoSp result, iRegINoSp tmp1, iRegINoSp tmp2,
                               iRegINoSp tmp3, rFlagsReg cr)
 %{
   match(Set result (StrIndexOfChar (Binary str1 cnt1) ch));
@@ -347,8 +347,8 @@ instruct stringL_indexof_char(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct stringL_indexof_char_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
-                                  iRegI_R0 result, vecA ztmp1, vecA ztmp2,
+instruct stringL_indexof_char_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegINoSp ch,
+                                  iRegINoSp result, vecA ztmp1, vecA ztmp2,
                                   pRegGov pgtmp, pReg ptmp, rFlagsReg cr) %{
   predicate(UseSVE > 0 && ((StrIndexOfCharNode*)n)->encoding() == StrIntrinsicNode::L);
   match(Set result (StrIndexOfChar (Binary str1 cnt1) ch));
@@ -363,8 +363,8 @@ instruct stringL_indexof_char_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct stringU_indexof_char_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
-                                  iRegI_R0 result, vecA ztmp1, vecA ztmp2,
+instruct stringU_indexof_char_sve(iRegPNoSp str1, iRegINoSp cnt1, iRegINoSp ch,
+                                  iRegINoSp result, vecA ztmp1, vecA ztmp2,
                                   pRegGov pgtmp, pReg ptmp, rFlagsReg cr) %{
   predicate(UseSVE > 0 && ((StrIndexOfCharNode*)n)->encoding() == StrIntrinsicNode::U);
   match(Set result (StrIndexOfChar (Binary str1 cnt1) ch));
@@ -380,8 +380,8 @@ instruct stringU_indexof_char_sve(iRegP_R1 str1, iRegI_R2 cnt1, iRegI_R3 ch,
 %}
 
 instruct string_equalsL_sve(
-    iRegP_R1   str1,      // str1 (kill)
-    iRegP_R3   str2,      // str2 (kill)
+    iRegPNoSp   str1,      // str1 (kill)
+    iRegPNoSp   str2,      // str2 (kill)
     iRegINoSp   cnt,       // int length
     iRegINoSp   result,    // boolean
     vecA ztmp1, vecA ztmp2, // SVE z registers
@@ -432,15 +432,15 @@ instruct string_equalsL(
   ins_pipe(pipe_class_memory);
 %}
 
-instruct array_equalsB(iRegP_R1 ary1, iRegP_R2 ary2, iRegI_R0 result,
-                       iRegP_R3 tmp1, iRegP_R4 tmp2, iRegP_R5 tmp3,
+instruct array_equalsB(iRegPNoSp ary1, iRegPNoSp ary2, iRegINoSp result,
+                       iRegPNoSp tmp1, iRegPNoSp tmp2, iRegPNoSp tmp3,
                        vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2, vRegD_V3 vtmp3,
                        vRegD_V4 vtmp4, vRegD_V5 vtmp5, vRegD_V6 vtmp6, vRegD_V7 vtmp7,
-                       iRegP_R10 tmp, rFlagsReg cr)
+                       iRegPNoSp tmp, rFlagsReg cr)
 %{
   predicate(((AryEqNode*)n)->encoding() == StrIntrinsicNode::LL);
   match(Set result (AryEq ary1 ary2));
-  effect(KILL tmp, USE_KILL ary1, USE_KILL ary2, TEMP tmp1, TEMP tmp2, TEMP tmp3,
+  effect(TEMP tmp, USE_KILL ary1, USE_KILL ary2, TEMP tmp1, TEMP tmp2, TEMP tmp3,
          TEMP vtmp0, TEMP vtmp1, TEMP vtmp2, TEMP vtmp3, TEMP vtmp4, TEMP vtmp5,
          TEMP vtmp6, TEMP vtmp7, KILL cr);
 
@@ -457,15 +457,15 @@ instruct array_equalsB(iRegP_R1 ary1, iRegP_R2 ary2, iRegI_R0 result,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct array_equalsC(iRegP_R1 ary1, iRegP_R2 ary2, iRegI_R0 result,
-                       iRegP_R3 tmp1, iRegP_R4 tmp2, iRegP_R5 tmp3,
+instruct array_equalsC(iRegPNoSp ary1, iRegPNoSp ary2, iRegINoSp result,
+                       iRegPNoSp tmp1, iRegPNoSp tmp2, iRegPNoSp tmp3,
                        vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2, vRegD_V3 vtmp3,
                        vRegD_V4 vtmp4, vRegD_V5 vtmp5, vRegD_V6 vtmp6, vRegD_V7 vtmp7,
-                       iRegP_R10 tmp, rFlagsReg cr)
+                       iRegPNoSp tmp, rFlagsReg cr)
 %{
   predicate(((AryEqNode*)n)->encoding() == StrIntrinsicNode::UU);
   match(Set result (AryEq ary1 ary2));
-  effect(KILL tmp, USE_KILL ary1, USE_KILL ary2, TEMP tmp1, TEMP tmp2, TEMP tmp3,
+  effect(TEMP tmp, USE_KILL ary1, USE_KILL ary2, TEMP tmp1, TEMP tmp2, TEMP tmp3,
          TEMP vtmp0, TEMP vtmp1, TEMP vtmp2, TEMP vtmp3, TEMP vtmp4, TEMP vtmp5,
          TEMP vtmp6, TEMP vtmp7, KILL cr);
 
@@ -482,7 +482,7 @@ instruct array_equalsC(iRegP_R1 ary1, iRegP_R2 ary2, iRegI_R0 result,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct arrays_hashcode(iRegP_R1 ary, iRegI_R2 cnt, iRegI_R0 result, immI basic_type,
+instruct arrays_hashcode(iRegPNoSp ary, iRegINoSp cnt, iRegINoSp result, immI basic_type,
                          vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2, vRegD_V3 vtmp3,
                          vRegD_V4 vtmp4, vRegD_V5 vtmp5, vRegD_V6 vtmp6, vRegD_V7 vtmp7,
                          vRegD_V12 vtmp8, vRegD_V13 vtmp9, rFlagsReg cr)
@@ -508,7 +508,7 @@ instruct arrays_hashcode(iRegP_R1 ary, iRegI_R2 cnt, iRegI_R0 result, immI basic
   ins_pipe(pipe_class_memory);
 %}
 
-instruct count_positives(iRegP_R1 ary1, iRegI_R2 len, iRegI_R0 result, rFlagsReg cr)
+instruct count_positives(iRegPNoSp ary1, iRegINoSp len, iRegINoSp result, rFlagsReg cr)
 %{
   match(Set result (CountPositives ary1 len));
   effect(USE_KILL ary1, USE_KILL len, KILL cr);
@@ -524,10 +524,10 @@ instruct count_positives(iRegP_R1 ary1, iRegI_R2 len, iRegI_R0 result, rFlagsReg
 %}
 
 // fast char[] to byte[] compression
-instruct string_compress(iRegP_R2 src, iRegP_R1 dst, iRegI_R3 len,
+instruct string_compress(iRegPNoSp src, iRegPNoSp dst, iRegINoSp len,
                          vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2,
                          vRegD_V3 vtmp3, vRegD_V4 vtmp4, vRegD_V5 vtmp5,
-                         iRegI_R0 result, rFlagsReg cr)
+                         iRegINoSp result, rFlagsReg cr)
 %{
   match(Set result (StrCompressedCopy src (Binary dst len)));
   effect(TEMP vtmp0, TEMP vtmp1, TEMP vtmp2, TEMP vtmp3, TEMP vtmp4, TEMP vtmp5,
@@ -544,7 +544,7 @@ instruct string_compress(iRegP_R2 src, iRegP_R1 dst, iRegI_R3 len,
 %}
 
 // fast byte[] to char[] inflation
-instruct string_inflate(Universe dummy, iRegP_R0 src, iRegP_R1 dst, iRegI_R2 len, iRegP_R3 tmp,
+instruct string_inflate(Universe dummy, iRegPNoSp src, iRegPNoSp dst, iRegINoSp len, iRegPNoSp tmp,
                         vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2, vRegD_V3 vtmp3,
                         vRegD_V4 vtmp4, vRegD_V5 vtmp5, vRegD_V6 vtmp6, rFlagsReg cr)
 %{
@@ -567,10 +567,10 @@ instruct string_inflate(Universe dummy, iRegP_R0 src, iRegP_R1 dst, iRegI_R2 len
 %}
 
 // encode char[] to byte[] in ISO_8859_1
-instruct encode_iso_array(iRegP_R2 src, iRegP_R1 dst, iRegI_R3 len,
+instruct encode_iso_array(iRegPNoSp src, iRegPNoSp dst, iRegINoSp len,
                           vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2,
                           vRegD_V3 vtmp3, vRegD_V4 vtmp4, vRegD_V5 vtmp5,
-                          iRegI_R0 result, rFlagsReg cr)
+                          iRegINoSp result, rFlagsReg cr)
 %{
   predicate(!((EncodeISOArrayNode*)n)->is_ascii());
   match(Set result (EncodeISOArray src (Binary dst len)));
@@ -588,10 +588,10 @@ instruct encode_iso_array(iRegP_R2 src, iRegP_R1 dst, iRegI_R3 len,
   ins_pipe(pipe_class_memory);
 %}
 
-instruct encode_ascii_array(iRegP_R2 src, iRegP_R1 dst, iRegI_R3 len,
+instruct encode_ascii_array(iRegPNoSp src, iRegPNoSp dst, iRegINoSp len,
                             vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2,
                             vRegD_V3 vtmp3, vRegD_V4 vtmp4, vRegD_V5 vtmp5,
-                            iRegI_R0 result, rFlagsReg cr)
+                            iRegINoSp result, rFlagsReg cr)
 %{
   predicate(((EncodeISOArrayNode*)n)->is_ascii());
   match(Set result (EncodeISOArray src (Binary dst len)));
