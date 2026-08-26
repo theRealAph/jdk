@@ -772,7 +772,7 @@ void PhaseChaitin::Register_Allocate() {
               uint lidx = _lrg_map.live_range_id(n->in(i));
               assert(lidx != 0, "");
               if (liveout.member(lidx)) {
-                tty->print("input %d of", i); n->dump();
+                tty->print("input %d of", i); DEBUG_ONLY(n->dump();)
                 failed = true;
               }
               // assert(!liveout.member(lidx), "");
@@ -800,7 +800,7 @@ void PhaseChaitin::Register_Allocate() {
           Node* n = block->get_node(j);
           OptoReg::Name reg = C->regalloc()->get_reg_first(n);
           tty->print(" %-6s ", reg >= 0 && reg < REG_COUNT ? Matcher::regName[reg] : "");
-          n->dump("\n", false, tty);
+          DEBUG_ONLY(n->dump("\n", false, tty);)
         }
       }
     }
