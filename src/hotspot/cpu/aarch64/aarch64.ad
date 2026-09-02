@@ -16053,30 +16053,26 @@ instruct string_equalsL_sve(
   ins_pipe(pipe_class_memory);
 %}
 
-
 instruct string_equalsL(
-    iRegP      str1_in,      // str1 (kill)
-    iRegP      str2_in,      // str2 (kill)
-    iRegI      cnt_in,       // int length (kill)
-    iRegINoSp  str1_hi,     // temp: str1 high 8B
-    iRegINoSp  str2_hi,     // temp: str2 high 8B (reused as shift amount in SMALL)
+    iRegP      str1,      // str1 (kill)
+    iRegP      str2,      // str2 (kill)
+    iRegI      cnt,       // int length (kill)
+    iRegINoSp  str1_hi,   // temp: str1 high 8B
+    iRegINoSp  str2_hi,   // temp: str2 high 8B (reused as shift amount in SMALL)
     iRegINoSp  result,    // boolean
     rFlagsReg  cr)
 %{
   predicate(UseSVE == 0 && ((StrEqualsNode*)n)->encoding() == StrIntrinsicNode::LL);
-  match(Set result (StrEquals (Binary str1_in str2_in) cnt_in));
-  effect(TEMP_DEF result, USE_KILL str1_in, USE_KILL str2_in, USE_KILL cnt_in, TEMP str1_hi, TEMP str2_hi, KILL cr);
+  match(Set result (StrEquals (Binary str1 str2) cnt));
+  effect(TEMP_DEF result, USE_KILL str1, USE_KILL str2, USE_KILL cnt, TEMP str1_hi, TEMP str2_hi, KILL cr);
 
-  format %{ "String Equals $str1_in,$str2_in,$cnt_in -> $result" %}
+  format %{ "String Equals $str1,$str2,$cnt -> $result" %}
   ins_encode %{
     // __ assert_different_registers($str1$$Register, $str2$$Register, $cnt$$Register,
     //                               $result$$Register, $str1_hi$$Register, $str2_hi$$Register);
     // Count is in 8-bit bytes; non-Compact chars are 16 bits.
-    // __ mov($str1$$Register, $str1_in$$Register);
-    // __ mov($str2$$Register, $str2_in$$Register);
-    // __ movw($cnt$$Register,  $cnt_in$$Register);
-    __ string_equals($str1_in$$Register, $str2_in$$Register,
-                     $result$$Register, $cnt_in$$Register,
+    __ string_equals($str1$$Register, $str2$$Register,
+                     $result$$Register, $cnt$$Register,
                      $str1_hi$$Register, $str2_hi$$Register);
   %}
   ins_pipe(pipe_class_memory);
@@ -16156,6 +16152,21 @@ instruct arrays_hashcode(iRegP_R1 ary, iRegI_R2 cnt, iRegI_R0 result, immI basic
     }
   %}
   ins_pipe(pipe_class_memory);
+%}
+
+instruct count_positives(iRegP_R1 ary1, iRegI_R2 len, iRegI_R0 result, rFlagsReg cr)
+%{
+  match(Set result (CountPositives ary1 len));
+  effect(USE_KILL ary1, USE_KILL len, KILL cr);
+  format %{ "count positives byte[] $ary1,$len -> $result" %}
+  ins_encode %{
+    address tpc = __ count_positives($ary1$$Register, $len$$Register, $result$$Register);
+    if (tpc == nullptr) {
+      ciEnv::current()->record_failure("CodeCache is full");
+      return;
+    }
+  %}
+  ins_pipe( pipe_slow );
 %}
 
 // fast char[] to byte[] compression
