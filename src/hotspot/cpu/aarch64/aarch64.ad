@@ -16068,8 +16068,8 @@ instruct string_equalsL(
 
   format %{ "String Equals $str1,$str2,$cnt -> $result" %}
   ins_encode %{
-    // __ assert_different_registers($str1$$Register, $str2$$Register, $cnt$$Register,
-    //                               $result$$Register, $str1_hi$$Register, $str2_hi$$Register);
+    assert_different_registers($str1$$Register, $str2$$Register, $cnt$$Register,
+                               $result$$Register, $str1_hi$$Register, $str2_hi$$Register);
     // Count is in 8-bit bytes; non-Compact chars are 16 bits.
     __ string_equals($str1$$Register, $str2$$Register,
                      $result$$Register, $cnt$$Register,
@@ -16170,9 +16170,11 @@ instruct count_positives(iRegP_R1 ary1, iRegI_R2 len, iRegI_R0 result, rFlagsReg
 %}
 
 // fast char[] to byte[] compression
+// NB: vtmp0...vtmp3 and vtmp4...vtmp5 are hard registers because
+// we're going to use them in blocks with ld1 and st1.
 instruct string_compress(iRegPNoSp src, iRegPNoSp dst, iRegINoSp len,
-                         vRegD vtmp0, vRegD vtmp1, vRegD vtmp2,
-                         vRegD vtmp3, vRegD vtmp4, vRegD vtmp5,
+                         vRegD_V0 vtmp0, vRegD_V1 vtmp1, vRegD_V2 vtmp2,
+                         vRegD_V3 vtmp3, vRegD_V4 vtmp4, vRegD_V5 vtmp5,
                          iRegINoSp result, rFlagsReg cr)
 %{
   match(Set result (StrCompressedCopy src (Binary dst len)));
