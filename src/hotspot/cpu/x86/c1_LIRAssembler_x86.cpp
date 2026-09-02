@@ -1336,6 +1336,9 @@ void LIR_Assembler::emit_alloc_array(LIR_OpAllocArray* op) {
   __ bind(*op->stub()->continuation());
 }
 
+void fubar() {
+  asm("nop");
+}
 
 static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Register temp) {
   auto as_C1_masm = C1_masm->as_C1_MacroAssembler();
@@ -1343,14 +1346,21 @@ static void increment_mdo(MacroAssembler *C1_masm, Address dst, int32_t src, Reg
   __ block_comment("increment_mdo {");
   int ratio_shift = exact_log2(ProfileCaptureRatio);
   Label nope;
+  __ addptr(dst, src);
   if (ProfileCaptureRatio > 1) {
     assert(!dst.uses(temp), "fix register allocation");
     auto threshold = (UCONST64(1) << 32) >> ratio_shift;
     __ cmpl(r_profile_rng, (uint32_t)threshold);
     __ jccb(Assembler::aboveEqual, nope);
-  }
-  __ addptr(dst, src << ratio_shift);
-  if (ProfileCaptureRatio > 1) {
+
+    __ lea(temp, ExternalAddress(address(fubar)));
+    __ call(temp);
+
+    __ lea(temp, ExternalAddress((address)0x100000000000ul));
+    __ subq(dst.base(), temp);
+    __ addptr(dst, src << ratio_shift);
+    __ addq(dst.base(), temp);
+
     __ bind(nope);
     __ step_random(r_profile_rng, temp);
   }
@@ -2974,6 +2984,9 @@ void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
   __ load_klass(result, obj, rscratch1);
 }
 
+extern MethodData *offsetted(MethodData *md);
+extern char *offsetted(char *md);
+
 void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
                                           LIR_Opr freq_opr,
                                           LIR_Opr md_reg, LIR_Opr md_opr, LIR_Opr md_offset_opr,
@@ -2995,19 +3008,25 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
   Register dest = as_reg(dest_opr);
 
   auto lambda = [counter_stub, overflow_stub, freq_opr, ratio_shift, step_opr,
-                 md_reg, md_opr, md_offset_opr, dest_opr, dest] (LIR_Assembler* ce, LIR_Op* op) {
+                 md_reg, md_opr, md_offset_opr, dest_opr, dest]
+      (LIR_Assembler* ce, LIR_Op* op, bool is_stub) {
     auto masm = [ce]() { return ce->masm(); };
 
-    if (counter_stub != nullptr)  __ bind(*counter_stub->entry());
+    if (is_stub)  __ bind(*counter_stub->entry());
 
     assert(md_opr->is_valid(), "must be");
 
+    Register md_addr_reg = as_reg(md_reg);
     if (md_opr->type() == T_METADATA) {
-      __ mov_metadata(md_reg->as_register(),
-                      md_opr->as_constant_ptr()->as_metadata());
+      auto addr = md_opr->as_constant_ptr()->as_metadata();
+      __ mov_metadata(md_addr_reg, addr);
     } else {
-      __ lea(md_reg->as_pointer_register(),
-             ExternalAddress(md_opr->as_constant_ptr()->as_pointer()));
+      auto addr = (address)md_opr->as_constant_ptr()->as_pointer();
+      __ lea(md_addr_reg, ExternalAddress(addr));
+    }
+    if (is_stub)  {
+      __ lea(dest, ExternalAddress((address)0x100000000000ul));
+      __ subq(md_addr_reg, dest);
     }
     RegisterOrConstant offset =
       md_offset_opr->is_constant()
@@ -3019,15 +3038,15 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
       Register inc = step_opr->as_register();
       __ movl(dest, counter_address);
       if (ProfileCaptureRatio > 1) {
-        __ shll(inc, ratio_shift);
+        __ shll(inc, (is_stub ? ratio_shift : 0));
       }
       __ lea(dest, Address(dest, inc, Address::times_1));
       __ movl(counter_address, dest);
       if (ProfileCaptureRatio > 1) {
-        __ shrl(inc, ratio_shift);
+        __ shrl(inc, (is_stub ? ratio_shift : 0));
       }
     } else {
-      jint inc = step_opr->as_constant_ptr()->as_jint_bits() * ProfileCaptureRatio;
+      jint inc = step_opr->as_constant_ptr()->as_jint_bits() << (is_stub ? ratio_shift : 0);
       switch (dest_opr->type()) {
         case T_LONG: {
           __ movq(dest, counter_address);
@@ -3056,38 +3075,43 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
           // If step_opr is 0, make sure the stub check below always fails
           __ cmpl(step_opr->as_register(), 0);
           __ movl(rscratch1,
-                  InvocationCounter::count_increment * ProfileCaptureRatio);
+                  InvocationCounter::count_increment << (is_stub ? ratio_shift : 0));
           __ cmovl(Assembler::equal, dest, rscratch1);
         }
 
         // If (dest & mask) < step, we just overflowed.
         __ andl(dest, freq_opr->as_jint());
-        switch (ProfileCaptureRatio) {
-          case 1:
+        // switch (ProfileCaptureRatio) {
+        //   case 1:
+        if (!is_stub) {
             __ jcc(Assembler::equal, *overflow_stub->entry());
-            break;
-          default:
+          //   break;
+          // default:
+        } else {
             if (step_opr->is_register()) {
               __ mov(rscratch1, step_opr->as_register());
-              __ shll(rscratch1, ratio_shift);
+              __ shll(rscratch1, (is_stub ? ratio_shift : 0));
               __ cmpl(dest, rscratch1);
             } else {
-              __ cmpl(dest, step_opr->as_constant_ptr()->as_jint_bits() << ratio_shift);
+              __ cmpl(dest, step_opr->as_constant_ptr()->as_jint_bits() << (is_stub ? ratio_shift : 0));
             }
-            __ jcc(Assembler::below, *overflow_stub->entry());
-            break;
+          // __ jcc(Assembler::below, *overflow_stub->entry());
+            // break;
         }
       }
 
-      __ bind(*overflow_stub->continuation());
+      if (! is_stub) {
+        __ bind(*overflow_stub->continuation());
+      }
     }
 
-    if (counter_stub != nullptr) {
+    if (is_stub) {
       __ jmp(*counter_stub->continuation());
     }
   };
 
-  if (counter_stub != nullptr) {
+  // if (counter_stub != nullptr) {
+  if (ProfileCaptureRatio > 1) {
     __ cmpl(r_profile_rng, checked_cast<uint32_t>(threshold));
     __ jcc(Assembler::below, *counter_stub->entry());
     __ bind(*counter_stub->continuation());
@@ -3096,9 +3120,10 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
     counter_stub->set_action(lambda, nullptr);
     counter_stub->set_name("IncrementProfileCtr");
     append_code_stub(counter_stub);
-  } else {
-    lambda(this, nullptr);
   }
+  // } else {
+    lambda(this, nullptr, /*is_stub*/false);
+  // }
 
 #ifndef PRODUCT
   if (CommentedAssembly) {

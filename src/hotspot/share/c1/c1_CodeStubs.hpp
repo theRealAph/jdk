@@ -140,7 +140,7 @@ struct LambdaWrapper : public AbstractLambdaWrapper {
 
   LambdaWrapper(T lambda, LIR_Op* op) : _lambda(lambda), _op(op) { }
   virtual void operator() (LIR_Assembler* ce) {
-    _lambda(ce, _op);
+    _lambda(ce, _op, /*is_stub*/true);
   }
 };
 

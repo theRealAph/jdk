@@ -107,7 +107,7 @@ MetaWord* ClassLoaderMetaspace::allocate(size_t word_size, Metaspace::MetadataTy
     assert(word_size >= (sizeof(Klass)/BytesPerWord), "weird size for klass: %zu", word_size);
     result = class_space_arena()->allocate(word_size, wastage);
   } else {
-    result = non_class_space_arena()->allocate(word_size, wastage);
+    result = non_class_space_arena()->allocate(MAX2((int)word_size, 7), wastage);
   }
   if (wastage.is_nonempty()) {
     non_class_space_arena()->deallocate(wastage);

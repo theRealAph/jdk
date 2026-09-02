@@ -800,7 +800,12 @@ nmethod* CompilationPolicy::event(const methodHandle& method, const methodHandle
     return nullptr;
   }
 
-  handle_counter_overflow(method);
+  if (comp_level == CompLevel_full_profile) {
+    asm("nop");
+    handle_counter_overflow(method);
+  } else {
+    handle_counter_overflow(method);
+  }
   if (method() != inlinee()) {
     handle_counter_overflow(inlinee);
   }

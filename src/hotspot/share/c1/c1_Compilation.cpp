@@ -43,6 +43,8 @@
 #include "memory/resourceArea.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/timerTrace.hpp"
+#include "oops/method.hpp"
+#include "oops/methodCounters.hpp"
 
 typedef enum {
   _t_compile,
@@ -410,11 +412,33 @@ int Compilation::compile_java_method() {
     return emit_code_body();
   }
 }
+extern MethodCounters *offsetted(MethodCounters *md);
+extern MethodData *offsetted(MethodData *md);
 
 void Compilation::install_code(int frame_size) {
   // frame_size is in 32-bit words so adjust it intptr_t words
   assert(frame_size == frame_map()->framesize(), "must match");
   assert(in_bytes(frame_map()->framesize_in_bytes()) % sizeof(intptr_t) == 0, "must be at least pointer aligned");
+  auto counters = method()->get_Method()->method_counters();
+  auto method_data = method()->get_Method()->method_data();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+    memcpy(offsetted(counters), counters, MethodCounters::method_counters_size() * wordSize);
+    if (method_data)
+      memcpy(offsetted(method_data), method_data, method_data->size_in_bytes());
+#pragma GCC diagnostic pop
+
+    if (WizardMode && method_data) {
+      ResourceMark rm;
+      stringStream strStream(1024);
+      char *name = method()->get_Method()->name_and_sig_as_C_string();
+      strStream.print_cr("method:%s ", name);
+      method_data->print_on(&strStream);
+      strStream.cr();
+      strStream.cr();
+      tty->print("%s", strStream.as_string(/*c_heap*/false));
+    }
   _env->register_method(
     method(),
     osr_bci(),

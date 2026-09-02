@@ -24,6 +24,7 @@
  *
  */
 
+# include <sys/mman.h>
 #include "cds/aotMetaspace.hpp"
 #include "cds/cdsConfig.hpp"
 #include "classfile/classLoaderData.hpp"
@@ -715,6 +716,8 @@ void Metaspace::ergo_initialize() {
 
 }
 
+char *universe_map;
+
 void Metaspace::global_initialize() {
   MetaspaceGC::initialize(); // <- since we do not prealloc init chunks anymore is this still needed?
 
@@ -840,6 +843,16 @@ void Metaspace::global_initialize() {
   const address end = (address)CompressedKlassPointers::max_klass_range_size();
   CompressedKlassPointers::initialize(start, end - start);
 #endif // INCLUDE_CLASS_SPACE
+
+  {
+    char *requested_addr = (char*)0x600000000000ul;
+    const int flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS |
+                      MAP_FIXED_NOREPLACE;
+    long bytes = 0x100000000000ul;
+    universe_map = (char*)::mmap(requested_addr, bytes, PROT_READ | PROT_WRITE,
+                                 flags, -1, 0);
+    guarantee(universe_map != MAP_FAILED, "must be");
+  }
 
   // Initialize non-class virtual space list, and its chunk manager:
   MetaspaceContext::initialize_nonclass_space_context();

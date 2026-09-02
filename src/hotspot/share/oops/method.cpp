@@ -675,6 +675,20 @@ bool Method::install_training_method_data(const methodHandle& method) {
   return false;
 }
 
+char *offsetted(char *p) {
+  return (p - 0x100000000000);
+}
+
+MethodCounters *offsetted(MethodCounters *md) {
+  auto p = (char*)md;
+  return (MethodCounters*)offsetted(p);
+}
+
+MethodData *offsetted(MethodData *md) {
+  auto p = (char*)md;
+  return (MethodData*)offsetted(p);
+}
+
 // Build a MethodData* object to hold profiling information collected on this
 // method when requested.
 void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
@@ -688,6 +702,7 @@ void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
     return;
   }
 
+ retry:
   ClassLoaderData* loader_data = method->method_holder()->class_loader_data();
   MethodData* method_data = MethodData::allocate(loader_data, method, THREAD);
   if (HAS_PENDING_EXCEPTION) {
@@ -702,11 +717,42 @@ void Method::build_profiling_method_data(const methodHandle& method, TRAPS) {
   }
 
   if (PrintMethodData && (Verbose || WizardMode)) {
-    ResourceMark rm(THREAD);
-    tty->print("build_profiling_method_data for ");
-    method->print_name(tty);
-    tty->cr();
+    ResourceMark rm;
+    // tty->print("build_profiling_method_data for ");
+    // method->print_name(tty);
+    stringStream strStream(1024);
+    strStream.print("build %p ", method_data);
+    method_data->print_on(&strStream);
+    strStream.cr();
+    tty->print("%s", strStream.as_string(/*c_heap*/false));
     // At the end of the run, the MDO, full of data, will be dumped.
+  }
+
+  int byte_size = MethodData::compute_allocation_size_in_bytes(method);
+  if ((uintptr_t)method_data > 0x700000000000ul && (uintptr_t)method_data < 0x800000000000) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+    memcpy(offsetted(method_data), method_data, byte_size);
+#pragma GCC diagnostic pop
+
+    auto limit = method_data->args_data_limit();
+
+    if (PrintMethodData && WizardMode) {
+      auto m_md = offsetted(method_data);
+      ResourceMark rm;
+      char *name = method->name_and_sig_as_C_string();
+      // tty->print("build_profiling_method_data for ");
+      // method->print_name(tty);
+      stringStream strStream(1024);
+      strStream.print("CLONE %p ", m_md);
+      m_md->print_on(&strStream);
+      strStream.cr();
+      tty->print("%s", strStream.as_string(/*c_heap*/false));
+    }
+  } else {
+    // tty->print_cr("OOOOOFF!! %p %d", method_data, byte_size);
+    method->_method_data = nullptr;
+    goto retry;
   }
 }
 
@@ -716,6 +762,7 @@ MethodCounters* Method::build_method_counters(Thread* current, Method* m) {
     return nullptr;
   }
 
+ retry:
   methodHandle mh(current, m);
   MethodCounters* counters;
   if (current->is_Java_thread()) {
@@ -738,11 +785,36 @@ MethodCounters* Method::build_method_counters(Thread* current, Method* m) {
     return nullptr;
   }
 
+  if ((uintptr_t)counters > 0x700000000000ul && (uintptr_t)counters < 0x800000000000) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+    memcpy(offsetted(counters), counters, MethodCounters::method_counters_size() * wordSize);
+#pragma GCC diagnostic pop
+
+    if (PrintMethodData && WizardMode) {
+      auto m_md = offsetted(counters);
+      ResourceMark rm;
+      char *name = m->name_and_sig_as_C_string();
+      // tty->print("build_profiling_counters for ");
+      // method->print_name(tty);
+      stringStream strStream(1024);
+      strStream.print("CLONE %p ", m_md);
+      m_md->print_on(&strStream);
+      strStream.cr();
+      tty->print("%s", strStream.as_string(/*c_heap*/false));
+    }
+  } else {
+    // tty->print_cr("OOOOOFF!! %p %d", counters,MethodCounters::method_counters_size());
+    m->_method_counters = nullptr;
+    goto retry;
+  }
+
   if (!mh->init_method_counters(counters)) {
     MetadataFactory::free_metadata(mh->method_holder()->class_loader_data(), counters);
   }
 
-  return mh->method_counters();
+  auto result = mh->method_counters();
+  return result;
 }
 
 bool Method::init_method_counters(MethodCounters* counters) {

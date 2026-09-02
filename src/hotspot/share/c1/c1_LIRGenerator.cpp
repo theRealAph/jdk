@@ -3914,6 +3914,7 @@ void LIRGenerator::increment_event_counter_impl(CodeEmitInfo* info,
     ciMethodData* md = method->method_data_or_null();
     assert(md != nullptr, "Sanity");
     counters_base = LIR_OprFact::metadataConst(md->constant_encoding());
+    asm("nop");
   } else {
     ShouldNotReachHere();
   }
