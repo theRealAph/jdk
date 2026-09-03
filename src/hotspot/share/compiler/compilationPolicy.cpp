@@ -503,10 +503,14 @@ void CompilationPolicy::print_event_on(outputStream *st, EventType type, Method*
 }
 
 void CompilationPolicy::print_event(EventType type, Method* m, Method* im, int bci, CompLevel level) {
+  if (level < 4) {
+    return;
+  }
   stringStream s;
   print_event_on(&s, type, m, im, bci, level);
   ResourceMark rm;
   tty->print("%s", s.as_string());
+  asm("nop");
 }
 
 void CompilationPolicy::initialize() {
@@ -809,6 +813,7 @@ nmethod* CompilationPolicy::event(const methodHandle& method, const methodHandle
   if (method() != inlinee()) {
     handle_counter_overflow(inlinee);
   }
+
 
   if (bci == InvocationEntryBci) {
     method_invocation_event(method, inlinee, comp_level, nm, THREAD);

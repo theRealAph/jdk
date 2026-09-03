@@ -5129,6 +5129,20 @@ void MacroAssembler::profile_receiver_type(Register recv, Register mdp, int mdp_
   xorptr(rax, rax);
   cmpxchgptr(shifted_recv, Address(shifted_mdp, offset, Address::times_ptr));
 
+  if (ProfileCaptureRatio > 1) {
+    Label nope;
+    jccb(Assembler::notEqual, nope);
+
+    push(rax);
+    movptr(rax, 0x100000000000ul);
+    subq(shifted_mdp, rax);
+    movptr(Address(shifted_mdp, offset, Address::times_ptr), shifted_recv);
+    addq(shifted_mdp, rax);
+    pop(rax);
+
+    bind(nope);
+  }
+
   // Unshift registers.
   if (recv == rax || mdp == rax) {
     movptr(rax, spare_reg);

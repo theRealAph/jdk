@@ -3122,6 +3122,7 @@ void LIR_Assembler::increment_profile_ctr(LIR_Opr step_opr, LIR_Opr dest_opr,
     append_code_stub(counter_stub);
   }
   // } else {
+    __ block_comment(" ### increment_profile_ctr ###");
     lambda(this, nullptr, /*is_stub*/false);
   // }
 
