@@ -30,6 +30,8 @@
 #include "memory/resourceArea.hpp"
 #include "metaprogramming/primitiveConversions.hpp"
 
+void klutz() { }
+
 #ifndef PRODUCT
 const uintptr_t Assembler::asm_bp = 0x0000ffffac221240;
 #endif

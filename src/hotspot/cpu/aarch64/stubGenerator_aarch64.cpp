@@ -433,6 +433,9 @@ class StubGenerator: public StubCodeGenerator {
     __ stpd(v13, v12,  d13_save);
     __ stpd(v15, v14,  d15_save);
 
+    Label blurgh;
+    __ ldrd(v0, blurgh);
+
     __ get_fpcr(rscratch1);
     __ str(rscratch1, fpcr_save);
     // Set FPCR to the state we need. We do want Round to Nearest. We
@@ -441,6 +444,7 @@ class StubGenerator: public StubCodeGenerator {
     __ bfi(rscratch1, zr, 8, 5);  // Clear exception-control bits (8-12)
     __ set_fpcr(rscratch1);
 
+    __ bind(blurgh);
     // install Java thread in global register now we have saved
     // whatever value it held
     __ mov(rthread, c_rarg7);

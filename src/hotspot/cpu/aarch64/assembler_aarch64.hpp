@@ -47,6 +47,7 @@
 
 #endif
 
+extern void klutz();
 
 // definitions of various symbolic names for machine registers
 
@@ -786,7 +787,18 @@ public:
   void wrap_label(Label &L, uncond_branch_insn insn);
   void wrap_label(Register r, Label &L, compare_and_branch_insn insn);
   void wrap_label(Register r, int bitpos, Label &L, test_and_branch_insn insn);
+
   void wrap_label(Label &L, prfop, prefetch_insn insn);
+
+  template<typename pcrel_insn, typename reg>
+  void wrap_label(reg r, Label &L, pcrel_insn insn) {
+    if (L.is_bound()) {
+      (this->*insn)(r, target(L));
+    } else {
+      L.add_patch_at(code(), locator());
+      (this->*insn)(r, pc());
+    }
+  }
 
   // PC-rel. addressing
 
@@ -1438,10 +1450,15 @@ public:
 #define INSN(NAME, opc, V)                                              \
   void NAME(FloatRegister Rt, address dest) {                           \
     int64_t offset = (dest - pc()) >> 2;                                \
+    klutz();                                                            \
     starti;                                                             \
     f(opc, 31, 30), f(0b011, 29, 27), f(V, 26), f(0b00, 25, 24),        \
       sf(offset, 23, 5);                                                \
     rf(as_Register(Rt), 0);                                             \
+  }                                                                     \
+  void NAME(FloatRegister Rt, Label &L) {                               \
+    wrap_label(Rt, L,                                                   \
+      (void (Assembler::*)(FloatRegister, address))&Assembler::NAME);   \
   }
 
   INSN(ldrs, 0b00, 1);
