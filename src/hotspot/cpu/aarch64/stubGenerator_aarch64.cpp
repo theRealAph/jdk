@@ -57,6 +57,7 @@
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/intpow.hpp"
+#include "utilities/pmove.hpp"
 #include "utilities/powerOfTwo.hpp"
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
@@ -433,6 +434,9 @@ class StubGenerator: public StubCodeGenerator {
     __ stpd(v13, v12,  d13_save);
     __ stpd(v15, v14,  d15_save);
 
+    parallel_move({r9, r10}, {r10, r9},
+                  [=](Register) { return rscratch1; },
+                  [=](Register dst, Register src) { __ mov(dst, src); });
     __ get_fpcr(rscratch1);
     __ str(rscratch1, fpcr_save);
     // Set FPCR to the state we need. We do want Round to Nearest. We
