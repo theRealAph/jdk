@@ -6,15 +6,15 @@
 
 template <typename Reg, typename TempFn, typename MoveFn>
 class ParallelMover {
-  GrowableArray<Reg> * _src;
-  GrowableArray<Reg> * _dst;
+  GrowableArrayView<Reg> * _src;
+  GrowableArrayView<Reg> * _dst;
   TempFn _tmp;
   MoveFn _move;
 
 public:
 
-  ParallelMover(GrowableArray<Reg> *src,
-                GrowableArray<Reg> *dst,
+  ParallelMover(GrowableArrayView<Reg> *src,
+                GrowableArrayView<Reg> *dst,
                 TempFn tmp,
                 MoveFn move)
     : _src(src), _dst(dst), _tmp(tmp), _move(move),
@@ -71,8 +71,8 @@ public:
 };
 
 template<typename Reg, typename TempFn, typename MoveFn>
-void parallel_move(GrowableArray<Reg> *src,
-                   GrowableArray<Reg> *dst,
+void parallel_move(GrowableArrayView<Reg> *src,
+                   GrowableArrayView<Reg> *dst,
                    const TempFn tmp,
                    const MoveFn move) {
   ParallelMover(src, dst, tmp, move).doIt();
@@ -83,14 +83,11 @@ void parallel_move(const Reg (&src)[N],
                    const Reg (&dst)[N],
                    const TempFn tmp,
                    const MoveFn move) {
-  GrowableArray<Reg> src_array(N, N, noreg);
-  for (int i = 0; i < (int)N; i++) {
-    src_array.at_put(i, src[i]);
-  }
-  GrowableArray<Reg> dst_array(N, N, noreg);
-  for (int i = 0; i < (int)N; i++) {
-    dst_array.at_put(i, dst[i]);
-  }
+  Reg src_copy[N], dst_copy[N];
+  memcpy(src_copy, const_cast<Reg*>(src), sizeof src);
+  memcpy(dst_copy, const_cast<Reg*>(dst), sizeof dst);
+  GrowableArrayFromArray src_array(src_copy, N);
+  GrowableArrayFromArray<Reg> dst_array(dst_copy, N);
   parallel_move(&src_array, &dst_array, tmp, move);
 }
 
