@@ -437,6 +437,17 @@ class StubGenerator: public StubCodeGenerator {
     parallel_move({r9, r10}, {r10, r9},
                   [=](Register) { return rscratch1; },
                   [=](Register dst, Register src) { __ mov(dst, src); });
+
+    parallel_move({r0, r1, r2, r3, r4, r5, r6, r7},
+                  {r1, r2, r3, r4, r5, r6, r7, r0},
+                  [=](Register) { return rscratch1; },
+                  [=](Register dst, Register src) { __ mov(dst, src); });
+
+    parallel_move({r1, r2, r3, r4, r5, r6, r7, r0},
+                  {r0, r1, r2, r3, r4, r5, r6, r7},
+                  [=](Register) { return rscratch1; },
+                  [=](Register dst, Register src) { __ mov(dst, src); });
+
     __ get_fpcr(rscratch1);
     __ str(rscratch1, fpcr_save);
     // Set FPCR to the state we need. We do want Round to Nearest. We

@@ -26,7 +26,7 @@ public:
   enum Status { ToMove, BeingMoved, Moved };
 
   const int _n;
-  GrowableArray<Status> _status = new GrowableArray<Status>(_n, _n, ToMove);
+  GrowableArray<Status> *_status = new GrowableArray<Status>(_n, _n, ToMove);
 
   // Recursive, like the original: emitting `dst->at(i) = _src->at(i)`
   // first requires clearing every j that still needs to read the
