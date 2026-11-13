@@ -47,6 +47,7 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/threadIdentifier.hpp"
+#include "utilities/pmove.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "vmreg_aarch64.inline.hpp"
 
@@ -1502,11 +1503,34 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
         }
         __ br(Assembler::EQ, *success_target);
 
-        __ stp(klass_RInfo, k_RInfo, Address(__ pre(sp, -2 * wordSize)));
-        __ far_call(RuntimeAddress(Runtime1::entry_for(StubId::c1_slow_subtype_check_id)));
-        __ ldr(klass_RInfo, Address(__ post(sp, 2 * wordSize)));
-        // result is a boolean
-        __ cbzw(klass_RInfo, *failure_target);
+        if (k->is_klass()) {
+          __ block_comment("Ploopy");
+          int slot = ((Klass*)(k->as_klass()->constant_encoding()))->hash_slot();
+          RegSet temps = RegSet::of(k_RInfo, klass_RInfo, Rtmp1);
+          RegSet toPush = RegSet::range(r0, r5) - temps;
+          __ push(toPush, sp);
+          __ push_fp(v0, sp);
+          parallel_move({k_RInfo, klass_RInfo}, {r0, r4},
+                        [=](Register) { return rscratch1; },
+                        [=](Register dst, Register src) { __ mov(dst, src); });
+          __ lookup_secondary_supers_table_const(/*r_sub_klass*/r4,
+                                                 /*r_super_klass*/r0,
+                                                 /*temp1*/r1,
+                                                 /*temp2*/r2,
+                                                 /*temp3*/r3,
+                                                 /*vtemp*/v0,
+                                                 /*result*/r5, slot);
+          __ cmpw(r5, 0);
+          __ pop_fp(v0, sp);
+          __ pop(toPush, sp);
+          __ br(Assembler::NE, *failure_target);
+        } else {
+          __ stp(klass_RInfo, k_RInfo, Address(__ pre(sp, -2 * wordSize)));
+          __ far_call(RuntimeAddress(Runtime1::entry_for(StubId::c1_slow_subtype_check_id)));
+          __ ldr(klass_RInfo, Address(__ post(sp, 2 * wordSize)));
+          // result is a boolean
+          __ cbzw(klass_RInfo, *failure_target);
+        }
         // successful cast, fall through to profile or jump
       }
     } else {
