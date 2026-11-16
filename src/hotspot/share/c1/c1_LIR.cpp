@@ -287,7 +287,7 @@ void LIR_OpBranch::negate_cond() {
 LIR_OpTypeCheck::LIR_OpTypeCheck(LIR_Code code, LIR_Opr result, LIR_Opr object, ciKlass* klass,
                                  LIR_Opr tmp1, LIR_Opr tmp2, LIR_Opr tmp3,
                                  bool fast_check, CodeEmitInfo* info_for_exception, CodeEmitInfo* info_for_patch,
-                                 CodeStub* stub, bool need_null_check)
+                                 CodeStub* stub, bool need_null_check, LIR_Opr tmp4)
 
   : LIR_Op(code, result, nullptr)
   , _object(object)
@@ -296,6 +296,7 @@ LIR_OpTypeCheck::LIR_OpTypeCheck(LIR_Code code, LIR_Opr result, LIR_Opr object, 
   , _tmp1(tmp1)
   , _tmp2(tmp2)
   , _tmp3(tmp3)
+  , _tmp4(tmp4)
   , _info_for_patch(info_for_patch)
   , _info_for_exception(info_for_exception)
   , _stub(stub)
@@ -324,6 +325,7 @@ LIR_OpTypeCheck::LIR_OpTypeCheck(LIR_Code code, LIR_Opr object, LIR_Opr array, L
   , _tmp1(tmp1)
   , _tmp2(tmp2)
   , _tmp3(tmp3)
+  , _tmp4(LIR_OprFact::illegalOpr)
   , _info_for_patch(nullptr)
   , _info_for_exception(info_for_exception)
   , _stub(nullptr)
@@ -848,6 +850,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       if (opTypeCheck->_tmp1->is_valid())         do_temp(opTypeCheck->_tmp1);
       if (opTypeCheck->_tmp2->is_valid())         do_temp(opTypeCheck->_tmp2);
       if (opTypeCheck->_tmp3->is_valid())         do_temp(opTypeCheck->_tmp3);
+      if (opTypeCheck->_tmp4->is_valid())         do_temp(opTypeCheck->_tmp4);
       if (opTypeCheck->_result->is_valid())       do_output(opTypeCheck->_result);
       if (opTypeCheck->_stub != nullptr)          do_stub(opTypeCheck->_stub);
       break;
@@ -1575,13 +1578,14 @@ void check_LIR() {
 void LIR_List::checkcast (LIR_Opr result, LIR_Opr object, ciKlass* klass,
                           LIR_Opr tmp1, LIR_Opr tmp2, LIR_Opr tmp3, bool fast_check,
                           CodeEmitInfo* info_for_exception, CodeEmitInfo* info_for_patch, CodeStub* stub,
-                          ciMethod* profiled_method, int profiled_bci, bool is_null_free) {
+                          ciMethod* profiled_method, int profiled_bci, bool is_null_free,
+                          LIR_Opr tmp4) {
   // If klass is non-nullable,  LIRGenerator::do_CheckCast has already performed null-check
   // on the object.
   bool need_null_check = !is_null_free;
   LIR_OpTypeCheck* c = new LIR_OpTypeCheck(lir_checkcast, result, object, klass,
                                            tmp1, tmp2, tmp3, fast_check, info_for_exception, info_for_patch, stub,
-                                           need_null_check);
+                                           need_null_check, tmp4);
   if (profiled_method != nullptr && TypeProfileCasts) {
     c->set_profiled_method(profiled_method);
     c->set_profiled_bci(profiled_bci);
@@ -2159,6 +2163,7 @@ void LIR_OpTypeCheck::print_instr(outputStream* out) const {
   tmp1()->print(out);                    out->print(" ");
   tmp2()->print(out);                    out->print(" ");
   tmp3()->print(out);                    out->print(" ");
+  tmp4()->print(out);                    out->print(" ");
   result_opr()->print(out);              out->print(" ");
   if (info_for_exception() != nullptr) out->print(" [bci:%d]", info_for_exception()->stack()->bci());
 }

@@ -1396,6 +1396,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
   Register dst = op->result_opr()->as_register();
   ciKlass* k = op->klass();
   Register Rtmp1 = noreg;
+  auto vtemp = op->tmp4();
 
   // check if it needs to be profiled
   ciMethodData* md;
@@ -1509,7 +1510,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
           RegSet temps = RegSet::of(k_RInfo, klass_RInfo, Rtmp1);
           RegSet toPush = RegSet::range(r0, r5) - temps;
           __ push(toPush, sp);
-          __ push_fp(v0, sp);
+          if (vtemp != FrameMap::fpu0_double_opr)  __ push_fp(v0, sp);
           parallel_move({k_RInfo, klass_RInfo}, {r0, r4},
                         [=](Register) { return rscratch1; },
                         [=](Register dst, Register src) { __ mov(dst, src); });
@@ -1521,7 +1522,7 @@ void LIR_Assembler::emit_typecheck_helper(LIR_OpTypeCheck *op, Label* success, L
                                                  /*vtemp*/v0,
                                                  /*result*/r5, slot);
           __ cmpw(r5, 0);
-          __ pop_fp(v0, sp);
+          if (vtemp != FrameMap::fpu0_double_opr)  __ pop_fp(v0, sp);
           __ pop(toPush, sp);
           __ br(Assembler::NE, *failure_target);
         } else {

@@ -1532,6 +1532,7 @@ class LIR_OpTypeCheck: public LIR_Op {
   LIR_Opr       _tmp1;
   LIR_Opr       _tmp2;
   LIR_Opr       _tmp3;
+  LIR_Opr       _tmp4;
   CodeEmitInfo* _info_for_patch;
   CodeEmitInfo* _info_for_exception;
   CodeStub*     _stub;
@@ -1544,7 +1545,7 @@ class LIR_OpTypeCheck: public LIR_Op {
 public:
   LIR_OpTypeCheck(LIR_Code code, LIR_Opr result, LIR_Opr object, ciKlass* klass,
                   LIR_Opr tmp1, LIR_Opr tmp2, LIR_Opr tmp3, bool fast_check,
-                  CodeEmitInfo* info_for_exception, CodeEmitInfo* info_for_patch, CodeStub* stub, bool need_null_check = true);
+                  CodeEmitInfo* info_for_exception, CodeEmitInfo* info_for_patch, CodeStub* stub, bool need_null_check = true, LIR_Opr tmp4 = LIR_Opr::illegalOpr());
   LIR_OpTypeCheck(LIR_Code code, LIR_Opr object, LIR_Opr array,
                   LIR_Opr tmp1, LIR_Opr tmp2, LIR_Opr tmp3, CodeEmitInfo* info_for_exception);
 
@@ -1553,6 +1554,7 @@ public:
   LIR_Opr tmp1() const                           { return _tmp1;           }
   LIR_Opr tmp2() const                           { return _tmp2;           }
   LIR_Opr tmp3() const                           { return _tmp3;           }
+  LIR_Opr tmp4() const                           { return _tmp4;           }
   ciKlass* klass() const                         { assert(code() == lir_instanceof || code() == lir_checkcast, "not valid"); return _klass;          }
   bool fast_check() const                        { assert(code() == lir_instanceof || code() == lir_checkcast, "not valid"); return _fast_check;     }
   CodeEmitInfo* info_for_patch() const           { return _info_for_patch;  }
@@ -2444,7 +2446,8 @@ class LIR_List: public CompilationResourceObj {
   void checkcast (LIR_Opr result, LIR_Opr object, ciKlass* klass,
                   LIR_Opr tmp1, LIR_Opr tmp2, LIR_Opr tmp3, bool fast_check,
                   CodeEmitInfo* info_for_exception, CodeEmitInfo* info_for_patch, CodeStub* stub,
-                  ciMethod* profiled_method, int profiled_bci, bool is_null_free);
+                  ciMethod* profiled_method, int profiled_bci, bool is_null_free,
+                  LIR_Opr tmp4 = LIR_Opr::illegalOpr());
   // MethodData* profiling
   void profile_call(ciMethod* method, int bci, ciMethod* callee, LIR_Opr mdo, LIR_Opr recv, LIR_Opr t1, ciKlass* cha_klass) {
     append(new LIR_OpProfileCall(method, bci, callee, mdo, recv, t1, cha_klass));

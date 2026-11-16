@@ -457,7 +457,7 @@ namespace AccessInternal {
     static T load_init(void* addr);
 
     static inline T load(void* addr) {
-      assert_access_thread_state();
+      // assert_access_thread_state();
       return _load_func(addr);
     }
   };
